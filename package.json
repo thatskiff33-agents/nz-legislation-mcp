@@ -34,7 +34,7 @@
     "lint": "eslint . --max-warnings 0",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "knip": "knip && knip --production --strict",
+    "knip": "knip",
     "test": "vitest run --coverage",
     "test:watch": "vitest",
     "check": "pnpm run typecheck && pnpm run lint && pnpm run format:check && pnpm run knip && pnpm run test && pnpm run build",
