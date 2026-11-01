@@ -1,0 +1,472 @@
+{
+  "results": [
+    {
+      "administering_agencies": [
+        "Parliamentary Counsel Office"
+      ],
+      "instrument_classification": "principal",
+      "instrument_status": "in_force",
+      "instrument_type_group": "regulations",
+      "latest_matching_version": {
+        "formats": [
+          {
+            "type": "html",
+            "url": "https://www.legislation.govt.nz/secondary-legislation/pco-drafted/2021/246/en/latest/"
+          },
+          {
+            "type": "pdf",
+            "url": "https://www.legislation.govt.nz/secondary-legislation/pco-drafted/2021/246/en/latest.pdf"
+          },
+          {
+            "type": "xml",
+            "url": "https://www.legislation.govt.nz/secondary-legislation/pco-drafted/2021/246/en/latest.xml"
+          }
+        ],
+        "is_latest_version": true,
+        "title": "Legislation (Publication) Regulations 2021",
+        "version_id": "secondary-legislation_pco-drafted_2021_246_en_2026-11-02"
+      },
+      "legislation_status": "in_force",
+      "legislation_type": "secondary_legislation",
+      "publisher": "Parliamentary Counsel Office",
+      "work_id": "secondary-legislation_pco-drafted_2021_246"
+    },
+    {
+      "administering_agencies": [
+        "Oranga Tamariki—Ministry for Children"
+      ],
+      "instrument_classification": "principal",
+      "instrument_status": "in_force",
+      "instrument_type_group": "regulations",
+      "latest_matching_version": {
+        "formats": [
+          {
+            "type": "html",
+            "url": "https://www.legislation.govt.nz/secondary-legislation/pco-drafted/1989/296/en/latest/"
+          },
+          {
+            "type": "pdf",
+            "url": "https://www.legislation.govt.nz/secondary-legislation/pco-drafted/1989/296/en/latest.pdf"
+          },
+          {
+            "type": "xml",
+            "url": "https://www.legislation.govt.nz/secondary-legislation/pco-drafted/1989/296/en/latest.xml"
+          }
+        ],
+        "is_latest_version": true,
+        "title": "Oranga Tamariki (Forms) Regulations 1989",
+        "version_id": "secondary-legislation_pco-drafted_1989_296_en_2026-10-30"
+      },
+      "legislation_status": "in_force",
+      "legislation_type": "secondary_legislation",
+      "publisher": "Parliamentary Counsel Office",
+      "work_id": "secondary-legislation_pco-drafted_1989_296"
+    },
+    {
+      "administering_agencies": [
+        "Oranga Tamariki—Ministry for Children"
+      ],
+      "instrument_classification": "principal",
+      "instrument_status": "in_force",
+      "instrument_type_group": "regulations",
+      "latest_matching_version": {
+        "formats": [
+          {
+            "type": "html",
+            "url": "https://www.legislation.govt.nz/secondary-legislation/pco-drafted/2026/342/en/latest/"
+          },
+          {
+            "type": "pdf",
+            "url": "https://www.legislation.govt.nz/secondary-legislation/pco-drafted/2026/342/en/latest.pdf"
+          },
+          {
+            "type": "xml",
+            "url": "https://www.legislation.govt.nz/secondary-legislation/pco-drafted/2026/342/en/latest.xml"
+          }
+        ],
+        "is_latest_version": true,
+        "title": "Oranga Tamariki (Military-style Academy Programmes) Regulations 2026",
+        "version_id": "secondary-legislation_pco-drafted_2026_342_en_2026-10-27"
+      },
+      "legislation_status": "in_force",
+      "legislation_type": "secondary_legislation",
+      "publisher": "Parliamentary Counsel Office",
+      "work_id": "secondary-legislation_pco-drafted_2026_342"
+    },
+    {
+      "administering_agencies": [
+        "Ministry for Primary Industries"
+      ],
+      "instrument_classification": "principal",
+      "instrument_status": "not_yet_in_force",
+      "instrument_type_group": "regulations",
+      "latest_matching_version": {
+        "formats": [
+          {
+            "type": "html",
+            "url": "https://www.legislation.govt.nz/secondary-legislation/pco-drafted/2026/341/en/latest/"
+          },
+          {
+            "type": "pdf",
+            "url": "https://www.legislation.govt.nz/secondary-legislation/pco-drafted/2026/341/en/latest.pdf"
+          },
+          {
+            "type": "xml",
+            "url": "https://www.legislation.govt.nz/secondary-legislation/pco-drafted/2026/341/en/latest.xml"
+          }
+        ],
+        "is_latest_version": true,
+        "title": "Biosecurity (Avian Biosecurity Control Programme Standards—H5N1) Regulations 2026",
+        "version_id": "secondary-legislation_pco-drafted_2026_341_en_2026-10-27"
+      },
+      "legislation_status": "not_in_force",
+      "legislation_type": "secondary_legislation",
+      "publisher": "Parliamentary Counsel Office",
+      "work_id": "secondary-legislation_pco-drafted_2026_341"
+    },
+    {
+      "administering_agencies": [
+        "Ministry of Education"
+      ],
+      "instrument_classification": "amendment",
+      "instrument_status": "not_yet_in_force",
+      "instrument_type_group": "regulations",
+      "latest_matching_version": {
+        "formats": [
+          {
+            "type": "html",
+            "url": "https://www.legislation.govt.nz/secondary-legislation/pco-drafted/2026/336/en/latest/"
+          },
+          {
+            "type": "pdf",
+            "url": "https://www.legislation.govt.nz/secondary-legislation/pco-drafted/2026/336/en/latest.pdf"
+          },
+          {
+            "type": "xml",
+            "url": "https://www.legislation.govt.nz/secondary-legislation/pco-drafted/2026/336/en/latest.xml"
+          }
+        ],
+        "is_latest_version": true,
+        "title": "Education (School Boards) Amendment Regulations 2026",
+        "version_id": "secondary-legislation_pco-drafted_2026_336_en_2026-10-27"
+      },
+      "legislation_status": "not_in_force",
+      "legislation_type": "secondary_legislation",
+      "publisher": "Parliamentary Counsel Office",
+      "work_id": "secondary-legislation_pco-drafted_2026_336"
+    },
+    {
+      "administering_agencies": [
+        "Ministry of Business, Innovation, and Employment"
+      ],
+      "instrument_classification": "amendment",
+      "instrument_status": "not_yet_in_force",
+      "instrument_type_group": "regulations",
+      "latest_matching_version": {
+        "formats": [
+          {
+            "type": "html",
+            "url": "https://www.legislation.govt.nz/secondary-legislation/pco-drafted/2026/339/en/latest/"
+          },
+          {
+            "type": "pdf",
+            "url": "https://www.legislation.govt.nz/secondary-legislation/pco-drafted/2026/339/en/latest.pdf"
+          },
+          {
+            "type": "xml",
+            "url": "https://www.legislation.govt.nz/secondary-legislation/pco-drafted/2026/339/en/latest.xml"
+          }
+        ],
+        "is_latest_version": true,
+        "title": "Crown Minerals (Royalties for Petroleum) Amendment Regulations 2026",
+        "version_id": "secondary-legislation_pco-drafted_2026_339_en_2026-10-27"
+      },
+      "legislation_status": "not_in_force",
+      "legislation_type": "secondary_legislation",
+      "publisher": "Parliamentary Counsel Office",
+      "work_id": "secondary-legislation_pco-drafted_2026_339"
+    },
+    {
+      "administering_agencies": [
+        "Inland Revenue Department"
+      ],
+      "instrument_classification": "amendment",
+      "instrument_status": "not_yet_in_force",
+      "instrument_type_group": "order",
+      "latest_matching_version": {
+        "formats": [
+          {
+            "type": "html",
+            "url": "https://www.legislation.govt.nz/secondary-legislation/pco-drafted/2026/340/en/latest/"
+          },
+          {
+            "type": "pdf",
+            "url": "https://www.legislation.govt.nz/secondary-legislation/pco-drafted/2026/340/en/latest.pdf"
+          },
+          {
+            "type": "xml",
+            "url": "https://www.legislation.govt.nz/secondary-legislation/pco-drafted/2026/340/en/latest.xml"
+          }
+        ],
+        "is_latest_version": true,
+        "title": "Income Tax (Minimum Family Tax Credit) Order 2026",
+        "version_id": "secondary-legislation_pco-drafted_2026_340_en_2026-10-27"
+      },
+      "legislation_status": "not_in_force",
+      "legislation_type": "secondary_legislation",
+      "publisher": "Parliamentary Counsel Office",
+      "work_id": "secondary-legislation_pco-drafted_2026_340"
+    },
+    {
+      "administering_agencies": [
+        "Oranga Tamariki—Ministry for Children"
+      ],
+      "instrument_classification": "amendment",
+      "instrument_status": "in_force",
+      "instrument_type_group": "regulations",
+      "latest_matching_version": {
+        "formats": [
+          {
+            "type": "html",
+            "url": "https://www.legislation.govt.nz/secondary-legislation/pco-drafted/2026/344/en/latest/"
+          },
+          {
+            "type": "pdf",
+            "url": "https://www.legislation.govt.nz/secondary-legislation/pco-drafted/2026/344/en/latest.pdf"
+          },
+          {
+            "type": "xml",
+            "url": "https://www.legislation.govt.nz/secondary-legislation/pco-drafted/2026/344/en/latest.xml"
+          }
+        ],
+        "is_latest_version": true,
+        "title": "Oranga Tamariki (Forms) Amendment Regulations 2026",
+        "version_id": "secondary-legislation_pco-drafted_2026_344_en_2026-10-27"
+      },
+      "legislation_status": "in_force",
+      "legislation_type": "secondary_legislation",
+      "publisher": "Parliamentary Counsel Office",
+      "work_id": "secondary-legislation_pco-drafted_2026_344"
+    },
+    {
+      "administering_agencies": [
+        "Ministry for Primary Industries"
+      ],
+      "instrument_classification": "amendment",
+      "instrument_status": "not_yet_in_force",
+      "instrument_type_group": "regulations",
+      "latest_matching_version": {
+        "formats": [
+          {
+            "type": "html",
+            "url": "https://www.legislation.govt.nz/secondary-legislation/pco-drafted/2026/338/en/latest/"
+          },
+          {
+            "type": "pdf",
+            "url": "https://www.legislation.govt.nz/secondary-legislation/pco-drafted/2026/338/en/latest.pdf"
+          },
+          {
+            "type": "xml",
+            "url": "https://www.legislation.govt.nz/secondary-legislation/pco-drafted/2026/338/en/latest.xml"
+          }
+        ],
+        "is_latest_version": true,
+        "title": "Fisheries (Amateur Fishing) Amendment Regulations 2026",
+        "version_id": "secondary-legislation_pco-drafted_2026_338_en_2026-10-27"
+      },
+      "legislation_status": "not_in_force",
+      "legislation_type": "secondary_legislation",
+      "publisher": "Parliamentary Counsel Office",
+      "work_id": "secondary-legislation_pco-drafted_2026_338"
+    },
+    {
+      "administering_agencies": [
+        "Ministry of Business, Innovation, and Employment"
+      ],
+      "instrument_classification": "amendment",
+      "instrument_status": "not_yet_in_force",
+      "instrument_type_group": "order",
+      "latest_matching_version": {
+        "formats": [
+          {
+            "type": "html",
+            "url": "https://www.legislation.govt.nz/secondary-legislation/pco-drafted/2026/335/en/latest/"
+          },
+          {
+            "type": "pdf",
+            "url": "https://www.legislation.govt.nz/secondary-legislation/pco-drafted/2026/335/en/latest.pdf"
+          },
+          {
+            "type": "xml",
+            "url": "https://www.legislation.govt.nz/secondary-legislation/pco-drafted/2026/335/en/latest.xml"
+          }
+        ],
+        "is_latest_version": true,
+        "title": "Fast-track Approvals (Waikokowai Wind Farm) Order 2026",
+        "version_id": "secondary-legislation_pco-drafted_2026_335_en_2026-10-27"
+      },
+      "legislation_status": "not_in_force",
+      "legislation_type": "secondary_legislation",
+      "publisher": "Parliamentary Counsel Office",
+      "work_id": "secondary-legislation_pco-drafted_2026_335"
+    },
+    {
+      "administering_agencies": [
+        "Ministry for Cities, Environment, Regions, and Transport"
+      ],
+      "instrument_classification": "amendment",
+      "instrument_status": "not_yet_in_force",
+      "instrument_type_group": "regulations",
+      "latest_matching_version": {
+        "formats": [
+          {
+            "type": "html",
+            "url": "https://www.legislation.govt.nz/secondary-legislation/pco-drafted/2026/334/en/latest/"
+          },
+          {
+            "type": "pdf",
+            "url": "https://www.legislation.govt.nz/secondary-legislation/pco-drafted/2026/334/en/latest.pdf"
+          },
+          {
+            "type": "xml",
+            "url": "https://www.legislation.govt.nz/secondary-legislation/pco-drafted/2026/334/en/latest.xml"
+          }
+        ],
+        "is_latest_version": true,
+        "title": "Resource Management (Wellington District Plan Modification) Regulations 2026",
+        "version_id": "secondary-legislation_pco-drafted_2026_334_en_2026-10-27"
+      },
+      "legislation_status": "not_in_force",
+      "legislation_type": "secondary_legislation",
+      "publisher": "Parliamentary Counsel Office",
+      "work_id": "secondary-legislation_pco-drafted_2026_334"
+    },
+    {
+      "administering_agencies": [
+        "Ministry of Justice"
+      ],
+      "instrument_classification": "amendment",
+      "instrument_status": "not_yet_in_force",
+      "instrument_type_group": "order",
+      "latest_matching_version": {
+        "formats": [
+          {
+            "type": "html",
+            "url": "https://www.legislation.govt.nz/secondary-legislation/pco-drafted/2026/337/en/latest/"
+          },
+          {
+            "type": "pdf",
+            "url": "https://www.legislation.govt.nz/secondary-legislation/pco-drafted/2026/337/en/latest.pdf"
+          },
+          {
+            "type": "xml",
+            "url": "https://www.legislation.govt.nz/secondary-legislation/pco-drafted/2026/337/en/latest.xml"
+          }
+        ],
+        "is_latest_version": true,
+        "title": "Gangs (Identified Gangs) Order 2026",
+        "version_id": "secondary-legislation_pco-drafted_2026_337_en_2026-10-27"
+      },
+      "legislation_status": "not_in_force",
+      "legislation_type": "secondary_legislation",
+      "publisher": "Parliamentary Counsel Office",
+      "work_id": "secondary-legislation_pco-drafted_2026_337"
+    },
+    {
+      "administering_agencies": [
+        "Ministry for Cities, Environment, Regions, and Transport"
+      ],
+      "instrument_classification": "amendment",
+      "instrument_status": "not_yet_in_force",
+      "instrument_type_group": "regulations",
+      "latest_matching_version": {
+        "formats": [
+          {
+            "type": "html",
+            "url": "https://www.legislation.govt.nz/secondary-legislation/pco-drafted/2026/333/en/latest/"
+          },
+          {
+            "type": "pdf",
+            "url": "https://www.legislation.govt.nz/secondary-legislation/pco-drafted/2026/333/en/latest.pdf"
+          },
+          {
+            "type": "xml",
+            "url": "https://www.legislation.govt.nz/secondary-legislation/pco-drafted/2026/333/en/latest.xml"
+          }
+        ],
+        "is_latest_version": true,
+        "title": "Resource Management (New Plymouth District Plan Modification) Regulations 2026",
+        "version_id": "secondary-legislation_pco-drafted_2026_333_en_2026-10-27"
+      },
+      "legislation_status": "not_in_force",
+      "legislation_type": "secondary_legislation",
+      "publisher": "Parliamentary Counsel Office",
+      "work_id": "secondary-legislation_pco-drafted_2026_333"
+    },
+    {
+      "administering_agencies": [
+        "Oranga Tamariki—Ministry for Children"
+      ],
+      "instrument_classification": "amendment",
+      "instrument_status": "in_force",
+      "instrument_type_group": "regulations",
+      "latest_matching_version": {
+        "formats": [
+          {
+            "type": "html",
+            "url": "https://www.legislation.govt.nz/secondary-legislation/pco-drafted/2026/343/en/latest/"
+          },
+          {
+            "type": "pdf",
+            "url": "https://www.legislation.govt.nz/secondary-legislation/pco-drafted/2026/343/en/latest.pdf"
+          },
+          {
+            "type": "xml",
+            "url": "https://www.legislation.govt.nz/secondary-legislation/pco-drafted/2026/343/en/latest.xml"
+          }
+        ],
+        "is_latest_version": true,
+        "title": "Oranga Tamariki (Residential Care) Amendment Regulations (No 3) 2026",
+        "version_id": "secondary-legislation_pco-drafted_2026_343_en_2026-10-27"
+      },
+      "legislation_status": "in_force",
+      "legislation_type": "secondary_legislation",
+      "publisher": "Parliamentary Counsel Office",
+      "work_id": "secondary-legislation_pco-drafted_2026_343"
+    },
+    {
+      "administering_agencies": [
+        "Financial Markets Authority"
+      ],
+      "instrument_classification": "principal",
+      "instrument_status": "not_yet_in_force",
+      "instrument_type_group": "notice",
+      "latest_matching_version": {
+        "formats": [
+          {
+            "type": "html",
+            "url": "https://www.legislation.govt.nz/secondary-legislation/pco-drafted/2026/332/en/latest/"
+          },
+          {
+            "type": "pdf",
+            "url": "https://www.legislation.govt.nz/secondary-legislation/pco-drafted/2026/332/en/latest.pdf"
+          },
+          {
+            "type": "xml",
+            "url": "https://www.legislation.govt.nz/secondary-legislation/pco-drafted/2026/332/en/latest.xml"
+          }
+        ],
+        "is_latest_version": true,
+        "title": "Financial Markets Conduct (Overseas FMC Reporting Entities) Exemption Notice 2026",
+        "version_id": "secondary-legislation_pco-drafted_2026_332_en_2026-10-22B"
+      },
+      "legislation_status": "not_in_force",
+      "legislation_type": "secondary_legislation",
+      "publisher": "Parliamentary Counsel Office",
+      "work_id": "secondary-legislation_pco-drafted_2026_332"
+    }
+  ],
+  "page": 1,
+  "per_page": 15,
+  "total": 11430
+}
