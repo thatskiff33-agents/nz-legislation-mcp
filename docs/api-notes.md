@@ -32,13 +32,14 @@ Base `https://api.legislation.govt.nz`. Authentication is the `X-Api-Key` header
 | `GET /v0/works/{work_id}/versions/` | Version history. Paging works with `page` and `per_page=100` (undocumented). `sort=asc` and `sort=desc` both work. The Income Tax Act 2007 has 206 versions. |
 | `GET /v0/versions/{version_id}/` | One version's metadata and format links. |
 | `/api/rss/...` | Returned 404 with the main key. These are legacy "classic site" feeds, which PCO asks developers to migrate away from. Out of scope. |
-| OpenAPI spec | Not published at any obvious path, and the developer page links none. |
+| OpenAPI spec | OpenAPI 3.0.1, embedded in the docs page (the Download link is generated in the browser and has no fixed URL). Snapshot of 2 Nov 2026 in `spec/legislation-api-v0.openapi.json`. All enums match our vocabulary. |
 
 ## Behaviour that differs from, or is missing in, the docs
 
 * **Invalid filter values are silently ignored.** For example, `legislation_type=nonsense` returns `200` with `total: 0` instead of an error. We must validate every filter on our side, or the model will think no legislation exists.
-* **Undocumented `publisher` field** on search results. It is `null` for PCO-published works.
-* **The versions list returns fewer fields than documented.** For example, `act_classification`, `bill_*` and `instrument_*` are absent rather than null. Schemas must treat these fields as optional.
+* **`publisher` appears in search results** but not in the documented response (it is documented only as a filter). It was `null` for Acts and populated for secondary legislation.
+* **The versions list returns fewer fields than documented.** For an Act (`act_public_2007_97`), items omit `act_classification`, which the spec lists. Schemas must treat these fields as optional.
+* **`page` and `per_page` work on the versions endpoint** and appear in its response, but the spec lists only `sort` as a request parameter.
 * **Same-day version suffixes:** for example `act_public_2007_97_en_2025-05-29B`.
 * **The latest version's format links use the `/latest/` alias,** for example `.../2007/97/en/latest.xml`. Historical versions use dated links, for example `.../2010-04-01.xml`. To cite a fixed version, build the dated URL from the `version_id`.
 * `pdf_original_scan` links point to `.../{date}/official_scan.pdf`.
