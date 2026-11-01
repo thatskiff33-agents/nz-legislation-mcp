@@ -234,6 +234,8 @@ const optionalText = z.string().nullish();
  * A usable format link: absolute https URL without embedded credentials. Any host is allowed
  * here because agency-published records link to agency websites; code that *fetches* a link
  * must separately allowlist the host and must never attach the API key.
+ *
+ * @internal Exported for tests.
  */
 export const FormatSchema = z
   .object({ type: z.string(), url: z.url({ protocol: /^https$/ }) })
@@ -304,10 +306,4 @@ export const SearchResponseSchema = z.object({
 export const VersionListResponseSchema = z.object({
   results: z.array(VersionRecordSchema),
   ...pageFields,
-});
-
-/** Error body shapes observed: `{"error":"API key is required"}` and `{"error":"404","message":"Not Found"}`. */
-export const ApiErrorBodySchema = z.object({
-  error: z.string().optional(),
-  message: z.string().optional(),
 });

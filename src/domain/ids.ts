@@ -15,7 +15,11 @@ import {
   type IdType,
 } from "./vocabulary.js";
 
-/** Upper bound on identifier length; real identifiers are well under 80 characters. */
+/**
+ * Upper bound on identifier length; real identifiers are well under 80 characters.
+ *
+ * @internal Exported for tests.
+ */
 export const MAX_ID_LENGTH = 120;
 
 const ID_TYPES = Object.values(ID_TYPE_BY_LEGISLATION_TYPE);
@@ -154,12 +158,20 @@ export function parseVersionId(input: string): ParseResult<VersionId> {
   return { ok: true, value: value as VersionId };
 }
 
-/** Formats a work identifier. Inverse of {@link parseWorkId}. */
+/**
+ * Formats a work identifier. Inverse of {@link parseWorkId}.
+ *
+ * @internal Exported for tests.
+ */
 export function formatWorkId(work: WorkId): string {
   return [work.type, work.subtype, work.year, work.number].join("_");
 }
 
-/** Formats a version identifier. Exact inverse of {@link parseVersionId}. */
+/**
+ * Formats a version identifier. Exact inverse of {@link parseVersionId}.
+ *
+ * @internal Exported for tests.
+ */
 export function formatVersionId(version: VersionId): string {
   const date = `${version.dateProvisional ? "~" : ""}${version.date}${version.suffix}`;
   return [formatWorkId(version.work), version.language, date].join("_");

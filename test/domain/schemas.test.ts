@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  ApiErrorBodySchema,
   FormatSchema,
   SearchParamsSchema,
   SearchResponseSchema,
@@ -158,10 +157,6 @@ describe("response schemas parse every recorded response", () => {
 
   it.each(["version-latest", "version-historical"])("version record %s", (name) => {
     expect(VersionRecordSchema.safeParse(fixture(name)).success).toBe(true);
-  });
-
-  it.each(["error-401", "error-404"])("error body %s", (name) => {
-    expect(ApiErrorBodySchema.safeParse(fixture(name)).success).toBe(true);
   });
 
   it("strips unknown fields and tolerates new enum values (tolerant reader)", () => {

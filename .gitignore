@@ -8,3 +8,4 @@ coverage/
 .DS_Store
 *.mcpb
 .cache/
+.e2e-dist/

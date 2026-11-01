@@ -1,17 +1,6 @@
 /**
- * Package entry point. The MCP server is wired up here in later issues (#6).
+ * Public package entry. Most users run the `nz-legislation-mcp` command (src/cli.ts); this
+ * module lets other programs embed the server.
  */
-
-/** Machine name of this server, used in MCP `serverInfo` and logs. */
-export const SERVER_NAME = "nz-legislation-mcp";
-
-/** Human-readable name shown by MCP clients. */
-export const SERVER_TITLE = "NZ Legislation";
-
-/**
- * Formats the identifying banner written to stderr at start-up.
- * Never include configuration values here: it must stay safe to log.
- */
-export function startupBanner(version: string): string {
-  return `${SERVER_TITLE} MCP server (${SERVER_NAME}) v${version}`;
-}
+export { createServer, SERVER_INSTRUCTIONS, TOOLS } from "./server.js";
+export { SERVER_NAME, SERVER_TITLE, VERSION } from "./version.js";

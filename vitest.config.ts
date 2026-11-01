@@ -10,6 +10,8 @@ export default defineConfig({
     coverage: {
       provider: "v8",
       include: ["src/**/*.ts"],
+      // Two-line process shim; exercised by the spawn test in test/e2e.
+      exclude: ["src/cli.ts"],
       reporter: ["text", "lcov"],
       thresholds: { lines: 100, branches: 100, functions: 100, statements: 100 },
     },
