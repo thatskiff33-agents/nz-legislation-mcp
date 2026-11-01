@@ -49,8 +49,9 @@ const PLACEHOLDER_KEYS = new Set([
   "changeme",
   "xxx",
 ]);
-/** Unexpanded variables (`${VAR}`, `$VAR`) and template markers (`<your key>`). */
-const PLACEHOLDER_PATTERN = /^\$\{.*\}$|^\$[A-Z_][A-Z0-9_]*$|^<.*>$/;
+/** Unexpanded variables (`${VAR}`, `$VAR`, `%VAR%`) and template markers (`<your key>`). */
+const PLACEHOLDER_PATTERN =
+  /^\$\{.*\}$|^\$[A-Za-z_][A-Za-z0-9_]*$|^%[A-Za-z_][A-Za-z0-9_]*%$|^<.*>$/;
 
 /** Upper bound for a key file; anything larger is not a key. */
 const MAX_KEY_FILE_BYTES = 4096;

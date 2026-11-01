@@ -92,6 +92,8 @@ describe("loadConfig", () => {
     [{ [ENV.apiKey]: "${LEGISLATION_NZ_API_KEY}" }, "unexpanded variable"],
     [{ [ENV.apiKey]: "$LEGISLATION_NZ_API_KEY" }, "unexpanded variable"],
     [{ [ENV.apiKey]: "<your-api-key>" }, "placeholder"],
+    [{ [ENV.apiKey]: "$legislation_nz_api_key" }, "unexpanded variable"],
+    [{ [ENV.apiKey]: "%LEGISLATION_NZ_API_KEY%" }, "unexpanded variable"],
     [{ [ENV.apiKey]: "short" }, "8 to 512 characters"],
     [{ [ENV.apiKey]: "has space in key value" }, "spaces, quotes"],
     [{ [ENV.apiKey]: '"quotedkeyvalue"' }, "spaces, quotes"],

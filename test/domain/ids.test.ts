@@ -152,7 +152,7 @@ describe("property-based", () => {
         workArb,
         dateArb,
         fc.boolean(),
-        segment("[A-Z]{0,3}"),
+        segment("[A-Z]{0,8}"),
         (w, date, tilde, suffix) => {
           const id = `${w.type}_${w.subtype}_${w.year}_${w.number}_en_${tilde ? "~" : ""}${date}${suffix}`;
           expect(formatVersionId(mustParseVersion(id))).toBe(id);

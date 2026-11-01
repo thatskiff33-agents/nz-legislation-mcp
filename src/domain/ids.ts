@@ -97,7 +97,7 @@ function parseWorkSegments(segments: readonly string[], raw: string): ParseResul
     year,
     number,
     provisional: year.startsWith("~") || number.startsWith("~"),
-  };
+  } satisfies Omit<WorkId, typeof parsed>;
   return { ok: true, value: value as WorkId };
 }
 
@@ -135,7 +135,7 @@ export function parseVersionId(input: string): ParseResult<VersionId> {
       `Invalid version date ${JSON.stringify(dateSegment)}. Expected YYYY-MM-DD, e.g. 2025-05-29.`,
     );
   }
-  // Grammar is validated above: optional "~", ten-character date, then 0-3 suffix letters.
+  // Grammar is validated above: optional "~", ten-character date, then 0-8 suffix letters.
   const tilde = dateSegment.startsWith("~");
   const body = tilde ? dateSegment.slice(1) : dateSegment;
   const date = body.slice(0, 10);
@@ -150,7 +150,7 @@ export function parseVersionId(input: string): ParseResult<VersionId> {
     suffix,
     dateProvisional: tilde,
     provisional: work.value.provisional || tilde,
-  };
+  } satisfies Omit<VersionId, typeof parsed>;
   return { ok: true, value: value as VersionId };
 }
 
