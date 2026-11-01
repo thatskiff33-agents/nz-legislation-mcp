@@ -1,0 +1,8 @@
+# Supply-chain hardening (pnpm settings).
+# Refuse any package version published less than 14 days ago (value in minutes).
+minimumReleaseAge: 20160
+# Never run dependency lifecycle scripts (postinstall etc.) unless explicitly listed.
+onlyBuiltDependencies: []
+strictDepBuilds: true
+# Fail if the lockfile and package.json disagree.
+preferFrozenLockfile: true
