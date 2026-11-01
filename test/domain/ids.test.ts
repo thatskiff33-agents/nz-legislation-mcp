@@ -202,7 +202,7 @@ describe("property-based", () => {
         }
       }),
       // Always-run example: appending a suffix letter keeps the ID valid, so the accept path runs.
-      { numRuns: 500, examples: [["act_public_2007_97_en_2025-05-29", 31, "A"]] },
+      { numRuns: 500, examples: [["act_public_2007_97_en_2025-05-29", 32, "A"]] },
     );
     expect(accepted).toBeGreaterThan(0);
   });
