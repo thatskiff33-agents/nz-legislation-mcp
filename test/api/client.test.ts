@@ -1,3 +1,4 @@
+import { DUMMY_KEY } from "../dummy-key.js";
 import { describe, expect, it, vi } from "vitest";
 import { MemoryCache } from "../../src/api/cache.js";
 import {
@@ -14,7 +15,7 @@ import { USER_AGENT } from "../../src/version.js";
 import { fixture } from "../fixtures.js";
 import { fakeFetch, json, RATE_HEADERS, status, type Step } from "./fake-fetch.js";
 
-const KEY = "test-key-0123456789abcdef";
+const KEY = DUMMY_KEY;
 const VERSION_ID = "act_public_2007_97_en_2026-09-04";
 
 function client(steps: Step[], overrides: Partial<ClientOptions> = {}) {

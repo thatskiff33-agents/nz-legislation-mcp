@@ -1,5 +1,6 @@
 // Transport behaviour against a real local HTTP server through real fetch (undici):
 // body-phase timeouts, decompression bombs and redirects.
+import { DUMMY_KEY } from "../dummy-key.js";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { gzipSync } from "node:zlib";
@@ -8,16 +9,16 @@ import { LegislationClient } from "../../src/api/client.js";
 import { ApiError } from "../../src/api/errors.js";
 import { Secret } from "../../src/secret.js";
 
-const KEY = "local-test-key-0123456789";
+const KEY = DUMMY_KEY;
 const VERSION_ID = "act_public_2007_97_en_2026-09-04";
 let server: Server;
 let base = "";
-const hits: Record<string, number> = {};
+const hits = new Map<string, number>();
 
 beforeAll(async () => {
   server = createServer((req, res) => {
     const path = req.url ?? "";
-    hits[path] = (hits[path] ?? 0) + 1;
+    hits.set(path, (hits.get(path) ?? 0) + 1);
     if (path.includes("stall")) {
       // Send headers and part of the body, then stall.
       res.writeHead(200, { "content-type": "application/json" });
@@ -80,7 +81,7 @@ describe("real transport", () => {
   it("classifies a body that stalls mid-download as a timeout and does not retry", async () => {
     const c = clientFor("stall");
     expect(await kindOf(c.getVersion(VERSION_ID))).toBe("timeout");
-    expect(hits[`/stall/v0/versions/${VERSION_ID}/`]).toBe(1);
+    expect(hits.get(`/stall/v0/versions/${VERSION_ID}/`)).toBe(1);
   });
 
   it("stops a gzip decompression bomb at the byte cap", async () => {
@@ -91,6 +92,6 @@ describe("real transport", () => {
   it("does not follow redirects", async () => {
     const c = clientFor("redirect");
     expect(await kindOf(c.getVersion(VERSION_ID))).toBe("unexpected_redirect");
-    expect(hits["/target"]).toBeUndefined();
+    expect(hits.get("/target")).toBeUndefined();
   });
 });

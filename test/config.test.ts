@@ -1,3 +1,4 @@
+import { DUMMY_KEY } from "./dummy-key.js";
 import { execFileSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -6,7 +7,7 @@ import { inspect } from "node:util";
 import { describe, expect, it } from "vitest";
 import { ConfigError, ENV, loadConfig } from "../src/config.js";
 
-const KEY = "abcDEF0123456789xyzKEYvalue";
+const KEY = DUMMY_KEY;
 const noFile = (): string => {
   throw new Error("no file");
 };
