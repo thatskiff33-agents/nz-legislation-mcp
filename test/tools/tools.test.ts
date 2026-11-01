@@ -157,6 +157,41 @@ describe("get_legislation", () => {
     }
   });
 
+  it("judges 'latest' by the same last-of-the-day rule, whatever the API order", async () => {
+    const { deps: d } = deps([
+      json(versionsPage(WORK, ["2026-09-04", "2026-09-04B", "2026-07-10"])),
+    ]);
+    const out = await getLegislation.run({ work_id: WORK, as_at: "2026-10-01" }, d, signal);
+    expect(out).toMatchObject({
+      version_id: `${WORK}_en_2026-09-04B`,
+      is_latest_version: true,
+      newer_versions_exist: false,
+    });
+    expect(out.notes.join(" ")).not.toContain("Newer versions exist");
+  });
+
+  it("ignores an unparseable newest entry when judging 'latest'", async () => {
+    const { deps: d } = deps([json(versionsPage(WORK, ["2026-02-30", "2026-09-04"]))]);
+    const out = await getLegislation.run({ work_id: WORK, as_at: "2026-10-01" }, d, signal);
+    expect(out).toMatchObject({ version_id: `${WORK}_en_2026-09-04`, is_latest_version: true });
+  });
+
+  it("warns when the scan cap may have cut off a same-day group", async () => {
+    const pages = Array.from({ length: 20 }, (_, i) =>
+      json(
+        versionsPage(
+          WORK,
+          Array.from({ length: 100 }, () => (i === 0 ? "2030-01-01" : "2020-01-01")),
+          99_999,
+          i + 1,
+        ),
+      ),
+    );
+    const { deps: d } = deps(pages);
+    const out = await getLegislation.run({ work_id: WORK, as_at: "2025-01-01" }, d, signal);
+    expect(out.notes.join(" ")).toContain("only scanned to 2000 versions");
+  });
+
   it("collects same-day versions that spill onto the next page", async () => {
     const page1 = versionsPage(
       WORK,
@@ -190,6 +225,24 @@ describe("get_legislation", () => {
     expect(notes).not.toContain("not yet in force");
   });
 
+  it("uses bill wording for an ended status", async () => {
+    const page = versionsPage("bill_government_2025_1", ["2025-11-01"]);
+    for (const r of page["results"] as Record<string, unknown>[]) {
+      r["legislation_type"] = "bill";
+      r["act_status"] = null;
+      r["bill_status"] = "terminated";
+    }
+    const { deps: d } = deps([json(page)]);
+    const out = await getLegislation.run(
+      { work_id: "bill_government_2025_1", as_at: "2026-01-01" },
+      d,
+      signal,
+    );
+    const notes = out.notes.join(" ");
+    expect(notes).toContain('This bill\'s current status is "terminated"');
+    expect(notes).not.toContain("in force on");
+  });
+
   it("warns that status is current when the work has since been repealed", async () => {
     const page = versionsPage(WORK, ["2015-04-01"]);
     for (const r of page["results"] as Record<string, unknown>[]) r["act_status"] = "repealed";
@@ -202,6 +255,17 @@ describe("get_legislation", () => {
     const { deps: d } = deps([json(versionsPage(WORK, ["2025-04-01", "2024-04-01"]))]);
     const out = await getLegislation.run({ work_id: WORK, as_at: "2024-06-30" }, d, signal);
     expect(out.notes.join(" ")).toContain("retrospectively");
+  });
+
+  it("reports how many versions were actually scanned at the cap", async () => {
+    const pages = Array.from({ length: 20 }, (_, i) => () => {
+      const body = versionsPage(WORK, ["2025-01-01"], 99_999, i + 1);
+      return new Response(JSON.stringify({ ...body, per_page: 1 }), { status: 200 });
+    });
+    const { deps: d } = deps(pages);
+    await expect(
+      getLegislation.run({ work_id: WORK, as_at: "2000-01-01" }, d, signal),
+    ).rejects.toThrow("Searched the newest 20 versions");
   });
 
   it("pages by the API's own per_page and skips unparseable dates", async () => {

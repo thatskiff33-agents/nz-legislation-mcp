@@ -113,7 +113,9 @@ function describe(
     }
     if (classification.type_status !== null && ENDED_STATUSES.has(classification.type_status)) {
       notes.push(
-        `This work's current status is "${classification.type_status}". Status fields describe today, not as_at; check whether it was still in force on ${extra.as_at}.`,
+        stages
+          ? `This bill's current status is "${classification.type_status}". Status fields describe today, not as_at.`
+          : `This work's current status is "${classification.type_status}". Status fields describe today, not as_at; check whether it was still in force on ${extra.as_at}.`,
       );
     }
   }
@@ -164,26 +166,35 @@ export const getLegislation = defineTool({
     // Scan newest-first. Once a version dated on or before as_at is found, collect every
     // version with that same date (possibly spilling onto the next page) and choose the last
     // of the day: the highest suffix letter (API data: 2008-04-01B is listed before 2008-04-01).
+    // "Latest" uses the same rule on the newest date, so API ordering cannot change either.
+    let newestDate: string | undefined;
     let latestId: string | undefined;
     let earliest: string | undefined;
+    let scanned = 0;
     let chosenDate: string | undefined;
     const sameDay: VersionRecord[] = [];
     let exhausted = false;
-    let page = 1;
-    for (; page <= MAX_HISTORY_PAGES; page += 1) {
+    let leftDate = false;
+    for (let page = 1; page <= MAX_HISTORY_PAGES; page += 1) {
       const response = await client.listVersions(
         { work_id: workId, sort: "desc", page, per_page: PER_PAGE },
         { signal },
       );
-      latestId ??= response.results[0]?.version_id;
-      let leftDate = false;
       for (const version of response.results) {
+        scanned += 1;
         const date = versionDate(version.version_id);
         if (date === null) {
           logger.warn("skipping version with unparseable date", { version_id: version.version_id });
           continue;
         }
         earliest = version.version_id;
+        newestDate ??= date;
+        if (
+          date === newestDate &&
+          (latestId === undefined || laterSuffix(suffixOf(version.version_id), suffixOf(latestId)))
+        ) {
+          latestId = version.version_id;
+        }
         if (chosenDate === undefined && date <= asAt) chosenDate = date;
         if (chosenDate !== undefined) {
           if (date === chosenDate) sameDay.push(version);
@@ -210,6 +221,11 @@ export const getLegislation = defineTool({
           `Several versions share the date ${String(chosenDate)} (${sameDay.map((v) => v.version_id).join(", ")}); the last of the day (${chosen.version_id}) was used.`,
         );
       }
+      if (!exhausted && !leftDate) {
+        notes.push(
+          `The version history was only scanned to ${String(scanned)} versions, so more versions dated ${String(chosenDate)} may exist. Check with list_versions.`,
+        );
+      }
       const newer = chosen.version_id !== latestId;
       return describe(chosen, { as_at: asAt, is_latest: !newer, newer }, notes);
     }
@@ -219,7 +235,7 @@ export const getLegislation = defineTool({
     }
     if (!exhausted) {
       throw new ToolInputError(
-        `Searched the newest ${String(MAX_HISTORY_PAGES * PER_PAGE)} versions of ${workId} without reaching ${asAt}. Use list_versions with sort=asc to find older versions, then get_legislation with that version_id.`,
+        `Searched the newest ${String(scanned)} versions of ${workId} without reaching ${asAt}. Use list_versions with sort=asc to find older versions, then get_legislation with that version_id.`,
       );
     }
     throw new ToolInputError(
