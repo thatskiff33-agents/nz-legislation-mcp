@@ -1,6 +1,7 @@
 ## What and why
 
-Closes #
+<!-- Replace N with the issue number. One PR per issue. -->
+Closes #N
 
 ## How it was tested
 

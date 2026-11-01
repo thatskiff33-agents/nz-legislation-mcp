@@ -7,13 +7,13 @@ Thanks for helping. This project aims for a high bar on security and code qualit
 * Open or pick an issue before starting work. One pull request per issue.
 * Keep pull requests focused. Open them as drafts early.
 * Never commit API keys, `.env` files or real user data. Test fixtures must be sanitised.
-* Every change must pass `pnpm check` (typecheck, lint, dead-code check, tests with 100% line and branch coverage, drift checks).
+* Every change must pass `pnpm check`: typecheck, lint, format check, dead-code check (knip), tests with 100% line and branch coverage, build. Drift checks for generated files join it once they exist.
 * Use [Conventional Commits](https://www.conventionalcommits.org/) for commit messages and PR titles (for example `feat: add list_versions tool`).
 * Report security issues privately. See [SECURITY.md](SECURITY.md).
 
 ## Local setup
 
-Setup instructions will be added once the project skeleton lands (issue #2).
+See [docs/development.md](docs/development.md) for prerequisites and commands (added in issue #2).
 
 ## Design principles
 

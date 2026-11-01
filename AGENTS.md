@@ -18,8 +18,8 @@ Unofficial MCP server for the New Zealand Legislation API (PCO, `api.legislation
 ## Hard rules
 
 * Never commit, log, print or return an API key. Never put a key in a URL. The key is sent only as the `X-Api-Key` header to allowlisted PCO hosts.
-* Keep `pnpm check` green, including the 100% line and branch coverage gate.
-* Enums, identifier formats and response shapes are defined once in `src/domain/`. Do not duplicate them.
+* Keep `pnpm check` green. Its components are listed in CONTRIBUTING.md and include a 100% line and branch coverage gate.
+* Enums, identifier formats and response shapes are defined once in `src/domain/` (from issue #4). Do not duplicate them.
 * Every external input is parsed with a schema at the boundary.
 * stdout is reserved for the MCP stdio protocol. Log to stderr only.
 * Pin GitHub Actions by full commit SHA. New runtime dependencies need a justification in the PR.
