@@ -1,11 +1,12 @@
 // Builds ToolDeps backed by a scripted fetch, for tool and server tests.
+import { DUMMY_KEY } from "../dummy-key.js";
 import { LegislationClient } from "../../src/api/client.js";
 import { silentLogger } from "../../src/logger.js";
 import { Secret } from "../../src/secret.js";
 import type { ToolDeps } from "../../src/tools/shared.js";
 import { fakeFetch, type FakeFetch, type Step } from "../api/fake-fetch.js";
 
-export const TEST_KEY = "tool-test-key-0123456789";
+export const TEST_KEY = DUMMY_KEY;
 
 export function deps(steps: Step[], today = "2026-11-02"): { deps: ToolDeps; fake: FakeFetch } {
   const fake = fakeFetch(...steps);

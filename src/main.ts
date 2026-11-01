@@ -19,6 +19,7 @@ export interface MainIo {
   readonly stderr: (text: string) => void;
   readonly serve: typeof serveStdio;
   readonly onSignal: (signal: "SIGINT" | "SIGTERM", handler: () => void) => void;
+  readonly onUnhandledRejection: (handler: (reason: unknown) => void) => void;
 }
 
 /** @internal Exported for tests. */
@@ -27,6 +28,7 @@ export const defaultIo: MainIo = {
   stderr: (text) => process.stderr.write(text),
   serve: serveStdio,
   onSignal: (signal, handler) => process.once(signal, handler),
+  onUnhandledRejection: (handler) => process.on("unhandledRejection", handler),
 };
 
 /** Builds the dependencies shared by every tool call. */
@@ -59,10 +61,20 @@ export function main(io: MainIo = defaultIo): number | undefined {
     }
     throw error;
   }
-  const handle = io.serve(() => createServer(deps));
+  const handle = io.serve(() => createServer(deps), {
+    // e.g. malformed JSON from the client: log it (redacted) instead of dropping it silently.
+    onerror: (error) => {
+      deps.logger.warn("stdio transport error", { error });
+    },
+  });
+  io.onUnhandledRejection((reason) => {
+    deps.logger.error("unhandled promise rejection", { reason });
+  });
   const stop = (): void => {
     deps.logger.info("shutting down");
-    void handle.close();
+    handle.close().catch((error: unknown) => {
+      deps.logger.error("error while shutting down", { error });
+    });
   };
   io.onSignal("SIGINT", stop);
   io.onSignal("SIGTERM", stop);

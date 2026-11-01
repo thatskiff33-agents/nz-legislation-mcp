@@ -21,7 +21,7 @@ export const TOOLS = [searchLegislation, getLegislation, listVersions, getApiQuo
 export const SERVER_INSTRUCTIONS = [
   "Tools for New Zealand legislation from the official legislation.govt.nz API (Parliamentary Counsel Office).",
   "Typical flow: search_legislation to find a work_id, then get_legislation (with as_at for a past date) for the version and official links; list_versions for the amendment history.",
-  "Always cite the title, version date and legislation.govt.nz link. Results are not legal advice; tell the user to check the official version.",
+  "Cite the title, version date and the dated permalink (it does not change when the law is amended). Results are not legal advice; tell the user to check the official version on legislation.govt.nz.",
   "Each user's API key has a daily quota (get_api_quota), so prefer specific searches over many broad ones.",
 ].join("\n");
 
@@ -58,7 +58,8 @@ function register<
 export function createServer(deps: ToolDeps): McpServer {
   const server = new McpServer(
     { name: SERVER_NAME, title: SERVER_TITLE, version: VERSION },
-    { instructions: SERVER_INSTRUCTIONS },
+    // The tool list never changes at runtime, so do not advertise list-changed notifications.
+    { instructions: SERVER_INSTRUCTIONS, capabilities: { tools: { listChanged: false } } },
   );
   register(server, searchLegislation, deps);
   register(server, getLegislation, deps);

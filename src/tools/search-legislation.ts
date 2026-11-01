@@ -7,8 +7,7 @@ import {
   classificationFrom,
   defineTool,
   isProvisional,
-  linksFrom,
-  LinksSchema,
+  cleanText,
   OFFICIAL_SOURCE_NOTE,
   permalink,
   PermalinkSchema,
@@ -25,7 +24,6 @@ const ResultSchema = z.object({
   provisional_id: z.boolean().describe("True if the identifiers may change (agency records)."),
   permalink: PermalinkSchema,
   ...ClassificationShape,
-  links: LinksSchema,
 });
 
 const OutputSchema = z.object({
@@ -44,7 +42,7 @@ export const searchLegislation = defineTool({
     "Search New Zealand Acts, Bills, secondary legislation (regulations, orders, rules, etc.) and amendment papers on legislation.govt.nz.",
     "Search titles (search_field=title) or full text (search_field=content), or omit search_term to browse by filters.",
     "Type-specific filters (act_*, bill_*, instrument_*) require the matching legislation_type.",
-    "Returns work_id values for get_legislation and list_versions. Results are paged (per_page up to 100).",
+    "Returns work_id values for get_legislation (which gives links) and list_versions. Results are paged: per_page up to 50 (default 20).",
   ].join(" "),
   inputSchema: SearchParamsSchema,
   outputSchema: OutputSchema,
@@ -55,14 +53,13 @@ export const searchLegislation = defineTool({
       const version = work.latest_matching_version;
       return {
         work_id: work.work_id,
-        title: version.title,
+        title: cleanText(version.title),
         latest_matching_version_id: version.version_id,
         version_date: versionDate(version.version_id),
         is_latest_version: version.is_latest_version ?? null,
         provisional_id: isProvisional(version.version_id),
         permalink: permalink(version.version_id),
         ...classificationFrom(work),
-        links: linksFrom(version.formats),
       };
     });
     const notes = [OFFICIAL_SOURCE_NOTE];

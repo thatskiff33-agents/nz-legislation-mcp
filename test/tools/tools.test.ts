@@ -6,9 +6,11 @@ import { listVersions } from "../../src/tools/list-versions.js";
 import { searchLegislation } from "../../src/tools/search-legislation.js";
 import {
   classificationFrom,
+  cleanText,
   isProvisional,
   linksFrom,
   permalink,
+  suffixOf,
   todayInNewZealand,
   ToolInputError,
   versionDate,
@@ -39,9 +41,7 @@ describe("search_legislation", () => {
       provisional_id: false,
       permalink: "https://www.legislation.govt.nz/act/public/1914/3/en/1914-07-31/",
     });
-    expect(out.results[0]?.links.xml).toBe(
-      "https://www.legislation.govt.nz/act/public/1914/3/en/latest.xml",
-    );
+    expect(out.results[0]).not.toHaveProperty("links"); // kept small; get_legislation gives links
     expect(out.notes).toHaveLength(1);
     expect(fake.calls[0]?.url).toContain("search_term=income+tax");
   });
@@ -80,6 +80,11 @@ describe("list_versions", () => {
       version_date: "2026-09-04",
       permalink: "https://www.legislation.govt.nz/act/public/2007/97/en/2026-09-04/",
     });
+    // The API gives /latest/ links for the newest version; we return dated ones.
+    expect(out.versions[0]?.links.xml).toBe(
+      "https://www.legislation.govt.nz/act/public/2007/97/en/2026-09-04.xml",
+    );
+    expect(out).not.toHaveProperty("notes");
   });
 });
 
@@ -140,6 +145,90 @@ describe("get_legislation", () => {
     expect(out.notes).toHaveLength(1);
   });
 
+  it("picks the last version of the day whatever order the API lists them in", async () => {
+    for (const order of [
+      ["2008-04-01B", "2008-04-01"],
+      ["2008-04-01", "2008-04-01B"],
+    ]) {
+      const { deps: d } = deps([json(versionsPage(WORK, ["2009-01-01", ...order, "2007-11-01"]))]);
+      const out = await getLegislation.run({ work_id: WORK, as_at: "2008-06-30" }, d, signal);
+      expect(out.version_id).toBe(`${WORK}_en_2008-04-01B`);
+      expect(out.notes.join(" ")).toContain("Several versions share the date 2008-04-01");
+    }
+  });
+
+  it("collects same-day versions that spill onto the next page", async () => {
+    const page1 = versionsPage(
+      WORK,
+      [...Array.from({ length: 99 }, () => "2030-01-01"), "2008-04-01"],
+      102,
+      1,
+    );
+    const page2 = versionsPage(WORK, ["2008-04-01B", "2007-11-01"], 102, 2);
+    const { deps: d, fake } = deps([json(page1), json(page2)]);
+    const out = await getLegislation.run({ work_id: WORK, as_at: "2008-06-30" }, d, signal);
+    expect(out.version_id).toBe(`${WORK}_en_2008-04-01B`);
+    expect(fake.calls).toHaveLength(2);
+  });
+
+  it("uses stage wording for bills", async () => {
+    const page = versionsPage("bill_government_2025_1", ["2026-02-01", "2025-11-01"]);
+    for (const r of page["results"] as Record<string, unknown>[]) {
+      r["legislation_type"] = "bill";
+      r["act_status"] = null;
+      r["bill_status"] = "current";
+    }
+    const { deps: d } = deps([json(page)]);
+    const out = await getLegislation.run(
+      { work_id: "bill_government_2025_1", as_at: "2025-12-01" },
+      d,
+      signal,
+    );
+    const notes = out.notes.join(" ");
+    expect(notes).toContain("parliamentary stages");
+    expect(notes).toContain("Later stages exist");
+    expect(notes).not.toContain("not yet in force");
+  });
+
+  it("warns that status is current when the work has since been repealed", async () => {
+    const page = versionsPage(WORK, ["2015-04-01"]);
+    for (const r of page["results"] as Record<string, unknown>[]) r["act_status"] = "repealed";
+    const { deps: d } = deps([json(page)]);
+    const out = await getLegislation.run({ work_id: WORK, as_at: "2020-01-01" }, d, signal);
+    expect(out.notes.join(" ")).toContain('current status is "repealed"');
+  });
+
+  it("mentions possible retrospective amendments when newer versions exist", async () => {
+    const { deps: d } = deps([json(versionsPage(WORK, ["2025-04-01", "2024-04-01"]))]);
+    const out = await getLegislation.run({ work_id: WORK, as_at: "2024-06-30" }, d, signal);
+    expect(out.notes.join(" ")).toContain("retrospectively");
+  });
+
+  it("pages by the API's own per_page and skips unparseable dates", async () => {
+    const small = (dates: string[], page: number) => ({
+      ...versionsPage(WORK, dates, 4, page),
+      per_page: 2,
+    });
+    const { deps: d, fake } = deps([
+      json(small(["2026-01-01", "2025-02-30"], 1)),
+      json(small(["2024-01-01", "2023-01-01"], 2)),
+    ]);
+    const out = await getLegislation.run({ work_id: WORK, as_at: "2024-06-30" }, d, signal);
+    expect(out.version_id).toBe(`${WORK}_en_2024-01-01`);
+    expect(fake.calls).toHaveLength(2);
+  });
+
+  it("stops on an empty page", async () => {
+    const { deps: d, fake } = deps([
+      json(versionsPage(WORK, ["2026-01-01"], 500, 1)),
+      json({ page: 2, per_page: 100, total: 500, results: [] }),
+    ]);
+    await expect(
+      getLegislation.run({ work_id: WORK, as_at: "2000-01-01" }, d, signal),
+    ).rejects.toThrow(`The earliest version is ${WORK}_en_2026-01-01`);
+    expect(fake.calls).toHaveLength(2);
+  });
+
   it("pages back through history to find an old as_at", async () => {
     const page1 = versionsPage(
       WORK,
@@ -159,7 +248,7 @@ describe("get_legislation", () => {
     await expect(
       getLegislation.run({ work_id: WORK, as_at: "1999-01-01" }, d, signal),
     ).rejects.toThrow(
-      `No version of ${WORK} is dated on or before 1999-01-01. The earliest version found is ${WORK}_en_2007-11-01`,
+      `No version of ${WORK} is dated on or before 1999-01-01. The earliest version is ${WORK}_en_2007-11-01`,
     );
   });
 
@@ -184,7 +273,7 @@ describe("get_legislation", () => {
     const { deps: d, fake } = deps(pages);
     await expect(
       getLegislation.run({ work_id: WORK, as_at: "2000-01-01" }, d, signal),
-    ).rejects.toThrow("No version");
+    ).rejects.toThrow("Searched the newest 2000 versions");
     expect(fake.calls).toHaveLength(20);
   });
 
@@ -234,12 +323,44 @@ describe("get_api_quota", () => {
 describe("shared helpers", () => {
   it("keeps the first link per known format and ignores unknown types", () => {
     expect(
-      linksFrom([
-        { type: "html", url: "https://a/1" },
-        { type: "html", url: "https://a/2" },
-        { type: "epub", url: "https://a/3" },
-      ]),
-    ).toEqual({ html: "https://a/1" });
+      linksFrom(
+        [
+          { type: "html", url: "https://a/1" },
+          { type: "html", url: "https://a/2" },
+          { type: "epub", url: "https://a/3" },
+          { type: "pdf_original_scan", url: "https://a/scan.pdf" },
+        ],
+        "not-a-version-id",
+      ),
+    ).toEqual({ html: "https://a/1", pdf_original_scan: "https://a/scan.pdf" });
+  });
+
+  it("dates website links but never invents formats the API did not offer", () => {
+    expect(
+      linksFrom(
+        [{ type: "pdf", url: "https://www.legislation.govt.nz/act/public/2007/97/en/latest.pdf" }],
+        `${WORK}_en_2026-09-04`,
+      ),
+    ).toEqual({ pdf: "https://www.legislation.govt.nz/act/public/2007/97/en/2026-09-04.pdf" });
+  });
+
+  it("keeps agency links for provisional identifiers", () => {
+    const id = "secondary-legislation_agency-drafted_~2026_~346285_en_~2026-10-30";
+    expect(linksFrom([{ type: "pdf", url: "https://agency.example/x.pdf" }], id)).toEqual({
+      pdf: "https://agency.example/x.pdf",
+    });
+  });
+
+  it("cleans API text: control characters removed, length capped", () => {
+    expect(cleanText("  Income\u0000 Tax\nAct  ")).toBe("Income  Tax Act");
+    const long = cleanText("x".repeat(600));
+    expect(long).toHaveLength(500);
+    expect(long.endsWith("…")).toBe(true);
+  });
+
+  it("reads same-day suffixes", () => {
+    expect(suffixOf(`${WORK}_en_2008-04-01B`)).toBe("B");
+    expect(suffixOf("nonsense")).toBe("");
   });
 
   it("flattens classification for bills and instruments", () => {

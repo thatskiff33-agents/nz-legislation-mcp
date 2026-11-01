@@ -32,6 +32,18 @@ describe("server", () => {
     expect(c.getInstructions()).toBe(SERVER_INSTRUCTIONS);
   });
 
+  it("does not advertise tool list changes", async () => {
+    const { client: c } = await connect([]);
+    expect(c.getServerCapabilities()?.tools?.listChanged).not.toBe(true);
+  });
+
+  it("emits only regex patterns that every engine understands", async () => {
+    const { client: c } = await connect([]);
+    const { tools } = await c.listTools();
+    const text = JSON.stringify(tools);
+    expect(text).not.toContain("\\\\p{");
+  });
+
   it("lists tools in a deterministic order with schemas and read-only annotations", async () => {
     const { client: c } = await connect([]);
     const { tools } = await c.listTools();

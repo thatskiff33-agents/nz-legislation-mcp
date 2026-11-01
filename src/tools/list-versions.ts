@@ -2,10 +2,10 @@
 import { z } from "zod";
 import { VersionListParamsSchema } from "../domain/schemas.js";
 import {
+  cleanText,
   defineTool,
   linksFrom,
   LinksSchema,
-  OFFICIAL_SOURCE_NOTE,
   permalink,
   PermalinkSchema,
   READ_ONLY_API_TOOL,
@@ -27,7 +27,6 @@ const OutputSchema = z.object({
       links: LinksSchema,
     }),
   ),
-  notes: z.array(z.string()),
 });
 
 export const listVersions = defineTool({
@@ -51,12 +50,11 @@ export const listVersions = defineTool({
       has_more: response.page * response.per_page < response.total,
       versions: response.results.map((v) => ({
         version_id: v.version_id,
-        title: v.title,
+        title: cleanText(v.title),
         version_date: versionDate(v.version_id),
         permalink: permalink(v.version_id),
-        links: linksFrom(v.formats),
+        links: linksFrom(v.formats, v.version_id),
       })),
-      notes: [OFFICIAL_SOURCE_NOTE],
     };
   },
 });

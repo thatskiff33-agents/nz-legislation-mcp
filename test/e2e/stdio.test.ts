@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { Client } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { DUMMY_KEY } from "../dummy-key.js";
 
 const ROOT = join(import.meta.dirname, "..", "..");
 // Inside the repo so dist-relative paths (../package.json) resolve as in the published package.
@@ -28,7 +29,7 @@ describe("stdio binary", () => {
     const transport = new StdioClientTransport({
       command: process.execPath,
       args: [CLI],
-      env: { LEGISLATION_NZ_API_KEY: "e2e-test-key-0123456789", PATH: process.env["PATH"] ?? "" },
+      env: { LEGISLATION_NZ_API_KEY: DUMMY_KEY, PATH: process.env["PATH"] ?? "" },
       stderr: "pipe",
     });
     const client = new Client({ name: "e2e", version: "0.0.0" });
@@ -42,6 +43,24 @@ describe("stdio binary", () => {
     ]);
     const quota = await client.callTool({ name: "get_api_quota", arguments: {} });
     expect(quota.structuredContent).toMatchObject({ known: false });
+    await client.close();
+  }, 30_000);
+
+  it("serves a client pinned to the 2026-07-28 protocol revision", async () => {
+    const transport = new StdioClientTransport({
+      command: process.execPath,
+      args: [CLI],
+      env: { LEGISLATION_NZ_API_KEY: DUMMY_KEY, PATH: process.env["PATH"] ?? "" },
+      stderr: "pipe",
+    });
+    const client = new Client(
+      { name: "e2e-modern", version: "0.0.0" },
+      { versionNegotiation: { mode: { pin: "2026-07-28" } } },
+    );
+    await client.connect(transport);
+    expect(client.getNegotiatedProtocolVersion()).toBe("2026-07-28");
+    const { tools } = await client.listTools();
+    expect(tools).toHaveLength(4);
     await client.close();
   }, 30_000);
 

@@ -93,21 +93,47 @@ export const LinksSchema = z
     pdf_original_scan: z.string().optional(),
   })
   .describe(
-    "Links to this version. legislation.govt.nz links are the official source; agency-published records may link to agency websites.",
+    "Dated links to exactly this version on legislation.govt.nz (they do not change when the law is amended). Agency-published records may link to agency websites instead.",
   );
 export type Links = z.output<typeof LinksSchema>;
 
 const KNOWN_FORMATS = ["html", "pdf", "xml", "pdf_original_scan"] as const;
+const WEBSITE_FORMATS = ["html", "pdf", "xml"] as const;
 
-/** Picks the known format links; first link wins for duplicates. */
-export function linksFrom(formats: readonly { type: string; url: string }[]): Links {
+/**
+ * Links for a version. html/pdf/xml are rebuilt as dated legislation.govt.nz URLs where the
+ * identifier allows (the API gives "/latest/" links for the newest version, which move after
+ * an amendment); otherwise the API's own link is kept. First link wins for duplicates.
+ */
+export function linksFrom(
+  formats: readonly { type: string; url: string }[],
+  versionId: string,
+): Links {
   const links: Record<string, string> = {};
   for (const { type, url } of formats) {
     if ((KNOWN_FORMATS as readonly string[]).includes(type) && links[type] === undefined) {
       links[type] = url;
     }
   }
+  const parsed = parseVersionId(versionId);
+  if (parsed.ok) {
+    for (const format of WEBSITE_FORMATS) {
+      const dated = websiteUrl(parsed.value, format);
+      if (links[format] !== undefined && dated !== undefined) links[format] = dated;
+    }
+  }
   return links;
+}
+
+/** Longest API-supplied string passed through (titles, agency names). */
+const MAX_TEXT_LENGTH = 500;
+// eslint-disable-next-line no-control-regex -- matching control characters is the purpose
+const CONTROL_CHARS = /[\u0000-\u001F\u007F-\u009F]+/g;
+
+/** Strips control characters and caps the length of text that came from the API. */
+export function cleanText(text: string): string {
+  const flat = text.replace(CONTROL_CHARS, " ").trim();
+  return flat.length > MAX_TEXT_LENGTH ? `${flat.slice(0, MAX_TEXT_LENGTH - 1)}…` : flat;
 }
 
 const nullableText = z.string().nullable();
@@ -115,9 +141,11 @@ const nullableText = z.string().nullable();
 /** Classification fields, flattened so each record has the same shape whatever its type. */
 export const ClassificationShape = {
   legislation_type: nullableText.describe("act, bill, secondary_legislation or amendment_paper."),
-  legislation_status: nullableText.describe("in_force, not_in_force or no_value."),
+  legislation_status: nullableText.describe(
+    "Current status (today, not as at any date): in_force, not_in_force or no_value.",
+  ),
   type_status: nullableText.describe(
-    "Status specific to the type: act_status, bill_status or instrument_status.",
+    "Current type-specific status (today): act_status, bill_status or instrument_status, e.g. repealed.",
   ),
   category: nullableText.describe("Sub-category: act_type, bill_type or instrument_type_group."),
   classification: nullableText.describe("principal or amendment, where recorded."),
@@ -162,7 +190,7 @@ export function classificationFrom(raw: RawClassification): {
     category: raw.act_type ?? raw.bill_type ?? raw.instrument_type_group ?? null,
     classification: raw.act_classification ?? raw.instrument_classification ?? null,
     publisher: raw.publisher ?? null,
-    administering_agencies: [...(raw.administering_agencies ?? [])],
+    administering_agencies: (raw.administering_agencies ?? []).map(cleanText),
     agency_pilot_record: raw.publisher === "Agency",
   };
 }
@@ -186,20 +214,28 @@ export function permalink(versionId: string): string | null {
   return parsed.ok ? (websiteUrl(parsed.value, "html") ?? null) : null;
 }
 
+/** The same-day suffix letters of a version_id ("" if none or unparseable). */
+export function suffixOf(versionId: string): string {
+  const parsed = parseVersionId(versionId);
+  return parsed.ok ? parsed.value.suffix : "";
+}
+
 /** True when a version_id has provisional (~) parts that may change. */
 export function isProvisional(versionId: string): boolean {
   const parsed = parseVersionId(versionId);
   return parsed.ok ? parsed.value.provisional : false;
 }
 
-/** Today's date in New Zealand as YYYY-MM-DD. */
+/** Today's date in New Zealand as YYYY-MM-DD (built from parts, so locale data cannot change it). */
 export function todayInNewZealand(now: Date = new Date()): string {
-  return new Intl.DateTimeFormat("en-CA", {
+  const parts = new Intl.DateTimeFormat("en-NZ", {
     timeZone: "Pacific/Auckland",
     year: "numeric",
     month: "2-digit",
     day: "2-digit",
-  }).format(now);
+  }).formatToParts(now);
+  const map = Object.fromEntries(parts.map((p) => [p.type, p.value]));
+  return `${String(map["year"])}-${String(map["month"])}-${String(map["day"])}`;
 }
 
 /** Standard reminder included with every legislation result. */

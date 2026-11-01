@@ -17,6 +17,8 @@ import {
   permalink,
   PermalinkSchema,
   READ_ONLY_API_TOOL,
+  cleanText,
+  suffixOf,
   ToolInputError,
   versionDate,
 } from "./shared.js";
@@ -62,7 +64,7 @@ const OutputSchema = z.object({
   newer_versions_exist: z
     .boolean()
     .nullable()
-    .describe("True if versions dated after as_at exist (e.g. amendments not yet in force)."),
+    .describe("True if versions dated after as_at exist (later amendments, or later bill stages)."),
   provisional_id: z.boolean(),
   permalink: PermalinkSchema,
   ...ClassificationShape,
@@ -72,6 +74,22 @@ const OutputSchema = z.object({
 
 type Output = z.output<typeof OutputSchema>;
 
+/** Types whose versions are parliamentary stages rather than law in force. */
+const STAGE_TYPES = new Set(["bill", "amendment_paper"]);
+/** Current statuses that mean the work may not have been in force on a later as_at. */
+const ENDED_STATUSES = new Set(["repealed", "revoked", "expired", "superseded", "terminated"]);
+
+/** Orders same-date suffixes: "" < "A" < "B" < ... < "Z" < "AA". */
+function suffixRank(suffix: string): [number, string] {
+  return [suffix.length, suffix];
+}
+
+function laterSuffix(a: string, b: string): boolean {
+  const [la, sa] = suffixRank(a);
+  const [lb, sb] = suffixRank(b);
+  return la !== lb ? la > lb : sa > sb;
+}
+
 function describe(
   record: VersionRecord,
   extra: { as_at: string | null; is_latest: boolean | null; newer: boolean | null },
@@ -79,10 +97,30 @@ function describe(
 ): Output {
   const classification = classificationFrom(record);
   if (classification.agency_pilot_record) notes.push(AGENCY_PILOT_NOTE);
+  if (extra.as_at !== null) {
+    const stages = STAGE_TYPES.has(String(classification.legislation_type));
+    if (stages) {
+      notes.push(
+        "For bills and amendment papers, versions are parliamentary stages, not law in force: this is the latest stage dated on or before as_at.",
+      );
+    }
+    if (extra.newer === true) {
+      notes.push(
+        stages
+          ? "Later stages exist, dated after as_at. Use list_versions to see them."
+          : "Newer versions exist, dated after as_at (amendments made or in force later). Some later amendments may apply retrospectively to this date (common in tax legislation); check them with list_versions.",
+      );
+    }
+    if (classification.type_status !== null && ENDED_STATUSES.has(classification.type_status)) {
+      notes.push(
+        `This work's current status is "${classification.type_status}". Status fields describe today, not as_at; check whether it was still in force on ${extra.as_at}.`,
+      );
+    }
+  }
   return {
     work_id: record.work_id,
     version_id: record.version_id,
-    title: record.title,
+    title: cleanText(record.title),
     version_date: versionDate(record.version_id),
     as_at: extra.as_at,
     is_latest_version: extra.is_latest,
@@ -90,7 +128,7 @@ function describe(
     provisional_id: isProvisional(record.version_id),
     permalink: permalink(record.version_id),
     ...classification,
-    links: linksFrom(record.formats),
+    links: linksFrom(record.formats, record.version_id),
     notes,
   };
 }
@@ -99,14 +137,15 @@ export const getLegislation = defineTool({
   name: "get_legislation",
   title: "Get a version of NZ legislation",
   description: [
-    "Get metadata and official links for one version of a piece of NZ legislation.",
-    "Pass work_id (from search_legislation) to get the version in force on as_at (default: today in New Zealand), or pass a specific version_id.",
-    "Use as_at for questions about the law at a past date, e.g. a tax year.",
+    "Get metadata and links for one version of a piece of NZ legislation.",
+    "Pass work_id (from search_legislation) for the version as at a date (as_at, default today in New Zealand), or pass a specific version_id.",
+    "A version dated D shows the law as at D; amendments made later with retrospective effect are not included, so check newer versions for past tax years.",
+    "For bills, versions are parliamentary stages, not law in force.",
   ].join(" "),
   inputSchema: InputSchema,
   outputSchema: OutputSchema,
   annotations: READ_ONLY_API_TOOL,
-  async run(args, { client, today }, signal) {
+  async run(args, { client, today, logger }, signal) {
     const notes = [OFFICIAL_SOURCE_NOTE];
 
     if (args.version_id !== undefined) {
@@ -122,35 +161,69 @@ export const getLegislation = defineTool({
     const asAt = args.as_at ?? today();
     if (args.as_at === undefined) notes.push(`as_at defaulted to today in New Zealand (${asAt}).`);
 
+    // Scan newest-first. Once a version dated on or before as_at is found, collect every
+    // version with that same date (possibly spilling onto the next page) and choose the last
+    // of the day: the highest suffix letter (API data: 2008-04-01B is listed before 2008-04-01).
     let latestId: string | undefined;
     let earliest: string | undefined;
-    for (let page = 1; page <= MAX_HISTORY_PAGES; page += 1) {
+    let chosenDate: string | undefined;
+    const sameDay: VersionRecord[] = [];
+    let exhausted = false;
+    let page = 1;
+    for (; page <= MAX_HISTORY_PAGES; page += 1) {
       const response = await client.listVersions(
         { work_id: workId, sort: "desc", page, per_page: PER_PAGE },
         { signal },
       );
       latestId ??= response.results[0]?.version_id;
+      let leftDate = false;
       for (const version of response.results) {
         const date = versionDate(version.version_id);
+        if (date === null) {
+          logger.warn("skipping version with unparseable date", { version_id: version.version_id });
+          continue;
+        }
         earliest = version.version_id;
-        if (date !== null && date <= asAt) {
-          const newer = version.version_id !== latestId;
-          if (newer) {
-            notes.push(
-              "Newer versions exist, dated after as_at (for example amendments not yet in force). Use list_versions to see them.",
-            );
+        if (chosenDate === undefined && date <= asAt) chosenDate = date;
+        if (chosenDate !== undefined) {
+          if (date === chosenDate) sameDay.push(version);
+          else {
+            leftDate = true;
+            break;
           }
-          return describe(version, { as_at: asAt, is_latest: !newer, newer }, notes);
         }
       }
-      if (page * PER_PAGE >= response.total) break;
+      const lastPage = response.results.length === 0 || page * response.per_page >= response.total;
+      if (lastPage) exhausted = true;
+      if (leftDate || lastPage) break;
+    }
+
+    const first = sameDay[0];
+    if (first !== undefined) {
+      let chosen = first;
+      for (const candidate of sameDay) {
+        if (laterSuffix(suffixOf(candidate.version_id), suffixOf(chosen.version_id)))
+          chosen = candidate;
+      }
+      if (sameDay.length > 1) {
+        notes.push(
+          `Several versions share the date ${String(chosenDate)} (${sameDay.map((v) => v.version_id).join(", ")}); the last of the day (${chosen.version_id}) was used.`,
+        );
+      }
+      const newer = chosen.version_id !== latestId;
+      return describe(chosen, { as_at: asAt, is_latest: !newer, newer }, notes);
     }
 
     if (latestId === undefined) {
       throw new ToolInputError(`No versions were found for ${workId}.`);
     }
+    if (!exhausted) {
+      throw new ToolInputError(
+        `Searched the newest ${String(MAX_HISTORY_PAGES * PER_PAGE)} versions of ${workId} without reaching ${asAt}. Use list_versions with sort=asc to find older versions, then get_legislation with that version_id.`,
+      );
+    }
     throw new ToolInputError(
-      `No version of ${workId} is dated on or before ${asAt}. The earliest version found is ${String(earliest)}; use a later as_at.`,
+      `No version of ${workId} is dated on or before ${asAt}. The earliest version is ${String(earliest)}; use a later as_at.`,
     );
   },
 });

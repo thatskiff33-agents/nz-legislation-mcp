@@ -19,7 +19,6 @@ import {
   BILL_STATUSES,
   BILL_TYPES,
   CLASSIFICATIONS,
-  ID_SUBTYPES,
   INSTRUMENT_STATUSES,
   INSTRUMENT_TYPE_GROUPS,
   LEGISLATION_STATUSES,
@@ -35,8 +34,12 @@ import {
 // Shared building blocks
 // ---------------------------------------------------------------------------
 
-/** Rejects ASCII/Unicode control characters (NUL, newlines, etc.) in free text. */
-const NO_CONTROL_CHARS = /^[^\p{Cc}]*$/u;
+/**
+ * Rejects control characters (C0, DEL and C1: NUL, newlines, etc.) in free text. Written with
+ * explicit ranges, not \p{Cc}, so the emitted JSON Schema pattern works in every regex engine.
+ */
+// eslint-disable-next-line no-control-regex -- matching control characters is the purpose
+const NO_CONTROL_CHARS = /^[^\u0000-\u001F\u007F-\u009F]*$/;
 
 function freeText(max: number): z.ZodString {
   return z
@@ -58,10 +61,6 @@ function strictParams<T extends z.ZodRawShape>(shape: T): z.ZodObject<T, z.core.
   });
 }
 
-const ID_GRAMMAR = Object.entries(ID_SUBTYPES)
-  .map(([type, subtypes]) => `${type} (${subtypes.join("|")})`)
-  .join("; ");
-
 // ---------------------------------------------------------------------------
 // Identifier input schemas (the parser enforces length, grammar and vocabulary)
 // ---------------------------------------------------------------------------
@@ -74,7 +73,7 @@ export const WorkIdSchema = z
     if (!result.ok) ctx.addIssue({ code: "custom", message: result.error });
   })
   .describe(
-    `Work identifier {type}_{subtype}_{year}_{number}, e.g. act_public_2007_97 (Income Tax Act 2007). Types and subtypes: ${ID_GRAMMAR}. A "~" prefix marks a provisional value.`,
+    "Work identifier from search_legislation, e.g. act_public_2007_97 (Income Tax Act 2007).",
   );
 
 export const VersionIdSchema = z
@@ -85,7 +84,7 @@ export const VersionIdSchema = z
     if (!result.ok) ctx.addIssue({ code: "custom", message: result.error });
   })
   .describe(
-    "Version identifier {work_id}_en_{YYYY-MM-DD}{optional letters}, e.g. act_public_2007_97_en_2025-05-29 or act_public_2007_97_en_2025-05-29B.",
+    "Version identifier from get_legislation or list_versions, e.g. act_public_2007_97_en_2025-05-29.",
   );
 
 // ---------------------------------------------------------------------------
@@ -96,8 +95,10 @@ export const VersionIdSchema = z
 const MAX_SEARCH_TERM_LENGTH = 500;
 /** Agency names must match the website's "browse agencies" list exactly. */
 const MAX_AGENCY_LENGTH = 200;
-/** API maximum page size. */
+/** API maximum page size (used for version lists, whose items are small). */
 const MAX_PER_PAGE = 100;
+/** Search page cap: search results are large, so 50 keeps a page within client output limits. */
+const MAX_SEARCH_PER_PAGE = 50;
 /** Sanity bound on page numbers (the whole corpus is under 50,000 works, so under 500 pages of 100). */
 const MAX_PAGE = 10_000;
 
@@ -170,7 +171,13 @@ export const SearchParamsSchema = strictParams({
     .optional()
     .describe("Sort order. most_recently_updated sorts by latest version date, newest first."),
   page: pageParam,
-  per_page: perPageParam,
+  per_page: z
+    .number()
+    .int()
+    .min(1)
+    .max(MAX_SEARCH_PER_PAGE)
+    .optional()
+    .describe(`Results per page, 1 to ${String(MAX_SEARCH_PER_PAGE)}. Default 20.`),
 }).superRefine((params, ctx) => {
   // Reject type-specific filters used without (or with the wrong) legislation_type.
   for (const type of LEGISLATION_TYPES) {
