@@ -201,9 +201,9 @@ describe("property-based", () => {
           expect(formatVersionId(r.value)).toBe(mutated);
         }
       }),
-      { numRuns: 500 },
+      // Always-run example: appending a suffix letter keeps the ID valid, so the accept path runs.
+      { numRuns: 500, examples: [["act_public_2007_97_en_2025-05-29", 31, "A"]] },
     );
-    // Some mutations (e.g. inserting a digit-safe "~") remain valid; the assertion must run.
     expect(accepted).toBeGreaterThan(0);
   });
 });
