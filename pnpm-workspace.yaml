@@ -6,3 +6,10 @@ onlyBuiltDependencies: []
 strictDepBuilds: true
 # Fail if the lockfile and package.json disagree.
 preferFrozenLockfile: true
+# Time-boxed audit exception (tracked in a GitHub issue; remove on or after 10 Nov 2026).
+# GHSA-g3hv-75wg-m249: moderate DoS in minimatch <11.0.1, reached only via eslint (dev only,
+# patterns come from our own config). The fix was published 27 Oct 2026 and is held back by
+# minimumReleaseAge; Dependabot will raise it once it is 14 days old.
+auditConfig:
+  ignoreGhsas:
+    - GHSA-g3hv-75wg-m249
