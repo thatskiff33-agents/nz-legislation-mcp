@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -57,6 +58,12 @@ describe("loadConfig", () => {
 
     it("refuses a device such as /dev/null", () => {
       expect(() => loadConfig({ [ENV.apiKeyFile]: "/dev/null" })).toThrow("is not a regular file");
+    });
+
+    it("refuses a FIFO without blocking", () => {
+      const path = join(dir, "fifo");
+      execFileSync("mkfifo", [path]);
+      expect(() => loadConfig({ [ENV.apiKeyFile]: path })).toThrow("is not a regular file");
     });
 
     it("refuses an oversized file", () => {

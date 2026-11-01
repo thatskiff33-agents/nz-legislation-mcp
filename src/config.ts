@@ -3,7 +3,7 @@
  *
  * Error messages name the variable at fault but never echo its value.
  */
-import { readFileSync, statSync } from "node:fs";
+import { closeSync, constants, fstatSync, openSync, readSync } from "node:fs";
 import { z } from "zod";
 import { Secret } from "./secret.js";
 
@@ -108,19 +108,33 @@ class KeyFileError extends Error {}
  * example, pointing at /dev/stdin (which would swallow MCP stdio traffic) or a huge file.
  */
 const defaultReader: FileReader = (path) => {
-  let size: number;
+  // Open once and check/read through the same descriptor (no check-then-use race). O_NONBLOCK
+  // stops a FIFO from blocking the open; the regular-file check then rejects it.
+  let fd: number;
   try {
-    const stats = statSync(path);
-    if (!stats.isFile()) throw new KeyFileError("is not a regular file");
-    size = stats.size;
-  } catch (error) {
-    if (error instanceof KeyFileError) throw error;
+    fd = openSync(path, constants.O_RDONLY | constants.O_NONBLOCK);
+  } catch {
     throw new KeyFileError("cannot be read");
   }
-  if (size > MAX_KEY_FILE_BYTES) {
-    throw new KeyFileError(`is larger than ${String(MAX_KEY_FILE_BYTES)} bytes`);
+  try {
+    const stats = fstatSync(fd);
+    if (!stats.isFile()) throw new KeyFileError("is not a regular file");
+    // Read at most one byte more than the limit, so oversized files are detected without
+    // trusting the size reported by stat.
+    const buffer = Buffer.alloc(MAX_KEY_FILE_BYTES + 1);
+    let length = 0;
+    for (;;) {
+      const read = readSync(fd, buffer, length, buffer.length - length, null);
+      if (read === 0) break;
+      length += read;
+      if (length > MAX_KEY_FILE_BYTES) {
+        throw new KeyFileError(`is larger than ${String(MAX_KEY_FILE_BYTES)} bytes`);
+      }
+    }
+    return buffer.toString("utf8", 0, length);
+  } finally {
+    closeSync(fd);
   }
-  return readFileSync(path, "utf8");
 };
 
 /**
