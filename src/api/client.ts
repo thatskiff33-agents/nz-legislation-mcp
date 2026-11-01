@@ -219,18 +219,22 @@ export class LegislationClient {
     const deadline = this.#now() + this.#totalBudgetMs;
     const budget = AbortSignal.timeout(this.#totalBudgetMs);
     for (let attempt = 0; ; attempt += 1) {
-      this.#enterCircuit();
+      const isProbe = this.#enterCircuit();
       let apiError: ApiError;
       try {
         const attemptMs = Math.max(1, Math.min(this.#timeoutMs, deadline - this.#now()));
         const value = await this.#attempt(url, schema, what, attemptMs, budget);
-        this.#circuitResult(false);
+        this.#circuitResult(false, isProbe);
         return value;
       } catch (error) {
-        // #attempt converts every failure into an ApiError.
-        apiError = error as ApiError;
+        if (error instanceof ApiError) {
+          apiError = error;
+        } else {
+          this.#logger.error("internal error while handling an api response", { error });
+          apiError = apiErrors.internal();
+        }
       }
-      this.#circuitResult(isUpstreamFault(apiError));
+      this.#circuitResult(isUpstreamFault(apiError), isProbe);
 
       const delay = this.#backoff(attempt);
       const retryable = apiError.kind === "upstream_unavailable" || apiError.kind === "network";
@@ -256,8 +260,11 @@ export class LegislationClient {
     budget: AbortSignal,
   ): Promise<T> {
     const started = this.#now();
+    // Only the network operations are classified as transport failures; anything else that
+    // throws is a bug in this server and must not be retried or trip the circuit breaker.
+    let response: Response;
     try {
-      const response = await this.#fetch(url, {
+      response = await this.#fetch(url, {
         method: "GET",
         headers: {
           "X-Api-Key": this.#apiKey.reveal(),
@@ -268,29 +275,31 @@ export class LegislationClient {
         redirect: "manual",
         signal: AbortSignal.any([AbortSignal.timeout(attemptMs), budget]),
       });
+    } catch (error) {
+      throw transportError(error, attemptMs);
+    }
 
-      this.#captureQuota(response);
-      this.#logger.debug("api response", {
-        path: url.pathname,
-        status: response.status,
-        ms: this.#now() - started,
-      });
+    this.#captureQuota(response);
+    this.#logger.debug("api response", {
+      path: url.pathname,
+      status: response.status,
+      ms: this.#now() - started,
+    });
 
-      if (response.status !== 200) {
-        await response.body?.cancel();
-        throw this.#statusError(response, what);
-      }
+    if (response.status !== 200) {
+      await response.body?.cancel().catch(() => undefined);
+      throw this.#statusError(response, what);
+    }
 
-      // The body read is covered by the same signal, so a stalled body times out too.
-      const text = await this.#readCapped(response);
-      return this.#parse(text, schema, url);
+    // The body read is covered by the same signal, so a stalled body times out too.
+    let text: string;
+    try {
+      text = await this.#readCapped(response);
     } catch (error) {
       if (error instanceof ApiError) throw error;
-      if (error instanceof DOMException && error.name === "TimeoutError") {
-        throw apiErrors.timeout(attemptMs);
-      }
-      throw apiErrors.network();
+      throw transportError(error, attemptMs);
     }
+    return this.#parse(text, schema, url);
   }
 
   #parse<T>(text: string, schema: z.ZodType<T>, url: URL): T {
@@ -365,6 +374,9 @@ export class LegislationClient {
       [limit, remaining, reset].every((n) => Number.isInteger(n) && n >= 0);
     const previous = this.#quota;
 
+    if (valid && previous !== undefined && reset < previous.resetEpochSeconds) {
+      return; // late response from an earlier quota period
+    }
     if (valid) {
       // Responses can arrive out of order: within one quota period, never raise `remaining`.
       const lower = previous?.resetEpochSeconds === reset && previous.remaining < remaining;
@@ -380,26 +392,33 @@ export class LegislationClient {
     }
   }
 
-  /** Throws if the circuit is open; lets exactly one probe through when half-open. */
-  #enterCircuit(): void {
-    if (this.#circuitOpenUntil === 0) return;
+  /**
+   * Throws if the circuit is open. When half-open, lets exactly one probe through and returns
+   * true for it.
+   */
+  #enterCircuit(): boolean {
+    if (this.#circuitOpenUntil === 0) return false;
     const remainingMs = this.#circuitOpenUntil - this.#now();
     if (remainingMs > 0) throw apiErrors.circuitOpen(remainingMs);
     if (this.#probeInFlight) throw apiErrors.circuitOpen(1000);
     this.#probeInFlight = true;
+    return true;
   }
 
-  /** Records an attempt's outcome for the circuit breaker. */
-  #circuitResult(upstreamFault: boolean): void {
-    const wasProbe = this.#probeInFlight;
-    this.#probeInFlight = false;
+  /**
+   * Records an attempt's outcome. While the circuit is open or half-open only the probe's
+   * outcome counts, so requests that started before the circuit opened cannot change it.
+   */
+  #circuitResult(upstreamFault: boolean, isProbe: boolean): void {
+    if (this.#circuitOpenUntil !== 0 && !isProbe) return;
+    if (isProbe) this.#probeInFlight = false;
     if (!upstreamFault) {
       this.#consecutiveFaults = 0;
       this.#circuitOpenUntil = 0;
       return;
     }
     this.#consecutiveFaults += 1;
-    if (wasProbe || this.#consecutiveFaults >= this.#circuitThreshold) {
+    if (isProbe || this.#consecutiveFaults >= this.#circuitThreshold) {
       this.#circuitOpenUntil = this.#now() + this.#circuitCooldownMs;
       this.#consecutiveFaults = 0;
       this.#logger.warn("circuit opened", { cooldownMs: this.#circuitCooldownMs });
@@ -452,6 +471,14 @@ function deepFreeze<T>(value: T): T {
     for (const child of Object.values(value)) deepFreeze(child);
   }
   return value;
+}
+
+/** Classifies a failure thrown by fetch or by reading the body. */
+function transportError(error: unknown, attemptMs: number): ApiError {
+  if (error instanceof DOMException && error.name === "TimeoutError") {
+    return apiErrors.timeout(attemptMs);
+  }
+  return apiErrors.network();
 }
 
 /** Failures that say the upstream is unhealthy (as opposed to a bad request or a quota). */

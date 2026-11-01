@@ -228,6 +228,43 @@ describe("status handling", () => {
   });
 });
 
+describe("internal errors", () => {
+  it("does not retry or trip the circuit for a bug in this server", async () => {
+    const logger = {
+      debug: () => {
+        throw new Error("logger bug");
+      },
+      info: () => undefined,
+      warn: () => undefined,
+      error: () => undefined,
+    };
+    const { c, fake } = client([json(fixture("version-latest")), json(fixture("version-latest"))], {
+      logger,
+      circuitThreshold: 1,
+    });
+    const e = await expectApiError(c.getVersion(VERSION_ID), "internal_error");
+    expect(e.retryable).toBe(false);
+    expect(fake.calls).toHaveLength(1);
+    // The circuit stayed closed: the next call is attempted (and fails the same way).
+    await expectApiError(c.getVersion(VERSION_ID), "internal_error");
+    expect(fake.calls).toHaveLength(2);
+  });
+
+  it("tolerates a body that cannot be cancelled on an error status", async () => {
+    const stubborn = () =>
+      new Response(
+        new ReadableStream({
+          cancel() {
+            throw new Error("cannot cancel");
+          },
+        }),
+        { status: 404 },
+      );
+    const { c } = client([stubborn]);
+    await expectApiError(c.getVersion(VERSION_ID), "not_found");
+  });
+});
+
 describe("time budget", () => {
   it("does not start a retry that would overrun the overall budget", async () => {
     let clock = 0;
@@ -404,6 +441,20 @@ describe("quota tracking", () => {
     expect(c.quota?.remaining).toBe(9999);
   });
 
+  it("ignores a late response from an earlier quota period", async () => {
+    const { c } = client([
+      json(fixture("version-latest"), 200, {
+        ...RATE_HEADERS,
+        "x-ratelimit-remaining": "9999",
+        "x-ratelimit-reset": "1793703600",
+      }),
+      json(fixture("version-latest"), 200, { ...RATE_HEADERS, "x-ratelimit-remaining": "3" }),
+    ]);
+    await c.getVersion(VERSION_ID);
+    await c.getVersion(VERSION_ID);
+    expect(c.quota).toMatchObject({ remaining: 9999, resetEpochSeconds: 1793703600 });
+  });
+
   it("leaves quota unknown on a 429 when nothing was seen before", async () => {
     const { c } = client([status(429)]);
     await expectApiError(c.getVersion(VERSION_ID), "daily_quota_exceeded");
@@ -464,6 +515,33 @@ describe("circuit breaker", () => {
     await expectApiError(c.listVersions({ work_id: "act_public_2007_97" }), "circuit_open");
     release(json(fixture("version-latest"))());
     await expect(probe).resolves.toBeTruthy();
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+  });
+
+  it("ignores the outcome of a request that started before the circuit opened", async () => {
+    let releaseSlow: (r: Response) => void = () => undefined;
+    const responses: (() => Promise<Response>)[] = [
+      () =>
+        new Promise<Response>((resolve) => {
+          releaseSlow = resolve;
+        }),
+      () => Promise.resolve(status(500)()),
+    ];
+    const fetchFn = vi.fn(() =>
+      (responses.shift() ?? (() => Promise.reject(new Error("extra"))))(),
+    );
+    const c = new LegislationClient({
+      apiKey: new Secret(KEY),
+      timeoutMs: 5000,
+      fetch: fetchFn,
+      circuitThreshold: 1,
+      circuitCooldownMs: 60_000,
+    });
+    const slow = c.getVersion(VERSION_ID);
+    await expectApiError(c.listVersions({ work_id: "act_public_2007_97" }), "upstream_error"); // opens
+    releaseSlow(json(fixture("version-latest"))());
+    await expect(slow).resolves.toBeTruthy(); // stale success must not close the circuit
+    await expectApiError(c.searchWorks(search), "circuit_open");
     expect(fetchFn).toHaveBeenCalledTimes(2);
   });
 

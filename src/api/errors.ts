@@ -19,7 +19,8 @@ export type ApiErrorKind =
   | "response_too_large"
   | "unexpected_redirect"
   | "circuit_open"
-  | "cancelled";
+  | "cancelled"
+  | "internal_error";
 
 export class ApiError extends Error {
   override readonly name = "ApiError";
@@ -125,6 +126,13 @@ export const apiErrors = {
       `The Legislation API answered with a redirect (${String(status)}), which this server does not follow for security. The API may have moved; please report this at https://github.com/thatskiff33-agents/nz-legislation-mcp/issues.`,
       false,
       status,
+    ),
+
+  internal: (): ApiError =>
+    new ApiError(
+      "internal_error",
+      "An internal error occurred in this MCP server while handling the API response. Please report it at https://github.com/thatskiff33-agents/nz-legislation-mcp/issues.",
+      false,
     ),
 
   cancelled: (): ApiError =>

@@ -26,20 +26,28 @@ export interface LoggerOptions {
   readonly now?: () => Date;
 }
 
-/** JSON.stringify that redacts strings, tolerates BigInt/Error/cycles, and never throws. */
+/**
+ * Converts a value into plain JSON data: strings redacted, BigInt as text, Errors as
+ * {name, message}, and only true cycles (an object containing its own ancestor) marked.
+ */
+function sanitise(value: unknown, redact: (text: string) => string, ancestors: object[]): unknown {
+  if (typeof value === "string") return redact(value);
+  if (typeof value === "bigint") return value.toString();
+  if (value instanceof Error) return { name: value.name, message: redact(value.message) };
+  if (typeof value !== "object" || value === null) return value;
+  if (ancestors.includes(value)) return "[Circular]";
+  const path = [...ancestors, value];
+  if (Array.isArray(value)) return value.map((item) => sanitise(item, redact, path));
+  if (typeof (value as { toJSON?: unknown }).toJSON === "function") return value; // e.g. Date
+  return Object.fromEntries(
+    Object.entries(value).map(([key, item]) => [key, sanitise(item, redact, path)]),
+  );
+}
+
+/** Serialises a log record; never throws. */
 function serialise(record: Record<string, unknown>, redact: (text: string) => string): string {
-  const seen = new WeakSet<object>();
   try {
-    return JSON.stringify(record, (_key, value: unknown) => {
-      if (typeof value === "string") return redact(value);
-      if (typeof value === "bigint") return value.toString();
-      if (value instanceof Error) return { name: value.name, message: redact(value.message) };
-      if (typeof value === "object" && value !== null) {
-        if (seen.has(value)) return "[Circular]";
-        seen.add(value);
-      }
-      return value;
-    });
+    return JSON.stringify(sanitise(record, redact, []));
   } catch {
     return JSON.stringify({
       time: record["time"],

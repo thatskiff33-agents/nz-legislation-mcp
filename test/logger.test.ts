@@ -74,6 +74,19 @@ describe("logger", () => {
     });
   });
 
+  it("prints a repeated (non-circular) object in full each time", () => {
+    const { log, last } = capture();
+    const shared = { a: 1 };
+    log.info("twice", { first: shared, second: shared, list: [shared, shared] });
+    expect(last()).toMatchObject({ first: { a: 1 }, second: { a: 1 }, list: [{ a: 1 }, { a: 1 }] });
+  });
+
+  it("keeps values with their own toJSON, such as dates", () => {
+    const { log, last } = capture();
+    log.info("dated", { at: new Date("2026-01-02T03:04:05.000Z") });
+    expect(last()).toMatchObject({ at: "2026-01-02T03:04:05.000Z" });
+  });
+
   it("falls back safely when serialisation still fails", () => {
     const { log, last } = capture();
     const hostile = {
