@@ -62,7 +62,7 @@ describe("requests", () => {
       "https://api.legislation.govt.nz/v0/works/?legislation_type=act&search_term=income+tax",
     );
     expect(call?.url).not.toContain(KEY);
-    expect(call?.init.redirect).toBe("error");
+    expect(call?.init.redirect).toBe("manual");
     expect(call?.init.headers).toEqual({
       "X-Api-Key": KEY,
       Accept: "application/json",
@@ -100,10 +100,10 @@ describe("requests", () => {
     expect(fake.calls[0]?.url).toBe(`https://api.legislation.govt.nz/v0/versions/${VERSION_ID}/`);
   });
 
-  it("refuses identifiers that bypassed schema validation", () => {
+  it("refuses identifiers that bypassed schema validation (as a rejected promise)", async () => {
     const { c, fake } = client([]);
-    expect(() => c.getVersion("../../admin")).toThrow(TypeError);
-    expect(() => c.listVersions({ work_id: "act_public_2007_97/../x" })).toThrow(TypeError);
+    await expect(c.getVersion("../../admin")).rejects.toThrow(TypeError);
+    await expect(c.listVersions({ work_id: "act_public_2007_97/../x" })).rejects.toThrow(TypeError);
     expect(fake.calls).toHaveLength(0);
   });
 });
@@ -115,12 +115,17 @@ describe("buildApiUrl", () => {
     );
   });
 
-  it.each(["//evil.example/v0/works/", "https://evil.example/v0/", "/admin", "v0/works/"])(
-    "refuses %j",
-    (path) => {
-      expect(() => buildApiUrl(path, new URLSearchParams())).toThrow(TypeError);
-    },
-  );
+  it.each([
+    "//evil.example/v0/works/",
+    "https://evil.example/v0/",
+    "/admin",
+    "/v0/../admin",
+    "/v0/%2e%2e/%2E%2E/admin",
+    "/v0/..\\x",
+    "/\\evil.example/v0/",
+  ])("refuses %j", (path) => {
+    expect(() => buildApiUrl(path, new URLSearchParams())).toThrow(TypeError);
+  });
 });
 
 describe("status handling", () => {
@@ -139,6 +144,24 @@ describe("status handling", () => {
     expect(e.message).not.toContain(KEY);
   });
 
+  it.each([301, 302, 307, 308])(
+    "surfaces a %i redirect without following or retrying it",
+    async (code) => {
+      const { c, fake } = client([status(code, { location: "https://evil.example/" })], {
+        circuitThreshold: 1,
+      });
+      const e = await expectApiError(c.getVersion(VERSION_ID), "unexpected_redirect");
+      expect(e.retryable).toBe(false);
+      expect(fake.calls).toHaveLength(1);
+      // Not an upstream fault: the circuit stays closed.
+      const again = client([status(code), json(fixture("version-latest"))], {
+        circuitThreshold: 1,
+      });
+      await expectApiError(again.c.getVersion(VERSION_ID), "unexpected_redirect");
+      await expect(again.c.getVersion(VERSION_ID)).resolves.toBeTruthy();
+    },
+  );
+
   it("names the missing thing on 404", async () => {
     const { c } = client([status(404)]);
     const e = await expectApiError(c.getVersion("act_public_2007_97_en_1900-01-01"), "not_found");
@@ -149,6 +172,14 @@ describe("status handling", () => {
     const { c } = client([status(429, { "x-ratelimit-reset": "1793617200" })]);
     const e = await expectApiError(c.searchWorks(search), "daily_quota_exceeded");
     expect(e.message).toContain(new Date(1793617200 * 1000).toISOString());
+  });
+
+  it("uses the last known reset time when 429 has no header", async () => {
+    const { c } = client([json(fixture("version-latest")), status(429)]);
+    await c.getVersion(VERSION_ID);
+    const e = await expectApiError(c.searchWorks(search), "daily_quota_exceeded");
+    expect(e.message).toContain(new Date(1793617200 * 1000).toISOString());
+    expect(c.quota?.remaining).toBe(0);
   });
 
   it("falls back to midnight NZ time when 429 has no reset header", async () => {
@@ -197,7 +228,93 @@ describe("status handling", () => {
   });
 });
 
+describe("time budget", () => {
+  it("does not start a retry that would overrun the overall budget", async () => {
+    let clock = 0;
+    const fake = fakeFetch(status(503), status(503), status(503));
+    const c = new LegislationClient({
+      apiKey: new Secret(KEY),
+      timeoutMs: 5000,
+      totalBudgetMs: 3000,
+      fetch: fake.fn,
+      random: () => 0.99,
+      now: () => clock,
+      backoffBaseMs: 1500,
+      sleep: (ms) => {
+        clock += ms;
+        return Promise.resolve();
+      },
+    });
+    await expectApiError(c.getVersion(VERSION_ID), "upstream_unavailable");
+    // attempt 1 at t=0, backoff ~1485 -> attempt 2 at ~1485; next backoff ~2970 would overrun 3000.
+    expect(fake.calls).toHaveLength(2);
+  });
+
+  it("shrinks the per-attempt timeout to the remaining budget", async () => {
+    let clock = 0;
+    const timeout = new DOMException("timed out", "TimeoutError");
+    const fake = fakeFetch(status(503), timeout);
+    const c = new LegislationClient({
+      apiKey: new Secret(KEY),
+      timeoutMs: 5000,
+      totalBudgetMs: 4000,
+      fetch: fake.fn,
+      random: () => 0.5,
+      now: () => clock,
+      backoffBaseMs: 2000,
+      sleep: (ms) => {
+        clock += ms;
+        return Promise.resolve();
+      },
+    });
+    const e = await expectApiError(c.getVersion(VERSION_ID), "timeout");
+    expect(e.message).toContain("3000 ms"); // 4000 budget - 1000 elapsed
+  });
+});
+
+describe("cancellation", () => {
+  it("rejects immediately when already aborted, without a request", async () => {
+    const { c, fake } = client([]);
+    await expectApiError(c.getVersion(VERSION_ID, { signal: AbortSignal.abort() }), "cancelled");
+    expect(fake.calls).toHaveLength(0);
+  });
+
+  it("detaches a cancelled caller while other coalesced callers still get the result", async () => {
+    let release: (r: Response) => void = () => undefined;
+    const pending = new Promise<Response>((resolve) => {
+      release = resolve;
+    });
+    const fetchFn = vi.fn(() => pending) as unknown as typeof fetch;
+    const c = new LegislationClient({ apiKey: new Secret(KEY), timeoutMs: 5000, fetch: fetchFn });
+    const controller = new AbortController();
+    const cancelled = c.getVersion(VERSION_ID, { signal: controller.signal });
+    const other = c.getVersion(VERSION_ID);
+    controller.abort();
+    await expectApiError(cancelled, "cancelled");
+    release(json(fixture("version-latest"))());
+    await expect(other).resolves.toMatchObject({ title: "Income Tax Act 2007" });
+    expect(fetchFn).toHaveBeenCalledOnce();
+  });
+
+  it("passes results and errors through when the signal never fires", async () => {
+    const { c } = client([json(fixture("version-latest")), status(404)]);
+    const signal = new AbortController().signal;
+    await expect(c.getVersion(VERSION_ID, { signal })).resolves.toBeTruthy();
+    await expectApiError(c.getVersion("act_public_2007_97_en_1900-01-01", { signal }), "not_found");
+  });
+});
+
 describe("response handling", () => {
+  it("returns deeply frozen results so callers cannot mutate shared data", async () => {
+    const { c } = client([json(fixture("search-works"))]);
+    const r = await c.searchWorks(search);
+    expect(Object.isFrozen(r)).toBe(true);
+    expect(Object.isFrozen(r.results[0]?.latest_matching_version.formats)).toBe(true);
+    expect(() => {
+      (r as { total: number }).total = 0;
+    }).toThrow(TypeError);
+  });
+
   it("rejects malformed JSON", async () => {
     const { c } = client([() => new Response("<html>oops</html>", { status: 200 })]);
     await expectApiError(c.searchWorks(search), "invalid_response");
@@ -225,7 +342,7 @@ describe("response handling", () => {
 
   it("rejects a response that fails the schema and logs the issues without the key", async () => {
     const lines: string[] = [];
-    const logger = createLogger({ level: "debug", write: (l) => lines.push(l) });
+    const logger = createLogger({ level: "debug", write: (l) => lines.push(l), redact: (s) => s });
     const { c } = client([json({ results: "nope", page: 1, per_page: 20, total: 0 })], { logger });
     await expectApiError(c.searchWorks(search), "invalid_response");
     const logged = lines.join("");
@@ -270,6 +387,29 @@ describe("quota tracking", () => {
     });
   });
 
+  it("never raises remaining within one quota period (out-of-order responses)", async () => {
+    const { c } = client([
+      json(fixture("version-latest"), 200, { ...RATE_HEADERS, "x-ratelimit-remaining": "100" }),
+      json(fixture("version-latest"), 200, { ...RATE_HEADERS, "x-ratelimit-remaining": "105" }),
+      json(fixture("version-latest"), 200, {
+        ...RATE_HEADERS,
+        "x-ratelimit-remaining": "9999",
+        "x-ratelimit-reset": "1793703600",
+      }),
+    ]);
+    await c.getVersion(VERSION_ID);
+    await c.getVersion(VERSION_ID);
+    expect(c.quota?.remaining).toBe(100);
+    await c.getVersion(VERSION_ID); // new period: may rise
+    expect(c.quota?.remaining).toBe(9999);
+  });
+
+  it("leaves quota unknown on a 429 when nothing was seen before", async () => {
+    const { c } = client([status(429)]);
+    await expectApiError(c.getVersion(VERSION_ID), "daily_quota_exceeded");
+    expect(c.quota).toBeUndefined();
+  });
+
   it.each([
     {},
     { ...RATE_HEADERS, "x-ratelimit-remaining": "lots" },
@@ -293,6 +433,60 @@ describe("circuit breaker", () => {
     expect(open.message).toContain("10 s");
     expect(fake.calls).toHaveLength(2);
     advance(10_001);
+    await expect(c.getVersion(VERSION_ID)).resolves.toBeTruthy();
+  });
+
+  it("lets exactly one probe through when half-open, failing others fast", async () => {
+    let release: (r: Response) => void = () => undefined;
+    let clock = 0;
+    const responses: (() => Promise<Response>)[] = [
+      () => Promise.resolve(status(500)()),
+      () =>
+        new Promise<Response>((resolve) => {
+          release = resolve;
+        }),
+    ];
+    const fetchFn = vi.fn(() =>
+      (responses.shift() ?? (() => Promise.reject(new Error("extra"))))(),
+    );
+    const c = new LegislationClient({
+      apiKey: new Secret(KEY),
+      timeoutMs: 5000,
+      fetch: fetchFn,
+      circuitThreshold: 1,
+      circuitCooldownMs: 1000,
+      now: () => clock,
+    });
+    await expectApiError(c.getVersion(VERSION_ID), "upstream_error");
+    clock += 1001;
+    const probe = c.getVersion(VERSION_ID);
+    await Promise.resolve();
+    await expectApiError(c.listVersions({ work_id: "act_public_2007_97" }), "circuit_open");
+    release(json(fixture("version-latest"))());
+    await expect(probe).resolves.toBeTruthy();
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+  });
+
+  it("re-opens immediately when the half-open probe fails", async () => {
+    const { c, fake, advance } = client([status(500), status(500)], {
+      circuitThreshold: 1,
+      circuitCooldownMs: 1000,
+    });
+    await expectApiError(c.getVersion(VERSION_ID), "upstream_error"); // opens
+    advance(1001);
+    await expectApiError(c.getVersion(VERSION_ID), "upstream_error"); // probe fails
+    await expectApiError(c.getVersion(VERSION_ID), "circuit_open"); // re-opened at once
+    expect(fake.calls).toHaveLength(2);
+  });
+
+  it("closes when the half-open probe gets a non-fault answer such as 404", async () => {
+    const { c, advance } = client([status(500), status(404), json(fixture("version-latest"))], {
+      circuitThreshold: 1,
+      circuitCooldownMs: 1000,
+    });
+    await expectApiError(c.getVersion(VERSION_ID), "upstream_error");
+    advance(1001);
+    await expectApiError(c.getVersion(VERSION_ID), "not_found");
     await expect(c.getVersion(VERSION_ID)).resolves.toBeTruthy();
   });
 

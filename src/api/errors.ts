@@ -17,7 +17,9 @@ export type ApiErrorKind =
   | "network"
   | "invalid_response"
   | "response_too_large"
-  | "circuit_open";
+  | "unexpected_redirect"
+  | "circuit_open"
+  | "cancelled";
 
 export class ApiError extends Error {
   override readonly name = "ApiError";
@@ -116,6 +118,17 @@ export const apiErrors = {
       `The API response exceeded the ${String(limitBytes)}-byte safety limit. Request fewer results per page.`,
       false,
     ),
+
+  unexpectedRedirect: (status: number): ApiError =>
+    new ApiError(
+      "unexpected_redirect",
+      `The Legislation API answered with a redirect (${String(status)}), which this server does not follow for security. The API may have moved; please report this at https://github.com/thatskiff33-agents/nz-legislation-mcp/issues.`,
+      false,
+      status,
+    ),
+
+  cancelled: (): ApiError =>
+    new ApiError("cancelled", "The request was cancelled before it completed.", false),
 
   circuitOpen: (retryAfterMs: number): ApiError =>
     new ApiError(

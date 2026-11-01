@@ -2,7 +2,8 @@
  * Minimal structured logger.
  *
  * Writes one JSON object per line to stderr (stdout is reserved for the MCP stdio protocol).
- * Every line passes through a redactor so a secret can never be logged by accident.
+ * Redaction is mandatory: string values are redacted before serialisation (so escaping cannot
+ * hide a secret) and the finished line is redacted again. Serialisation never throws.
  */
 import type { LogLevel } from "./config.js";
 
@@ -19,15 +20,39 @@ export interface Logger {
 
 export interface LoggerOptions {
   readonly level: LogLevel;
-  /** Applied to each serialised line before it is written (e.g. `secret.redact`). */
-  readonly redact?: (line: string) => string;
+  /** Removes secrets from text, e.g. `secret.redact`. Required so it cannot be forgotten. */
+  readonly redact: (text: string) => string;
   readonly write?: (line: string) => void;
   readonly now?: () => Date;
 }
 
+/** JSON.stringify that redacts strings, tolerates BigInt/Error/cycles, and never throws. */
+function serialise(record: Record<string, unknown>, redact: (text: string) => string): string {
+  const seen = new WeakSet<object>();
+  try {
+    return JSON.stringify(record, (_key, value: unknown) => {
+      if (typeof value === "string") return redact(value);
+      if (typeof value === "bigint") return value.toString();
+      if (value instanceof Error) return { name: value.name, message: redact(value.message) };
+      if (typeof value === "object" && value !== null) {
+        if (seen.has(value)) return "[Circular]";
+        seen.add(value);
+      }
+      return value;
+    });
+  } catch {
+    return JSON.stringify({
+      time: record["time"],
+      level: record["level"],
+      message: record["message"],
+      fields: "[unserialisable]",
+    });
+  }
+}
+
 export function createLogger(options: LoggerOptions): Logger {
   const threshold = LEVEL_ORDER[options.level];
-  const redact = options.redact ?? ((line: string) => line);
+  const { redact } = options;
   const write = options.write ?? ((line: string) => process.stderr.write(line));
   const now = options.now ?? (() => new Date());
 
@@ -35,12 +60,17 @@ export function createLogger(options: LoggerOptions): Logger {
     (level: LogLevel) =>
     (message: string, fields: Fields = {}): void => {
       if (LEVEL_ORDER[level] < threshold) return;
-      const line = JSON.stringify({ time: now().toISOString(), level, message, ...fields });
-      write(`${redact(line)}\n`);
+      // Reserved keys last, so a field can never spoof time, level or message.
+      const record = { ...fields, time: now().toISOString(), level, message };
+      write(`${redact(serialise(record, redact))}\n`);
     };
 
   return { debug: log("debug"), info: log("info"), warn: log("warn"), error: log("error") };
 }
 
 /** A logger that discards everything (tests, or callers that do not log). */
-export const silentLogger: Logger = createLogger({ level: "error", write: () => undefined });
+export const silentLogger: Logger = createLogger({
+  level: "error",
+  redact: (text) => text,
+  write: () => undefined,
+});

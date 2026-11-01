@@ -1,19 +1,26 @@
 import { describe, expect, it, vi } from "vitest";
 import { createLogger, silentLogger } from "../src/logger.js";
+import { Secret } from "../src/secret.js";
+
+const fixed = () => new Date("2026-11-02T00:00:00.000Z");
+
+function capture(redact: (t: string) => string = (t) => t) {
+  const lines: string[] = [];
+  const log = createLogger({ level: "debug", write: (l) => lines.push(l), now: fixed, redact });
+  return { log, lines, last: () => JSON.parse(lines.at(-1) ?? "{}") as Record<string, unknown> };
+}
 
 describe("logger", () => {
-  const fixed = () => new Date("2026-11-02T00:00:00.000Z");
-
-  it("writes JSON lines at or above the threshold, redacted", () => {
+  it("writes JSON lines at or above the threshold", () => {
     const lines: string[] = [];
     const log = createLogger({
       level: "info",
       write: (l) => lines.push(l),
       now: fixed,
-      redact: (l) => l.replace("s3cret", "[REDACTED]"),
+      redact: (t) => t,
     });
     log.debug("hidden");
-    log.info("hello", { token: "s3cret" });
+    log.info("hello", { a: 1 });
     log.warn("careful");
     log.error("bad");
     expect(lines.map((l) => (JSON.parse(l) as { level: string }).level)).toEqual([
@@ -22,13 +29,72 @@ describe("logger", () => {
       "error",
     ]);
     expect(lines[0]).toBe(
-      '{"time":"2026-11-02T00:00:00.000Z","level":"info","message":"hello","token":"[REDACTED]"}\n',
+      '{"a":1,"time":"2026-11-02T00:00:00.000Z","level":"info","message":"hello"}\n',
     );
+  });
+
+  it("redacts secrets in values, nested values, error messages and the message itself", () => {
+    const secret = new Secret("s3cret-key-value");
+    const { log, lines } = capture((t) => secret.redact(t));
+    log.error("failed with s3cret-key-value", {
+      header: "X-Api-Key: s3cret-key-value",
+      nested: { deep: ["s3cret-key-value"] },
+      error: new Error("boom s3cret-key-value"),
+    });
+    expect(lines.join("")).not.toContain("s3cret-key-value");
+  });
+
+  it("redacts a secret even when JSON escaping would change it", () => {
+    const secret = new Secret('ab"cd\\ef-0123456789');
+    const { log, lines } = capture((t) => secret.redact(t));
+    log.info("x", { value: 'ab"cd\\ef-0123456789' });
+    expect(lines.join("")).toContain("[REDACTED]");
+    expect(lines.join("")).not.toContain("0123456789");
+  });
+
+  it("never lets fields spoof reserved keys", () => {
+    const { log, last } = capture();
+    log.info("real", { level: "error", message: "spoof", time: "never" });
+    expect(last()).toMatchObject({
+      level: "info",
+      message: "real",
+      time: "2026-11-02T00:00:00.000Z",
+    });
+  });
+
+  it("serialises BigInt, Error and circular references without throwing", () => {
+    const { log, last } = capture();
+    const circular: Record<string, unknown> = { name: "loop" };
+    circular["self"] = circular;
+    log.info("odd values", { big: 10n, err: new TypeError("bad"), circular });
+    expect(last()).toMatchObject({
+      big: "10",
+      err: { name: "TypeError", message: "bad" },
+      circular: { name: "loop", self: "[Circular]" },
+    });
+  });
+
+  it("falls back safely when serialisation still fails", () => {
+    const { log, last } = capture();
+    const hostile = {
+      toJSON() {
+        throw new Error("nope");
+      },
+    };
+    expect(() => {
+      log.warn("hostile", { hostile });
+    }).not.toThrow();
+    expect(last()).toEqual({
+      time: "2026-11-02T00:00:00.000Z",
+      level: "warn",
+      message: "hostile",
+      fields: "[unserialisable]",
+    });
   });
 
   it("defaults to stderr and the real clock", () => {
     const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
-    createLogger({ level: "debug" }).debug("to stderr");
+    createLogger({ level: "debug", redact: (t) => t }).debug("to stderr");
     expect(spy).toHaveBeenCalledOnce();
     expect(String(spy.mock.calls[0]?.[0])).toContain('"message":"to stderr"');
   });
