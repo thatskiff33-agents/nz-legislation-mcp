@@ -40,7 +40,7 @@ Base `https://api.legislation.govt.nz`. Authentication is the `X-Api-Key` header
 * **`publisher` appears in search results** but not in the documented response (it is documented only as a filter). It was `null` for Acts and populated for secondary legislation.
 * **The versions list returns fewer fields than documented.** For an Act (`act_public_2007_97`), items omit `act_classification`, which the spec lists. Schemas must treat these fields as optional.
 * **`page` and `per_page` work on the versions endpoint** and appear in its response, but the spec lists only `sort` as a request parameter.
-* **Same-day version suffixes:** for example `act_public_2007_97_en_2025-05-29B`.
+* **Same-day version suffixes:** for example `act_public_2007_97_en_2025-05-29B`. Across all 206 versions of the Income Tax Act 2007 (checked 2 Nov 2026) only one date has two versions, and newest-first order lists `2008-04-01B` before `2008-04-01`. The server therefore treats the highest suffix as the last version of that day. **To confirm with PCO.** Most `B` versions have no unsuffixed sibling.
 * **The latest version's format links use the `/latest/` alias,** for example `.../2007/97/en/latest.xml`. Historical versions use dated links, for example `.../2010-04-01.xml`. To cite a fixed version, build the dated URL from the `version_id`.
 * `pdf_original_scan` links point to `.../{date}/official_scan.pdf`.
 
