@@ -32,9 +32,9 @@ describe("loadConfig", () => {
   });
 
   it("uses the real file system by default", () => {
-    expect(problems({ [ENV.apiKeyFile]: "/definitely/not/a/real/path" }, undefined)).toEqual([
+    expect(() => loadConfig({ [ENV.apiKeyFile]: "/definitely/not/a/real/path" })).toThrow(
       `${ENV.apiKeyFile} points to a file that cannot be read.`,
-    ]);
+    );
   });
 
   it("reads options", () => {

@@ -24,7 +24,7 @@ const ID_TYPES = Object.values(ID_TYPE_BY_LEGISLATION_TYPE);
 // rejecting real identifiers; it is still a strict character whitelist.
 const YEAR_RE = /^~?\d{4}$/;
 const NUMBER_RE = /^~?\d{1,7}[A-Za-z]?(?:-[A-Za-z0-9]{1,4})?$/;
-const DATE_RE = /^(~?)(\d{4})-(\d{2})-(\d{2})([A-Z]{0,3})$/;
+const DATE_RE = /^~?\d{4}-\d{2}-\d{2}[A-Z]{0,3}$/;
 
 export interface WorkId {
   readonly type: IdType;
@@ -111,7 +111,8 @@ export function parseVersionId(input: string): ParseResult<VersionId> {
     return fail(`version_id must be 1 to ${String(MAX_ID_LENGTH)} characters.`);
   }
   const segments = input.split("_");
-  if (segments.length !== 6) {
+  const dateSegment = segments[5];
+  if (segments.length !== 6 || dateSegment === undefined) {
     return fail(
       `"${input}" is not a version_id. Expected {work_id}_en_{YYYY-MM-DD}, e.g. act_public_2007_97_en_2025-05-29.`,
     );
@@ -123,25 +124,26 @@ export function parseVersionId(input: string): ParseResult<VersionId> {
   if (language !== ID_LANGUAGE) {
     return fail(`Unsupported language "${String(language)}". Only "${ID_LANGUAGE}" is published.`);
   }
-  const match = DATE_RE.exec(segments[5] ?? "");
-  if (!match) {
-    return fail(
-      `Invalid version date "${String(segments[5])}". Expected YYYY-MM-DD, e.g. 2025-05-29.`,
-    );
+  if (!DATE_RE.test(dateSegment)) {
+    return fail(`Invalid version date "${dateSegment}". Expected YYYY-MM-DD, e.g. 2025-05-29.`);
   }
-  const [, tilde = "", y = "", m = "", d = "", suffix = ""] = match;
-  if (!isRealDate(Number(y), Number(m), Number(d))) {
-    return fail(`"${y}-${m}-${d}" is not a real calendar date.`);
+  // Grammar is validated above: optional "~", ten-character date, then 0-3 suffix letters.
+  const tilde = dateSegment.startsWith("~");
+  const body = tilde ? dateSegment.slice(1) : dateSegment;
+  const date = body.slice(0, 10);
+  const suffix = body.slice(10);
+  if (!isRealDate(Number(date.slice(0, 4)), Number(date.slice(5, 7)), Number(date.slice(8, 10)))) {
+    return fail(`"${date}" is not a real calendar date.`);
   }
   return {
     ok: true,
     value: {
       work: work.value,
       language: ID_LANGUAGE,
-      date: `${y}-${m}-${d}`,
+      date,
       suffix,
-      dateProvisional: tilde === "~",
-      provisional: work.value.provisional || tilde === "~",
+      dateProvisional: tilde,
+      provisional: work.value.provisional || tilde,
     },
   };
 }

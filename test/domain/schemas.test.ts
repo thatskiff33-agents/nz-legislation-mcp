@@ -84,6 +84,10 @@ describe("toSearchQuery", () => {
       "search_term=tax&administering_agencies=Inland+Revenue+Department&page=2",
     );
   });
+
+  it("ignores keys explicitly set to undefined", () => {
+    expect(toSearchQuery({ search_term: undefined, page: 3 }).toString()).toBe("page=3");
+  });
 });
 
 describe("VersionListParamsSchema", () => {
