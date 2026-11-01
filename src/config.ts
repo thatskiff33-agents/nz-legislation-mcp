@@ -15,12 +15,12 @@ export const ENV = {
   logLevel: "LEGISLATION_NZ_LOG_LEVEL",
 } as const;
 
-export const LOG_LEVELS = ["debug", "info", "warn", "error"] as const;
-export type LogLevel = (typeof LOG_LEVELS)[number];
+const LOG_LEVELS = ["debug", "info", "warn", "error"] as const;
+type LogLevel = (typeof LOG_LEVELS)[number];
 
 /** Response caching modes. `off` until PCO confirms caching is allowed (issue #3). */
-export const CACHE_MODES = ["off", "memory"] as const;
-export type CacheMode = (typeof CACHE_MODES)[number];
+const CACHE_MODES = ["off", "memory"] as const;
+type CacheMode = (typeof CACHE_MODES)[number];
 
 export interface Config {
   readonly apiKey: Secret;

@@ -61,9 +61,6 @@ export const BILL_STATUSES = ["current", "enacted", "terminated"] as const;
 
 export const VERSION_SORTS = ["asc", "desc"] as const;
 
-/** Format types a version may offer. */
-export const FORMAT_TYPES = ["html", "pdf", "xml", "pdf_original_scan"] as const;
-
 // ---------------------------------------------------------------------------
 // Which type-specific filters belong to which legislation type
 // ---------------------------------------------------------------------------
@@ -111,9 +108,6 @@ export const ID_LANGUAGE = "en";
 // ---------------------------------------------------------------------------
 // Hosts
 // ---------------------------------------------------------------------------
-
-/** The API host. The only host that ever receives the API key. */
-export const API_ORIGIN = "https://api.legislation.govt.nz";
 
 /** Public website host serving HTML, PDF and XML formats. Never receives the API key. */
 export const WEBSITE_ORIGIN = "https://www.legislation.govt.nz";

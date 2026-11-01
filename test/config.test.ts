@@ -1,0 +1,96 @@
+import { inspect } from "node:util";
+import { describe, expect, it } from "vitest";
+import { ConfigError, ENV, loadConfig } from "../src/config.js";
+
+const KEY = "abcDEF0123456789xyzKEYvalue";
+const noFile = (): string => {
+  throw new Error("no file");
+};
+
+function problems(env: Record<string, string>, reader: (p: string) => string = noFile): string[] {
+  try {
+    loadConfig(env, reader);
+  } catch (e) {
+    if (e instanceof ConfigError) return [...e.problems];
+    throw e;
+  }
+  return [];
+}
+
+describe("loadConfig", () => {
+  it("loads a key from the environment with safe defaults", () => {
+    const c = loadConfig({ [ENV.apiKey]: `  ${KEY}\n` }, noFile);
+    expect(c.apiKey.reveal()).toBe(KEY);
+    expect(c).toMatchObject({ timeoutMs: 15_000, cache: "off", logLevel: "info" });
+  });
+
+  it("loads a key from a file (secrets pattern)", () => {
+    const c = loadConfig({ [ENV.apiKeyFile]: "/run/secrets/key" }, (p) =>
+      p === "/run/secrets/key" ? `${KEY}\r\n` : "",
+    );
+    expect(c.apiKey.reveal()).toBe(KEY);
+  });
+
+  it("uses the real file system by default", () => {
+    expect(problems({ [ENV.apiKeyFile]: "/definitely/not/a/real/path" }, undefined)).toEqual([
+      `${ENV.apiKeyFile} points to a file that cannot be read.`,
+    ]);
+  });
+
+  it("reads options", () => {
+    const c = loadConfig(
+      {
+        [ENV.apiKey]: KEY,
+        [ENV.timeoutMs]: "5000",
+        [ENV.cache]: "memory",
+        [ENV.logLevel]: "debug",
+      },
+      noFile,
+    );
+    expect(c).toMatchObject({ timeoutMs: 5000, cache: "memory", logLevel: "debug" });
+  });
+
+  it("treats empty option values as unset", () => {
+    expect(loadConfig({ [ENV.apiKey]: KEY, [ENV.timeoutMs]: "" }, noFile).timeoutMs).toBe(15_000);
+  });
+
+  it.each([
+    [{}, "No API key found"],
+    [{ [ENV.apiKey]: "" }, "No API key found"],
+    [{ [ENV.apiKey]: "   " }, "is empty"],
+    [{ [ENV.apiKey]: "YOUR_KEY" }, "placeholder"],
+    [{ [ENV.apiKey]: "short" }, "8 to 512 characters"],
+    [{ [ENV.apiKey]: "has space in key value" }, "spaces, quotes"],
+    [{ [ENV.apiKey]: '"quotedkeyvalue"' }, "spaces, quotes"],
+    [{ [ENV.apiKey]: KEY, [ENV.apiKeyFile]: "/x" }, "Set only one"],
+    [{ [ENV.apiKey]: KEY, [ENV.timeoutMs]: "10" }, `${ENV.timeoutMs} is invalid`],
+    [{ [ENV.apiKey]: KEY, [ENV.cache]: "disk" }, `${ENV.cache} is invalid`],
+    [{ [ENV.apiKey]: KEY, [ENV.logLevel]: "verbose" }, `${ENV.logLevel} is invalid`],
+  ])("reports a clear problem for %j", (env, message) => {
+    expect(problems(env).join("\n")).toContain(message);
+  });
+
+  it("reports an invalid key read from a file", () => {
+    expect(problems({ [ENV.apiKeyFile]: "/k" }, () => "YOUR_KEY")[0]).toContain(
+      `file named by ${ENV.apiKeyFile}`,
+    );
+  });
+
+  it("collects several problems at once", () => {
+    expect(problems({ [ENV.timeoutMs]: "x", [ENV.cache]: "disk" })).toHaveLength(3);
+  });
+
+  it("never includes key material in errors or inspected config", () => {
+    const bad = "bad key with spaces 0123456789";
+    let message = "";
+    try {
+      loadConfig({ [ENV.apiKey]: bad }, noFile);
+    } catch (e) {
+      message = String(e);
+    }
+    expect(message).toContain("Invalid configuration");
+    expect(message).not.toContain(bad);
+    const c = loadConfig({ [ENV.apiKey]: KEY }, noFile);
+    expect(JSON.stringify(c) + inspect(c, { depth: 10 })).not.toContain(KEY);
+  });
+});

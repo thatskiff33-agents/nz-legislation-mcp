@@ -8,7 +8,7 @@ export function fixture(name: string): unknown {
   return JSON.parse(readFileSync(join(DIR, `${name}.json`), "utf8")) as unknown;
 }
 
-export function fixtureNames(): string[] {
+function fixtureNames(): string[] {
   return readdirSync(DIR)
     .filter((f) => f.endsWith(".json"))
     .map((f) => f.replace(/\.json$/, ""));

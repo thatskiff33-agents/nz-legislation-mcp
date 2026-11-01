@@ -1,9 +1,7 @@
 {
   "act_status": "in_force",
   "act_type": "public",
-  "administering_agencies": [
-    "Inland Revenue Department"
-  ],
+  "administering_agencies": ["Inland Revenue Department"],
   "formats": [
     {
       "type": "html",

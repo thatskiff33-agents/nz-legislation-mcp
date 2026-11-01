@@ -59,13 +59,13 @@ export const VersionIdSchema = z
 // ---------------------------------------------------------------------------
 
 /** Maximum search term length. The API uses Elasticsearch simple query string syntax. */
-export const MAX_SEARCH_TERM_LENGTH = 500;
+const MAX_SEARCH_TERM_LENGTH = 500;
 /** Agency names must match the website's "browse agencies" list exactly. */
-export const MAX_AGENCY_LENGTH = 200;
+const MAX_AGENCY_LENGTH = 200;
 /** API maximum page size. */
-export const MAX_PER_PAGE = 100;
+const MAX_PER_PAGE = 100;
 /** Guard against pathological page numbers. */
-export const MAX_PAGE = 10_000;
+const MAX_PAGE = 10_000;
 
 /**
  * Flat object (no root-level union) because several MCP clients mishandle `oneOf`/`anyOf`
@@ -146,7 +146,7 @@ export type SearchParams = z.infer<typeof SearchParamsSchema>;
  */
 export function toSearchQuery(params: SearchParams): URLSearchParams {
   const query = new URLSearchParams();
-  for (const [key, value] of Object.entries(params) as [string, string | number | undefined][]) {
+  for (const [key, value] of Object.entries<string | number | undefined>(params)) {
     if (value === undefined) continue;
     query.set(key === "administering_agency" ? "administering_agencies" : key, String(value));
   }
@@ -161,8 +161,6 @@ export const VersionListParamsSchema = z
     per_page: z.number().int().min(1).max(MAX_PER_PAGE).optional(),
   })
   .strict();
-
-export type VersionListParams = z.infer<typeof VersionListParamsSchema>;
 
 // ---------------------------------------------------------------------------
 // API response schemas (tolerant reader)
@@ -200,9 +198,8 @@ export const VersionRecordSchema = z.object({
   formats: z.array(FormatSchema).nullish(),
   ...classificationFields,
 });
-export type VersionRecord = z.infer<typeof VersionRecordSchema>;
 
-export const WorkSearchResultSchema = z.object({
+const WorkSearchResultSchema = z.object({
   work_id: apiId,
   ...classificationFields,
   latest_matching_version: z.object({
@@ -212,7 +209,6 @@ export const WorkSearchResultSchema = z.object({
     formats: z.array(FormatSchema).nullish(),
   }),
 });
-export type WorkSearchResult = z.infer<typeof WorkSearchResultSchema>;
 
 const pageFields = {
   page: z.number().int().min(1),
@@ -224,13 +220,11 @@ export const SearchResponseSchema = z.object({
   results: z.array(WorkSearchResultSchema),
   ...pageFields,
 });
-export type SearchResponse = z.infer<typeof SearchResponseSchema>;
 
 export const VersionListResponseSchema = z.object({
   results: z.array(VersionRecordSchema),
   ...pageFields,
 });
-export type VersionListResponse = z.infer<typeof VersionListResponseSchema>;
 
 /** Error body shapes observed: `{"error":"API key is required"}` and `{"error":"404","message":"Not Found"}`. */
 export const ApiErrorBodySchema = z.object({

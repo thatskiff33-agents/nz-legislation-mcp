@@ -1,9 +1,7 @@
 {
   "results": [
     {
-      "administering_agencies": [
-        "Ministry of Health"
-      ],
+      "administering_agencies": ["Ministry of Health"],
       "instrument_classification": "principal",
       "instrument_status": "in_force",
       "instrument_type_group": "other_type",
@@ -20,9 +18,7 @@
       "work_id": "secondary-legislation_agency-drafted_~2026_~346285"
     },
     {
-      "administering_agencies": [
-        "Ministry of Health"
-      ],
+      "administering_agencies": ["Ministry of Health"],
       "instrument_classification": "principal",
       "instrument_status": "in_force",
       "instrument_type_group": "other_type",
@@ -39,9 +35,7 @@
       "work_id": "secondary-legislation_agency-drafted_~2026_~346284"
     },
     {
-      "administering_agencies": [
-        "Reserve Bank of New Zealand"
-      ],
+      "administering_agencies": ["Reserve Bank of New Zealand"],
       "instrument_classification": "principal",
       "instrument_status": "in_force",
       "instrument_type_group": "other_type",
@@ -58,9 +52,7 @@
       "work_id": "secondary-legislation_agency-drafted_~2026_~346234"
     },
     {
-      "administering_agencies": [
-        "Ministry of Health"
-      ],
+      "administering_agencies": ["Ministry of Health"],
       "instrument_classification": "principal",
       "instrument_status": "in_force",
       "instrument_type_group": "other_type",
@@ -77,9 +69,7 @@
       "work_id": "secondary-legislation_agency-drafted_~2026_~346205"
     },
     {
-      "administering_agencies": [
-        "Ministry of Health"
-      ],
+      "administering_agencies": ["Ministry of Health"],
       "instrument_classification": "principal",
       "instrument_status": "in_force",
       "instrument_type_group": "other_type",
@@ -96,9 +86,7 @@
       "work_id": "secondary-legislation_agency-drafted_~2026_~346206"
     },
     {
-      "administering_agencies": [
-        "Fish & Game New Zealand"
-      ],
+      "administering_agencies": ["Fish & Game New Zealand"],
       "instrument_classification": "principal",
       "instrument_status": "in_force",
       "instrument_type_group": "notice",
@@ -115,9 +103,7 @@
       "work_id": "secondary-legislation_agency-drafted_~2026_~346190"
     },
     {
-      "administering_agencies": [
-        "Electricity Authority Te Mana Hiko"
-      ],
+      "administering_agencies": ["Electricity Authority Te Mana Hiko"],
       "instrument_classification": "amendment",
       "instrument_status": "in_force",
       "instrument_type_group": "code",
@@ -139,9 +125,7 @@
       "work_id": "secondary-legislation_agency-drafted_2026_~346217"
     },
     {
-      "administering_agencies": [
-        "Ministry of Health"
-      ],
+      "administering_agencies": ["Ministry of Health"],
       "instrument_classification": "principal",
       "instrument_status": "in_force",
       "instrument_type_group": "other_type",
@@ -158,9 +142,7 @@
       "work_id": "secondary-legislation_agency-drafted_~2026_~346124"
     },
     {
-      "administering_agencies": [
-        "Ministry of Health"
-      ],
+      "administering_agencies": ["Ministry of Health"],
       "instrument_classification": "principal",
       "instrument_status": "in_force",
       "instrument_type_group": "other_type",
@@ -177,9 +159,7 @@
       "work_id": "secondary-legislation_agency-drafted_~2026_~346125"
     },
     {
-      "administering_agencies": [
-        "The Office of the Privacy Commissioner"
-      ],
+      "administering_agencies": ["The Office of the Privacy Commissioner"],
       "instrument_classification": "principal",
       "instrument_status": "revoked",
       "instrument_type_group": "code",
@@ -201,9 +181,7 @@
       "work_id": "secondary-legislation_agency-drafted_~2025_~339011"
     },
     {
-      "administering_agencies": [
-        "The Office of the Privacy Commissioner"
-      ],
+      "administering_agencies": ["The Office of the Privacy Commissioner"],
       "instrument_classification": "amendment",
       "instrument_status": "revoked",
       "instrument_type_group": "code",
@@ -225,9 +203,7 @@
       "work_id": "secondary-legislation_agency-drafted_~2026_~346117"
     },
     {
-      "administering_agencies": [
-        "The Office of the Privacy Commissioner"
-      ],
+      "administering_agencies": ["The Office of the Privacy Commissioner"],
       "instrument_classification": "amendment",
       "instrument_status": "revoked",
       "instrument_type_group": "code",
@@ -249,9 +225,7 @@
       "work_id": "secondary-legislation_agency-drafted_~2026_~346106"
     },
     {
-      "administering_agencies": [
-        "The Office of the Privacy Commissioner"
-      ],
+      "administering_agencies": ["The Office of the Privacy Commissioner"],
       "instrument_classification": "amendment",
       "instrument_status": "revoked",
       "instrument_type_group": "code",
@@ -273,9 +247,7 @@
       "work_id": "secondary-legislation_agency-drafted_~2026_~346116"
     },
     {
-      "administering_agencies": [
-        "The Office of the Privacy Commissioner"
-      ],
+      "administering_agencies": ["The Office of the Privacy Commissioner"],
       "instrument_classification": "amendment",
       "instrument_status": "revoked",
       "instrument_type_group": "code",
@@ -297,9 +269,7 @@
       "work_id": "secondary-legislation_agency-drafted_~2026_~346120"
     },
     {
-      "administering_agencies": [
-        "The Office of the Privacy Commissioner"
-      ],
+      "administering_agencies": ["The Office of the Privacy Commissioner"],
       "instrument_classification": "amendment",
       "instrument_status": "revoked",
       "instrument_type_group": "code",
