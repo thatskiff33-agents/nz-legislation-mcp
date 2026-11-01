@@ -80,6 +80,11 @@ export const TYPE_SPECIFIC_FILTERS = {
   amendment_paper: [],
 } as const satisfies Record<LegislationType, readonly string[]>;
 
+/** Legislation types that can have publisher "Agency" (per the OpenAPI spec; confirmed live). */
+export const AGENCY_PUBLISHED_TYPES = [
+  "secondary_legislation",
+] as const satisfies readonly LegislationType[];
+
 // ---------------------------------------------------------------------------
 // Identifier vocabularies (identifiers use hyphens and different subtype spellings)
 // ---------------------------------------------------------------------------

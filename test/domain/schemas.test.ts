@@ -11,6 +11,8 @@ import {
   VersionRecordSchema,
   WorkIdSchema,
 } from "../../src/domain/schemas.js";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { fixture } from "../fixtures.js";
 
 describe("identifier schemas", () => {
@@ -19,6 +21,11 @@ describe("identifier schemas", () => {
     expect(VersionIdSchema.parse("act_public_2007_97_en_2025-05-29B")).toBe(
       "act_public_2007_97_en_2025-05-29B",
     );
+  });
+
+  it("reports a single message for an over-long identifier", () => {
+    const r = WorkIdSchema.safeParse("x".repeat(200));
+    expect(r.error?.issues).toHaveLength(1);
   });
 
   it("reports the parser's actionable message", () => {
@@ -56,6 +63,38 @@ describe("SearchParamsSchema", () => {
     const r = SearchParamsSchema.safeParse(input);
     expect(r.success).toBe(false);
     expect(r.error?.issues.map((i) => i.message).join(" ")).toContain(message);
+  });
+
+  it.each([
+    [{ legislation_type: "act", publisher: "Agency" }, true],
+    [{ legislation_type: "bill", publisher: "Agency" }, true],
+    [{ legislation_type: "secondary_legislation", publisher: "Agency" }, false],
+    [{ publisher: "Agency" }, false],
+    [{ legislation_type: "act", publisher: "Parliamentary Counsel Office" }, false],
+  ])("publisher rule for %j (rejected: %s)", (input, rejected) => {
+    const r = SearchParamsSchema.safeParse(input);
+    expect(r.success).toBe(!rejected);
+    if (rejected) expect(r.error?.issues[0]?.message).toContain('publisher "Agency" only applies');
+  });
+
+  it("keeps the default message for a non-object input", () => {
+    const r = SearchParamsSchema.safeParse("tax");
+    expect(r.error?.issues[0]?.message).toContain("expected object");
+  });
+
+  it("lists allowed parameters when an unknown one is given", () => {
+    const r = SearchParamsSchema.safeParse({ query: "tax" });
+    expect(r.error?.issues[0]?.message).toMatch(
+      /Unknown parameter\(s\): query\. Allowed parameters: search_term, /,
+    );
+  });
+
+  it.each([
+    { search_term: "tax\u0000" },
+    { search_term: "tax\nlevy" },
+    { administering_agency: "Inland Revenue\u0007" },
+  ])("rejects control characters in %j", (input) => {
+    expect(SearchParamsSchema.safeParse(input).success).toBe(false);
   });
 
   it.each([
@@ -137,10 +176,62 @@ describe("response schemas parse every recorded response", () => {
     expect(r).not.toHaveProperty("brand_new_field");
   });
 
+  it("drops one bad format link instead of failing the whole response", () => {
+    const body = structuredClone(fixture("search-secondary-agency")) as {
+      results: { latest_matching_version: { formats: { type: string; url: string }[] } }[];
+    };
+    const withLinks = body.results.find((r) => r.latest_matching_version.formats.length > 0);
+    if (withLinks === undefined) throw new Error("fixture has no linked records");
+    const before = withLinks.latest_matching_version.formats.length;
+    withLinks.latest_matching_version.formats.push(
+      { type: "pdf", url: "http://insecure.example/x.pdf" },
+      { type: "pdf", url: "https://user:pw@evil.example/x.pdf" },
+      { type: "pdf" } as unknown as { type: string; url: string },
+    );
+    const parsed = SearchResponseSchema.parse(body);
+    const record = parsed.results.find(
+      (r) => r.work_id === (withLinks as unknown as { work_id: string }).work_id,
+    );
+    expect(record?.latest_matching_version.formats).toHaveLength(before);
+  });
+
+  it("treats a missing format list as empty", () => {
+    const r = VersionRecordSchema.parse({
+      work_id: "w",
+      version_id: "v",
+      title: "t",
+      formats: null,
+    });
+    expect(r.formats).toEqual([]);
+  });
+
   it("rejects non-https format links", () => {
     expect(FormatSchema.safeParse({ type: "pdf", url: "http://example.com/x.pdf" }).success).toBe(
       false,
     );
     expect(FormatSchema.safeParse({ type: "pdf", url: "javascript:alert(1)" }).success).toBe(false);
+    expect(FormatSchema.safeParse({ type: "pdf", url: "https://a:b@x.example/y" }).success).toBe(
+      false,
+    );
+    expect(FormatSchema.safeParse({ type: "pdf", url: "https://x.example/y" }).success).toBe(true);
+  });
+});
+
+describe("search parameters match the API spec", () => {
+  it("sends only parameters the /v0/works/ endpoint documents", () => {
+    const spec = JSON.parse(
+      readFileSync(
+        join(import.meta.dirname, "..", "..", "spec", "legislation-api-v0.openapi.json"),
+        "utf8",
+      ),
+    ) as { paths: Record<string, { get: { parameters: { name: string }[] } }> };
+    const documented = new Set(spec.paths["/v0/works/"]?.get.parameters.map((p) => p.name));
+    const sent = [
+      ...toSearchQuery(
+        Object.fromEntries(Object.keys(SearchParamsSchema.shape).map((k) => [k, 1])),
+      ).keys(),
+    ];
+    expect(sent.length).toBe(Object.keys(SearchParamsSchema.shape).length);
+    for (const name of sent) expect(documented).toContain(name);
   });
 });

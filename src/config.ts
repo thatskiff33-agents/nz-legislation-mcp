@@ -3,7 +3,7 @@
  *
  * Error messages name the variable at fault but never echo its value.
  */
-import { readFileSync } from "node:fs";
+import { readFileSync, statSync } from "node:fs";
 import { z } from "zod";
 import { Secret } from "./secret.js";
 
@@ -41,10 +41,19 @@ const PLACEHOLDER_KEYS = new Set([
   "your_key",
   "your-key",
   "your-key-here",
+  "your_key_here",
   "your_api_key",
+  "your-api-key",
+  "your_api_key_here",
+  "your-api-key-here",
   "changeme",
   "xxx",
 ]);
+/** Unexpanded variables (`${VAR}`, `$VAR`) and template markers (`<your key>`). */
+const PLACEHOLDER_PATTERN = /^\$\{.*\}$|^\$[A-Z_][A-Z0-9_]*$|^<.*>$/;
+
+/** Upper bound for a key file; anything larger is not a key. */
+const MAX_KEY_FILE_BYTES = 4096;
 
 const MIN_KEY_LENGTH = 8;
 const MAX_KEY_LENGTH = 512;
@@ -54,9 +63,9 @@ const KEY_CHARSET = /^[\x21-\x7e]+$/;
 function validateKey(raw: string, source: string): string | Error {
   const key = raw.trim();
   if (key.length === 0) return new Error(`${source} is empty.`);
-  if (PLACEHOLDER_KEYS.has(key.toLowerCase())) {
+  if (PLACEHOLDER_KEYS.has(key.toLowerCase()) || PLACEHOLDER_PATTERN.test(key)) {
     return new Error(
-      `${source} still contains the placeholder text. Replace it with your API key.`,
+      `${source} contains placeholder text or an unexpanded variable. Replace it with your API key.`,
     );
   }
   if (key.length < MIN_KEY_LENGTH || key.length > MAX_KEY_LENGTH) {
@@ -90,7 +99,28 @@ function parseOption<T>(
 
 type FileReader = (path: string) => string;
 
-const defaultReader: FileReader = (path) => readFileSync(path, "utf8");
+/** A key-file problem whose message is safe to show (it never includes file contents). */
+class KeyFileError extends Error {}
+
+/**
+ * Reads a key file, refusing anything that is not a small regular file. This prevents, for
+ * example, pointing at /dev/stdin (which would swallow MCP stdio traffic) or a huge file.
+ */
+const defaultReader: FileReader = (path) => {
+  let size: number;
+  try {
+    const stats = statSync(path);
+    if (!stats.isFile()) throw new KeyFileError("is not a regular file");
+    size = stats.size;
+  } catch (error) {
+    if (error instanceof KeyFileError) throw error;
+    throw new KeyFileError("cannot be read");
+  }
+  if (size > MAX_KEY_FILE_BYTES) {
+    throw new KeyFileError(`is larger than ${String(MAX_KEY_FILE_BYTES)} bytes`);
+  }
+  return readFileSync(path, "utf8");
+};
 
 /**
  * Loads configuration from the environment.
@@ -110,8 +140,9 @@ export function loadConfig(env: Env = process.env, readFile: FileReader = defaul
     let contents: string | undefined;
     try {
       contents = readFile(file);
-    } catch {
-      problems.push(`${ENV.apiKeyFile} points to a file that cannot be read.`);
+    } catch (error) {
+      const reason = error instanceof KeyFileError ? error.message : "cannot be read";
+      problems.push(`${ENV.apiKeyFile} points to a file that ${reason}.`);
     }
     if (contents !== undefined) {
       const result = validateKey(contents, `The file named by ${ENV.apiKeyFile}`);

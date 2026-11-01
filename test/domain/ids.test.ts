@@ -66,6 +66,9 @@ describe("parseWorkId", () => {
     ["act_public_07_97", "Invalid year"],
     ["act_public_2007_9 7", "Invalid number"],
     ["act_public_2007_../../etc", "Invalid number"],
+    ["act_public_2007_97a", "Invalid number"],
+    ["act_public_２００７_97", "Invalid year"],
+    ["act\npublic_2007_97", "is not a work_id"],
   ])("rejects %j", (input, message) => {
     const r = parseWorkId(input);
     expect(r.ok).toBe(false);
@@ -82,6 +85,21 @@ describe("parseVersionId", () => {
       provisional: false,
       dateProvisional: false,
     });
+  });
+
+  it("accepts up to eight same-day suffix letters", () => {
+    expect(mustParseVersion("act_public_2007_97_en_2025-05-29ABCDEFGH").suffix).toBe("ABCDEFGH");
+  });
+
+  it("quotes untrusted input safely in error messages", () => {
+    const r = parseWorkId("evil\nline_public_2007_97");
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).not.toContain("\n");
+  });
+
+  it("parses a provisional year with a firm number", () => {
+    const v = mustParseVersion("secondary-legislation_agency-drafted_~2026_346217_en_2026-10-20");
+    expect(v.provisional).toBe(true);
   });
 
   it("parses a provisional date", () => {
@@ -103,6 +121,8 @@ describe("parseVersionId", () => {
     ["act_public_2007_97_en_29-05-2025", "Invalid version date"],
     ["act_public_2007_97_en_2025-02-30", "not a real calendar date"],
     ["act_public_2007_97_en_2025-13-01", "not a real calendar date"],
+    ["act_public_2007_97_en_2025-05-29ABCDEFGHI", "Invalid version date"],
+    ["act_public_2007_97_en_2025-05-29b", "Invalid version date"],
   ])("rejects %j", (input, message) => {
     const r = parseVersionId(input);
     expect(r.ok).toBe(false);
@@ -119,7 +139,7 @@ describe("property-based", () => {
         type: fc.constant(type),
         subtype: fc.constantFrom(...ID_SUBTYPES[type]),
         year: segment("~?[0-9]{4}"),
-        number: segment("~?[0-9]{1,7}[A-Za-z]?(-[A-Za-z0-9]{1,4})?"),
+        number: segment("~?[0-9]{1,7}[A-Z]?(-[A-Z0-9]{1,4})?"),
       }),
     );
   const dateArb = fc
@@ -150,13 +170,41 @@ describe("property-based", () => {
     );
   });
 
-  it("only accepts a safe URL character set", () => {
-    fc.assert(
-      fc.property(fc.string({ maxLength: 80 }), (s) => {
-        const r = parseVersionId(s);
-        if (r.ok) expect(s).toMatch(/^[A-Za-z0-9_~-]+$/);
-      }),
+  it("only accepts a safe URL character set, even from hostile near-miss inputs", () => {
+    // Mutate valid IDs with characters that matter for URLs and lookalike attacks.
+    const hostile = fc.constantFrom(
+      "/",
+      ".",
+      "%",
+      "\\",
+      "?",
+      "#",
+      " ",
+      "\u2215",
+      "２",
+      "\u200b",
+      "a",
+      "~",
+      "_",
+      "-",
     );
+    const valid = fc.constantFrom(...allFixtureIds().versionIds);
+    let accepted = 0;
+    fc.assert(
+      fc.property(valid, fc.nat(80), hostile, (id, at, ch) => {
+        const pos = at % (id.length + 1);
+        const mutated = id.slice(0, pos) + ch + id.slice(pos);
+        const r = parseVersionId(mutated);
+        if (r.ok) {
+          accepted += 1;
+          expect(mutated).toMatch(/^[A-Za-z0-9_~-]+$/);
+          expect(formatVersionId(r.value)).toBe(mutated);
+        }
+      }),
+      { numRuns: 500 },
+    );
+    // Some mutations (e.g. inserting a digit-safe "~") remain valid; the assertion must run.
+    expect(accepted).toBeGreaterThan(0);
   });
 });
 

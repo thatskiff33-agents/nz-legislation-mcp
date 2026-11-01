@@ -1,3 +1,6 @@
+import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { inspect } from "node:util";
 import { describe, expect, it } from "vitest";
 import { ConfigError, ENV, loadConfig } from "../src/config.js";
@@ -37,6 +40,32 @@ describe("loadConfig", () => {
     );
   });
 
+  describe("key file safety (real file system)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "nzlm-config-"));
+
+    it("reads a small regular file", () => {
+      const path = join(dir, "key");
+      writeFileSync(path, `${KEY}\n`);
+      expect(loadConfig({ [ENV.apiKeyFile]: path }).apiKey.reveal()).toBe(KEY);
+    });
+
+    it("refuses a directory", () => {
+      const path = join(dir, "sub");
+      mkdirSync(path);
+      expect(() => loadConfig({ [ENV.apiKeyFile]: path })).toThrow("is not a regular file");
+    });
+
+    it("refuses a device such as /dev/null", () => {
+      expect(() => loadConfig({ [ENV.apiKeyFile]: "/dev/null" })).toThrow("is not a regular file");
+    });
+
+    it("refuses an oversized file", () => {
+      const path = join(dir, "big");
+      writeFileSync(path, "a".repeat(5000));
+      expect(() => loadConfig({ [ENV.apiKeyFile]: path })).toThrow("is larger than 4096 bytes");
+    });
+  });
+
   it("reads options", () => {
     const c = loadConfig(
       {
@@ -59,6 +88,10 @@ describe("loadConfig", () => {
     [{ [ENV.apiKey]: "" }, "No API key found"],
     [{ [ENV.apiKey]: "   " }, "is empty"],
     [{ [ENV.apiKey]: "YOUR_KEY" }, "placeholder"],
+    [{ [ENV.apiKey]: "your_api_key_here" }, "placeholder"],
+    [{ [ENV.apiKey]: "${LEGISLATION_NZ_API_KEY}" }, "unexpanded variable"],
+    [{ [ENV.apiKey]: "$LEGISLATION_NZ_API_KEY" }, "unexpanded variable"],
+    [{ [ENV.apiKey]: "<your-api-key>" }, "placeholder"],
     [{ [ENV.apiKey]: "short" }, "8 to 512 characters"],
     [{ [ENV.apiKey]: "has space in key value" }, "spaces, quotes"],
     [{ [ENV.apiKey]: '"quotedkeyvalue"' }, "spaces, quotes"],
@@ -68,6 +101,12 @@ describe("loadConfig", () => {
     [{ [ENV.apiKey]: KEY, [ENV.logLevel]: "verbose" }, `${ENV.logLevel} is invalid`],
   ])("reports a clear problem for %j", (env, message) => {
     expect(problems(env).join("\n")).toContain(message);
+  });
+
+  it("reports an unreadable key file from any reader", () => {
+    expect(problems({ [ENV.apiKeyFile]: "/x" })).toEqual([
+      `${ENV.apiKeyFile} points to a file that cannot be read.`,
+    ]);
   });
 
   it("reports an invalid key read from a file", () => {

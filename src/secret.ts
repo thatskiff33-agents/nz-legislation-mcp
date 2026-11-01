@@ -18,9 +18,16 @@ export class Secret {
     return this.#value;
   }
 
-  /** Removes every occurrence of the secret from arbitrary text (e.g. upstream error bodies). */
+  /**
+   * Removes every occurrence of the secret, raw or URL-encoded, from arbitrary text
+   * (e.g. upstream error bodies or URLs).
+   */
   redact(text: string): string {
-    return this.#value.length === 0 ? text : text.split(this.#value).join(REDACTED);
+    if (this.#value.length === 0) return text;
+    const forms = new Set([this.#value, encodeURIComponent(this.#value)]);
+    let out = text;
+    for (const form of forms) out = out.split(form).join(REDACTED);
+    return out;
   }
 
   toString(): string {
