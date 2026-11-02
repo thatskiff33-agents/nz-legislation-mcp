@@ -25,9 +25,10 @@ RUN pnpm run build
 # ---- Runtime: distroless (no shell, no package manager), non-root ------------------------
 FROM gcr.io/distroless/nodejs22-debian13:nonroot@sha256:8ad9cc935b7843c4024b7e1487b5ef472c354ea847b97c667023e2618552607e
 WORKDIR /app
-COPY --from=build --chown=nonroot:nonroot /app/package.json ./package.json
-COPY --from=deps --chown=nonroot:nonroot /app/node_modules ./node_modules
-COPY --from=build --chown=nonroot:nonroot /app/dist ./dist
+# Application files stay root-owned (read-only to the nonroot user that runs the server).
+COPY --from=build /app/package.json ./package.json
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=build /app/dist ./dist
 COPY LICENSE NOTICE ./
 ENV NODE_ENV=production \
     LEGISLATION_NZ_HTTP_HOST=0.0.0.0 \

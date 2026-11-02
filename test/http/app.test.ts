@@ -325,6 +325,43 @@ describe("HTTP app abuse controls", () => {
   });
 });
 
+describe("trusted proxy", () => {
+  it("uses the last X-Forwarded-For entry only when the proxy is trusted", async () => {
+    const make = (trust: string) => {
+      const app = createHttpApp({
+        config: loadHttpConfig({
+          LEGISLATION_NZ_RATE_LIMIT_PER_MINUTE: "1",
+          LEGISLATION_NZ_TRUST_PROXY: trust,
+        }),
+        deps: deps([]).deps,
+        logger: silentLogger,
+      });
+      apps.push(app);
+      return app;
+    };
+    const health = (app: HttpApp, xff?: string) =>
+      app.fetch(
+        new Request("http://localhost:8080/healthz", {
+          headers: {
+            host: "localhost:8080",
+            ...(xff === undefined ? {} : { "x-forwarded-for": xff }),
+          },
+        }),
+        { remoteAddress: "10.0.0.2" }, // the proxy
+      );
+    // Trusted: each real client (last entry) gets its own allowance; spoofed earlier entries are ignored.
+    const trusted = make("true");
+    for (let i = 0; i < 5; i += 1) await health(trusted, `spoofed-${String(i)}, 203.0.113.5`);
+    expect((await health(trusted, "spoofed-x, 203.0.113.5")).status).toBe(429);
+    expect((await health(trusted, "203.0.113.6")).status).toBe(200);
+    expect((await health(trusted, " ")).status).toBe(200); // blank header: falls back to the socket
+    // Not trusted: the header is ignored and the socket address is used.
+    const untrusted = make("false");
+    for (let i = 0; i < 5; i += 1) await health(untrusted, `203.0.113.${String(i)}`);
+    expect((await health(untrusted, "198.51.100.1")).status).toBe(429);
+  });
+});
+
 describe("HTTP app on loopback without OAuth", () => {
   it("answers only loopback Host names (no tunnel or proxy access)", async () => {
     const app = createHttpApp({

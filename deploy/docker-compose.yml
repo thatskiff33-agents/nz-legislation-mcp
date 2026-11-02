@@ -3,12 +3,19 @@ name: nz-legislation-mcp
 
 services:
   mcp:
-    image: ghcr.io/thatskiff33-agents/nz-legislation-mcp:${NZLM_VERSION:-latest}
+    # Builds from this repository by default. To use a published release instead, set NZLM_IMAGE
+    # to a pinned version or digest, e.g. ghcr.io/thatskiff33-agents/nz-legislation-mcp:1.0.0
+    # (verify its signature first: see docs/self-hosting.md).
+    image: ${NZLM_IMAGE:-nz-legislation-mcp:local}
+    build:
+      context: ..
     restart: unless-stopped
     env_file: .env
     environment:
       LEGISLATION_NZ_API_KEY_FILE: /run/secrets/legislation_api_key
       LEGISLATION_NZ_PUBLIC_URL: https://${NZLM_DOMAIN}/mcp
+      # Caddy appends the real client address to X-Forwarded-For.
+      LEGISLATION_NZ_TRUST_PROXY: "true"
     secrets:
       - legislation_api_key
     read_only: true
@@ -24,7 +31,7 @@ services:
     restart: unless-stopped
     environment:
       NZLM_DOMAIN: ${NZLM_DOMAIN}
-    ports: ["80:80", "443:443"]
+    ports: ["80:80", "443:443", "443:443/udp"]
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data

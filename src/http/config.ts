@@ -23,6 +23,7 @@ export const HTTP_ENV = {
   allowedOrigins: "LEGISLATION_NZ_ALLOWED_ORIGINS",
   rateLimit: "LEGISLATION_NZ_RATE_LIMIT_PER_MINUTE",
   requireAtJwt: "LEGISLATION_NZ_OAUTH_REQUIRE_AT_JWT",
+  trustProxy: "LEGISLATION_NZ_TRUST_PROXY",
 } as const;
 
 /** Path of the MCP endpoint. */
@@ -52,6 +53,11 @@ export interface HttpConfig {
   readonly allowedOrigins: readonly string[];
   readonly rateLimitPerMinute: number;
   readonly loopback: boolean;
+  /**
+   * True when a reverse proxy in front of this server sets X-Forwarded-For: the client address
+   * for per-IP limits is then the last address the proxy appended (not values clients send).
+   */
+  readonly trustProxy: boolean;
 }
 
 type Env = Readonly<Record<string, string | undefined>>;
@@ -200,5 +206,6 @@ export function loadHttpConfig(env: Env): HttpConfig {
     allowedOrigins: list(get(HTTP_ENV.allowedOrigins)),
     rateLimitPerMinute,
     loopback,
+    trustProxy: get(HTTP_ENV.trustProxy) === "true",
   };
 }
