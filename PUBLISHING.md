@@ -13,11 +13,13 @@ Nothing leaves GitHub until someone approves the `release` environment.
 2. Merging the release pull request creates the Git tag and GitHub release.
 3. A build job with no publishing rights runs `pnpm check`, packs the npm tarball and builds
    the Claude Desktop bundle from that same tarball. Three publishing jobs then wait for
-   approval on the `release` environment. They install nothing and run no project tooling:
+   approval on the `release` environment. The npm and bundle jobs install nothing and run no
+   project tooling:
    - npm: publishes the checked tarball with provenance, using trusted publishing (no npm
      token is stored).
    - Claude Desktop bundle: attached to the GitHub release with SHA-256 checksums.
-   - Container: scanned, then pushed to `ghcr.io/thatskiff33-agents/nz-legislation-mcp`
+   - Container: built from the release tag (inside Docker, without access to the publishing
+     credentials), scanned, then pushed to `ghcr.io/thatskiff33-agents/nz-legislation-mcp`
      with an SBOM and provenance, and signed with cosign (keyless).
 4. After npm has the new version, publish to the MCP Registry by hand (see below).
 
@@ -74,3 +76,7 @@ The registry checks that the npm package belongs to this server through the `mcp
   token do not start CI, so there is no run to rerun: push an empty commit to the release
   branch to start one.
 - `docs/clients.md` and the README quick start still match the release.
+- The release pull request includes the "pin the Claude Code plugin" commit (the
+  `sync-release-pr` job adds it a minute or so after release-please updates the pull request).
+  If it is merged without it, the tag and GitHub release are still created but the build job
+  fails its pin check and nothing is published; fix the pin on `main` and release again.

@@ -3,8 +3,9 @@ name: Release
 # release-please keeps a release pull request open on main (version bump and changelog). Merging
 # that pull request creates the GitHub release and tag. The release is then built and checked in a
 # job with no publishing rights, and each publishing job waits for an owner's approval on the
-# "release" environment. Publishing jobs install nothing and run no project tooling: they only
-# publish the artefacts the build job produced.
+# "release" environment. The npm and bundle jobs install nothing and run no project tooling: they
+# only publish the artefacts the build job produced. The container is built from the tag source
+# inside BuildKit, which does not expose the job's OIDC token or registry login to build steps.
 on:
   push:
     branches: [main]

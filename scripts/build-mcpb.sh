@@ -27,6 +27,7 @@ cp pnpm-lock.yaml pnpm-workspace.yaml "$stage/"
 (cd "$stage" && pnpm install --prod --frozen-lockfile --ignore-scripts --config.node-linker=hoisted >/dev/null)
 rm -f "$stage/pnpm-lock.yaml" "$stage/pnpm-workspace.yaml" \
   "$stage/node_modules/.modules.yaml" "$stage"/node_modules/.pnpm-workspace-state*.json
+rm -rf "$stage/node_modules/.pnpm"
 
 # 3. The bundle manifest, then validate and pack. The mcpb CLI is pinned to an exact version and
 #    run with install scripts disabled; it is kept out of devDependencies because its own
