@@ -36,7 +36,6 @@ async function oauthApp(rateLimit = "60") {
   const verifier = createJwtVerifier({
     issuer: ISSUER,
     audience: RESOURCE,
-    allowedSubjects: [SUBJECT],
     resource: new URL(RESOURCE),
     keys: k.keys,
   });
@@ -140,7 +139,7 @@ describe("HTTP app with OAuth", () => {
         headers: { authorization: `Bearer ${other}`, "content-type": "application/json" },
       }),
     );
-    expect(res2.status).toBe(401);
+    expect(res2.status).toBe(403);
   });
 
   it("serves MCP to the key holder through the official client", async () => {
@@ -204,7 +203,126 @@ describe("HTTP app with OAuth", () => {
   });
 });
 
+describe("HTTP app abuse controls", () => {
+  const post = (
+    app: HttpApp,
+    token: string,
+    body = '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}',
+    ip = "203.0.113.1",
+  ) =>
+    app.fetch(
+      request("/mcp", {
+        method: "POST",
+        body,
+        headers: {
+          authorization: `Bearer ${token}`,
+          "content-type": "application/json",
+          accept: "application/json, text/event-stream",
+          "mcp-protocol-version": "2025-06-18",
+        },
+      }),
+      { remoteAddress: ip },
+    );
+
+  it("limits per user, so fresh OAuth client ids do not reset the limit", async () => {
+    const { app, k } = await oauthApp("2");
+    const statuses = [];
+    for (let i = 0; i < 3; i += 1)
+      statuses.push((await post(app, await k.mint({ client_id: `client-${String(i)}` }))).status);
+    expect(statuses.slice(0, 2).every((s) => s !== 429)).toBe(true);
+    expect(statuses[2]).toBe(429);
+  });
+
+  it("refuses JSON-RPC batches and oversized bodies", async () => {
+    const { app, k } = await oauthApp();
+    const token = await k.mint();
+    const batch = await post(app, token, '  [{"jsonrpc":"2.0","id":1,"method":"tools/list"}]');
+    expect(batch.status).toBe(400);
+    expect(await batch.json()).toMatchObject({ error: "batch_not_supported" });
+    const big = await post(app, token, `{"x":"${"a".repeat(4 * 1024 * 1024)}"}`);
+    expect(big.status).toBe(413);
+  });
+
+  it("passes an empty POST to the MCP handler, which rejects it", async () => {
+    const { app, k } = await oauthApp();
+    const res = await app.fetch(
+      request("/mcp", { method: "POST", headers: { authorization: `Bearer ${await k.mint()}` } }),
+    );
+    expect(res.status).toBeGreaterThanOrEqual(400);
+    expect(res.status).toBeLessThan(500);
+  });
+
+  it("refuses an oversized body declared up front without reading it", async () => {
+    const { app, k } = await oauthApp();
+    const res = await app.fetch(
+      request("/mcp", {
+        method: "POST",
+        body: "{}",
+        headers: {
+          authorization: `Bearer ${await k.mint()}`,
+          "content-length": String(10 * 1024 * 1024),
+        },
+      }),
+    );
+    expect(res.status).toBe(413);
+  });
+
+  it("rate-limits by IP before authentication", async () => {
+    const { app } = await oauthApp("1"); // per-IP allowance is 5x the per-user limit
+    const statuses = [];
+    for (let i = 0; i < 6; i += 1) {
+      statuses.push(
+        (await app.fetch(request("/healthz"), { remoteAddress: "198.51.100.7" })).status,
+      );
+    }
+    expect(statuses).toEqual([200, 200, 200, 200, 200, 429]);
+    expect((await app.fetch(request("/healthz"), { remoteAddress: "198.51.100.8" })).status).toBe(
+      200,
+    );
+  });
+
+  it("forbids a verified token that carries no subject", async () => {
+    const config = loadHttpConfig({
+      LEGISLATION_NZ_HTTP_HOST: "0.0.0.0",
+      LEGISLATION_NZ_PUBLIC_URL: RESOURCE,
+      LEGISLATION_NZ_OAUTH_ISSUER: ISSUER,
+      LEGISLATION_NZ_OAUTH_ALLOWED_SUBJECTS: SUBJECT,
+    });
+    const verifier = {
+      verifyAccessToken: (token: string) =>
+        Promise.resolve({
+          token,
+          clientId: "c",
+          scopes: [],
+          expiresAt: Date.now() / 1000 + 60,
+          resource: new URL(RESOURCE),
+        }),
+    };
+    const app = createHttpApp({
+      config,
+      deps: deps([]).deps,
+      logger: silentLogger,
+      auth: { verifier, authorizationServer: AS },
+    });
+    apps.push(app);
+    expect((await post(app, "opaque")).status).toBe(403);
+  });
+});
+
 describe("HTTP app on loopback without OAuth", () => {
+  it("answers only loopback Host names (no tunnel or proxy access)", async () => {
+    const app = createHttpApp({
+      config: loadHttpConfig({}),
+      deps: deps([]).deps,
+      logger: silentLogger,
+    });
+    apps.push(app);
+    const res = await app.fetch(
+      new Request("http://localhost:8080/healthz", { headers: { host: "mcp.example.com" } }),
+    );
+    expect(res.status).toBe(403);
+  });
+
   it("serves MCP locally with no token and no HSTS", async () => {
     const config = loadHttpConfig({});
     const app = createHttpApp({ config, deps: deps([]).deps, logger: silentLogger });

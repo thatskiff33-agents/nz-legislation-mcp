@@ -1,10 +1,11 @@
 /**
  * Configuration for HTTP (remote) mode.
  *
- * Secure by default: binds 127.0.0.1. Binding to any other address requires OAuth (an external
- * authorization server whose tokens this server validates) and a public https URL. Access is
- * limited to listed token subjects, because the PCO terms (clause 6) allow only the key holder
- * to use the key.
+ * Secure by default: binds 127.0.0.1. OAuth (an external authorization server whose tokens this
+ * server validates) is required whenever the server can be reached from elsewhere: a
+ * non-loopback bind address OR a non-loopback public URL (e.g. a tunnel or reverse proxy in
+ * front of a loopback bind). Access is limited to listed token subjects, because the PCO terms
+ * (clause 6) allow only the key holder to use the key.
  */
 import { z } from "zod";
 import { ConfigError } from "../config.js";
@@ -21,6 +22,7 @@ export const HTTP_ENV = {
   requiredScopes: "LEGISLATION_NZ_OAUTH_REQUIRED_SCOPES",
   allowedOrigins: "LEGISLATION_NZ_ALLOWED_ORIGINS",
   rateLimit: "LEGISLATION_NZ_RATE_LIMIT_PER_MINUTE",
+  requireAtJwt: "LEGISLATION_NZ_OAUTH_REQUIRE_AT_JWT",
 } as const;
 
 /** Path of the MCP endpoint. */
@@ -36,6 +38,8 @@ interface OAuthConfig {
   /** Token subjects (`sub`) allowed to use this server: the key holder. */
   readonly allowedSubjects: readonly string[];
   readonly requiredScopes: readonly string[];
+  /** Require the RFC 9068 "at+jwt" token type (off by default: not all providers set it). */
+  readonly requireAtJwt: boolean;
 }
 
 export interface HttpConfig {
@@ -133,9 +137,9 @@ export function loadHttpConfig(env: Env): HttpConfig {
     if (
       resourceUrl !== undefined &&
       resourceUrl.protocol !== "https:" &&
-      !isLoopback(resourceUrl.hostname)
+      (!isLoopback(resourceUrl.hostname) || !loopback)
     ) {
-      problems.push(`${HTTP_ENV.publicUrl} must use https (except for localhost).`);
+      problems.push(`${HTTP_ENV.publicUrl} must use https (except for a loopback-only server).`);
     }
     if (resourceUrl !== undefined && resourceUrl.pathname !== MCP_PATH) {
       problems.push(
@@ -178,11 +182,12 @@ export function loadHttpConfig(env: Env): HttpConfig {
         jwksUrl,
         allowedSubjects,
         requiredScopes: list(get(HTTP_ENV.requiredScopes)),
+        requireAtJwt: get(HTTP_ENV.requireAtJwt) === "true",
       };
     }
-  } else if (!loopback) {
+  } else if (!loopback || !isLoopback(resourceUrl.hostname)) {
     problems.push(
-      `Remote HTTP mode requires OAuth: set ${HTTP_ENV.issuer} (and ${HTTP_ENV.allowedSubjects}) or bind to 127.0.0.1. See docs/self-hosting.md.`,
+      `Remote HTTP mode requires OAuth: set ${HTTP_ENV.issuer} (and ${HTTP_ENV.allowedSubjects}), or bind to 127.0.0.1 with no public URL. A tunnel or reverse proxy in front of a loopback server is remote too. See docs/self-hosting.md.`,
     );
   }
 

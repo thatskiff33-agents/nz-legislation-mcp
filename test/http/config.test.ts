@@ -52,6 +52,13 @@ describe("loadHttpConfig", () => {
     expect(c.rateLimitPerMinute).toBe(120);
   });
 
+  it("reads the at+jwt requirement", () => {
+    expect(loadHttpConfig({ ...remote, [HTTP_ENV.requireAtJwt]: "true" }).oauth?.requireAtJwt).toBe(
+      true,
+    );
+    expect(loadHttpConfig(remote).oauth?.requireAtJwt).toBe(false);
+  });
+
   it("uses a custom audience when given", () => {
     expect(
       loadHttpConfig({ ...remote, [HTTP_ENV.audience]: "api://legislation" }).oauth?.audience,
@@ -60,6 +67,14 @@ describe("loadHttpConfig", () => {
 
   it.each([
     [{ [HTTP_ENV.host]: "0.0.0.0" }, "requires OAuth"],
+    [
+      { [HTTP_ENV.publicUrl]: "https://mcp.example.com/mcp" },
+      "A tunnel or reverse proxy in front of a loopback server is remote too",
+    ],
+    [
+      { ...remote, [HTTP_ENV.publicUrl]: "http://localhost/mcp" },
+      "must use https (except for a loopback-only server)",
+    ],
     [{ [HTTP_ENV.host]: "0.0.0.0" }, `${HTTP_ENV.publicUrl} is required when binding`],
     [{ ...remote, [HTTP_ENV.allowedSubjects]: "" }, `${HTTP_ENV.allowedSubjects} is required`],
     [{ ...remote, [HTTP_ENV.publicUrl]: "http://mcp.example.com/mcp" }, "must use https"],

@@ -7,7 +7,12 @@ import type { OAuthMetadata } from "@modelcontextprotocol/server";
 import { ConfigError } from "../config.js";
 import { buildDeps, type MainIo } from "../main.js";
 import { SERVER_NAME } from "../version.js";
-import { createJwtVerifier, discoverAuthorizationServer, remoteKeys } from "./auth.js";
+import {
+  createJwtVerifier,
+  discoverAuthorizationServer,
+  isSecureKeyUrl,
+  remoteKeys,
+} from "./auth.js";
 import { createHttpApp } from "./app.js";
 import { loadHttpConfig, MCP_PATH } from "./config.js";
 import type { listen } from "./node.js";
@@ -51,11 +56,21 @@ export async function serveHttp(io: HttpIo): Promise<number | undefined> {
         "The authorization server publishes no jwks_uri; set LEGISLATION_NZ_OAUTH_JWKS_URL.",
       );
     }
+    if (!isSecureKeyUrl(jwks)) {
+      return fail(`Refusing to fetch signing keys over plain http (${jwks.href}).`);
+    }
+    if (config.oauth.audience !== config.resourceUrl.href) {
+      logger.warn("token audience differs from the public URL", {
+        audience: config.oauth.audience,
+        publicUrl: config.resourceUrl.href,
+        note: "Use this audience only for this server, or tokens issued for other services could be accepted.",
+      });
+    }
     auth = {
       verifier: createJwtVerifier({
         issuer: metadata.issuer,
         audience: config.oauth.audience,
-        allowedSubjects: config.oauth.allowedSubjects,
+        requireAtJwt: config.oauth.requireAtJwt,
         resource: config.resourceUrl,
         keys: remoteKeys(jwks),
       }),

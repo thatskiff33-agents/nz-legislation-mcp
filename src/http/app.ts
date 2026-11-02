@@ -44,7 +44,10 @@ export interface HttpAppOptions {
 }
 
 export interface HttpApp {
-  readonly fetch: (request: Request) => Promise<Response>;
+  readonly fetch: (
+    request: Request,
+    meta?: { readonly remoteAddress: string },
+  ) => Promise<Response>;
   readonly close: () => Promise<void>;
 }
 
@@ -74,14 +77,55 @@ const json = (status: number, body: unknown, headers: Record<string, string> = {
     headers: { "Content-Type": "application/json", ...headers },
   });
 
+/** The pre-authentication per-IP limit is this multiple of the per-user limit. */
+const PRE_AUTH_MULTIPLIER = 5;
+/** Largest accepted request body (matches the SDK's own default). */
+const MAX_BODY_BYTES = 4 * 1024 * 1024;
+
+const rateLimited = (): Response =>
+  json(
+    429,
+    { error: "rate_limited", message: "Too many requests. Wait a minute and try again." },
+    { "Retry-After": "60" },
+  );
+
+/** The verified token subject ("local" without OAuth, "" if a verifier supplied none). */
+function subjectOf(authInfo: AuthInfo | undefined): string {
+  if (authInfo === undefined) return "local";
+  const subject = authInfo.extra?.["subject"];
+  return typeof subject === "string" ? subject : "";
+}
+
+/** Reads a request body as text, or returns null if it exceeds MAX_BODY_BYTES. */
+async function readBody(request: Request): Promise<string | null> {
+  if (Number(request.headers.get("content-length")) > MAX_BODY_BYTES) return null;
+  if (request.body === null) return "";
+  const reader = (request.body as ReadableStream<Uint8Array>).getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > MAX_BODY_BYTES) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  return new TextDecoder().decode(Buffer.concat(chunks));
+}
+
 export function createHttpApp(options: HttpAppOptions): HttpApp {
   const { config, deps, logger } = options;
   if (config.oauth !== undefined && options.auth === undefined) {
     throw new TypeError("OAuth is configured but no token verifier was supplied.");
   }
   const https = config.resourceUrl.protocol === "https:";
+  // The public host is trusted only with OAuth; a no-auth server answers loopback names only,
+  // so a tunnel or proxy forwarding a public Host header cannot reach it.
   const allowedHosts = [
-    config.resourceUrl.hostname,
+    ...(config.oauth === undefined ? [] : [config.resourceUrl.hostname]),
     ...(config.loopback ? localhostAllowedHostnames() : []),
   ];
   const allowedOrigins = [
@@ -93,7 +137,11 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
       logger.warn("mcp http handler error", { error });
     },
   });
+  /** Per-user limit (by token subject) protects the operator's API quota. */
   const limiter = new RateLimiter(config.rateLimitPerMinute, options.now);
+  /** Per-IP limit before authentication protects token verification and key fetching. */
+  const ipLimiter = new RateLimiter(config.rateLimitPerMinute * PRE_AUTH_MULTIPLIER, options.now);
+  const allowedSubjects = new Set(config.oauth?.allowedSubjects ?? []);
   const metadataUrl = getOAuthProtectedResourceMetadataUrl(config.resourceUrl);
   const auth = options.auth;
   const gate =
@@ -116,7 +164,8 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
             : {}),
         };
 
-  async function route(request: Request): Promise<Response> {
+  async function route(request: Request, remoteAddress: string): Promise<Response> {
+    if (!ipLimiter.take(remoteAddress)) return rateLimited();
     const hostRejected = hostHeaderValidationResponse(request, allowedHosts);
     if (hostRejected !== undefined) return hostRejected;
     const originRejected = originValidationResponse(request, allowedOrigins);
@@ -137,24 +186,41 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
       const result = await gate(request);
       if (result instanceof Response) return result;
       authInfo = result;
+      // Valid token, but only the API key holder may use this server (PCO terms clause 6).
+      if (!allowedSubjects.has(subjectOf(authInfo))) {
+        return json(403, {
+          error: "forbidden",
+          message: "This account is not allowed to use this server.",
+        });
+      }
     }
 
-    const subject = authInfo?.clientId ?? "local";
-    if (!limiter.take(subject)) {
-      return json(
-        429,
-        { error: "rate_limited", message: "Too many requests. Wait a minute and try again." },
-        { "Retry-After": "60" },
-      );
+    // Rate-limit per user (token subject), not per OAuth client, so new client
+    // registrations cannot reset the limit.
+    if (!limiter.take(subjectOf(authInfo))) return rateLimited();
+
+    let forwarded = request;
+    if (request.method === "POST") {
+      const body = await readBody(request);
+      if (body === null) return json(413, { error: "payload_too_large" });
+      // JSON-RPC batches (allowed by older protocol revisions) would let one request carry
+      // many tool calls past the rate limit; MCP no longer uses them, so refuse them.
+      if (body.trimStart().startsWith("[")) {
+        return json(400, {
+          error: "batch_not_supported",
+          message: "Send one JSON-RPC message per request.",
+        });
+      }
+      forwarded = new Request(request, { body });
     }
-    return mcp.fetch(request, authInfo === undefined ? {} : { authInfo });
+    return mcp.fetch(forwarded, authInfo === undefined ? {} : { authInfo });
   }
 
   return {
-    async fetch(request: Request): Promise<Response> {
+    async fetch(request: Request, meta = { remoteAddress: "unknown" }): Promise<Response> {
       let response: Response;
       try {
-        response = await route(request);
+        response = await route(request, meta.remoteAddress);
       } catch (error) {
         logger.error("unhandled http error", { error });
         response = json(500, { error: "internal_error" });

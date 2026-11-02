@@ -31,7 +31,11 @@ const ALGORITHMS = [
   "EdDSA",
 ];
 const CLOCK_TOLERANCE_SECONDS = 30;
+/** Longest accepted token age (from iat); access tokens are short-lived. */
+const MAX_TOKEN_AGE = "24h";
 const DISCOVERY_TIMEOUT_MS = 10_000;
+/** Largest accepted discovery document (real ones are a few KB). */
+const MAX_METADATA_BYTES = 64 * 1024;
 
 /** The parts of RFC 8414 / OIDC discovery metadata this server relies on. */
 const AuthorizationServerMetadataSchema = z
@@ -73,7 +77,18 @@ export async function discoverAuthorizationServer(
         problems.push(`${url.href}: HTTP ${String(response.status)}`);
         continue;
       }
-      const parsed = AuthorizationServerMetadataSchema.safeParse(await response.json());
+      const body = await response.text();
+      if (body.length > MAX_METADATA_BYTES) {
+        problems.push(`${url.href}: metadata too large`);
+        continue;
+      }
+      let json: unknown;
+      try {
+        json = JSON.parse(body);
+      } catch {
+        json = undefined;
+      }
+      const parsed = AuthorizationServerMetadataSchema.safeParse(json);
       if (!parsed.success) {
         problems.push(`${url.href}: not valid authorization server metadata`);
         continue;
@@ -102,11 +117,20 @@ export async function discoverAuthorizationServer(
 export interface JwtVerifierOptions {
   readonly issuer: string;
   readonly audience: string;
-  readonly allowedSubjects: readonly string[];
+  /** Require the RFC 9068 "at+jwt" type header (rejects ID tokens and other JWTs). */
+  readonly requireAtJwt?: boolean;
   /** This server's resource URL, stamped on verified tokens (RFC 8707 resource binding). */
   readonly resource: URL;
   /** Key source: a remote JWKS in production, a local key set in tests. */
   readonly keys: JWTVerifyGetKey;
+}
+
+/** True if a URL is safe to fetch keys from: https, or http on a loopback host. */
+export function isSecureKeyUrl(url: URL): boolean {
+  return (
+    url.protocol === "https:" ||
+    (url.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname))
+  );
 }
 
 /** Builds a key source from a JWKS URL (keys are cached and refreshed by jose). */
@@ -120,9 +144,11 @@ export function remoteKeys(jwksUrl: URL): JWTVerifyGetKey {
 const invalid = (message: string): OAuthError =>
   new OAuthError(OAuthErrorCode.InvalidToken, message);
 
-/** Verifies signed JWT access tokens and limits access to the allowed subjects. */
+/**
+ * Verifies signed JWT access tokens. The verified subject is returned in `extra.subject`; the
+ * app checks it against the allowed subjects (so a valid token for another user gets 403).
+ */
 export function createJwtVerifier(options: JwtVerifierOptions): OAuthTokenVerifier {
-  const allowed = new Set(options.allowedSubjects);
   return {
     async verifyAccessToken(token: string): Promise<AuthInfo> {
       let payload: JWTPayload;
@@ -132,17 +158,17 @@ export function createJwtVerifier(options: JwtVerifierOptions): OAuthTokenVerifi
           audience: options.audience,
           algorithms: ALGORITHMS,
           clockTolerance: CLOCK_TOLERANCE_SECONDS,
-          requiredClaims: ["exp", "sub"],
+          maxTokenAge: MAX_TOKEN_AGE,
+          requiredClaims: ["exp", "sub", "iat"],
+          ...(options.requireAtJwt === true ? { typ: "at+jwt" } : {}),
         }));
       } catch (error) {
         if (error instanceof joseErrors.JWTExpired) throw invalid("The access token has expired.");
         throw invalid("The access token is not valid for this server.");
       }
-      const subject = String(payload.sub);
-      if (!allowed.has(subject)) {
-        throw invalid(
-          "This account is not allowed to use this server (only the API key holder may).",
-        );
+      const subject = payload.sub;
+      if (typeof subject !== "string" || subject === "") {
+        throw invalid("The access token is not valid for this server.");
       }
       const scopeClaim = payload["scope"];
       const scpClaim = payload["scp"];
@@ -163,6 +189,7 @@ export function createJwtVerifier(options: JwtVerifierOptions): OAuthTokenVerifi
         expiresAt: Number(payload.exp),
         // The audience check above binds the token to this server.
         resource: options.resource,
+        extra: { subject },
       };
     },
   };

@@ -49,14 +49,40 @@ export async function writeResponse(response: Response, res: ServerResponse): Pr
   res.end();
 }
 
+/** Methods the MCP endpoint and health/metadata routes can use; anything else gets 405. */
+const ALLOWED_METHODS = new Set(["GET", "HEAD", "POST", "DELETE", "OPTIONS"]);
+
+/** Request details the adapter passes to the app alongside the Request. */
+export interface RequestMeta {
+  /** The client's IP address (for pre-authentication rate limiting). */
+  readonly remoteAddress: string;
+}
+
 /** Starts listening; resolves once the server is accepting connections. */
 export async function listen(
-  handler: (request: Request) => Promise<Response>,
+  handler: (request: Request, meta: RequestMeta) => Promise<Response>,
   options: NodeServerOptions,
 ): Promise<Server> {
   const server = createServer((req, res) => {
-    const request = toRequest(req, res);
-    handler(request)
+    // Everything here runs outside the promise chain, so it must never throw: an exception
+    // would crash the process (one bad request line = denial of service).
+    if (!ALLOWED_METHODS.has(String(req.method))) {
+      res.writeHead(405, {
+        Allow: [...ALLOWED_METHODS].join(", "),
+        "Content-Type": "application/json",
+      });
+      res.end('{"error":"method_not_allowed"}');
+      return;
+    }
+    let request: Request;
+    try {
+      request = toRequest(req, res);
+    } catch {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      res.end('{"error":"bad_request"}');
+      return;
+    }
+    handler(request, { remoteAddress: String(req.socket.remoteAddress) })
       .then((response) => writeResponse(response, res))
       .catch((error: unknown) => {
         options.logger.error("http response failed", { error });

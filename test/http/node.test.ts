@@ -1,4 +1,5 @@
 import type { Server } from "node:http";
+import { connect } from "node:net";
 import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
 import { listen } from "../../src/http/node.js";
@@ -126,6 +127,41 @@ describe("listen", () => {
     controller.abort();
     await pending;
     expect(await aborted).toBe(true);
+  });
+
+  it("survives malformed request lines and unsupported methods (no crash)", async () => {
+    server = await listen(() => Promise.resolve(new Response("ok")), {
+      host: "127.0.0.1",
+      port: 0,
+      logger: silentLogger,
+    });
+    const port = (server.address() as AddressInfo).port;
+    const raw = (line: string) =>
+      new Promise<string>((resolve) => {
+        const socket = connect(port, "127.0.0.1", () => {
+          socket.write(`${line}\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n`);
+        });
+        let data = "";
+        socket.on("data", (d: Buffer) => (data += d.toString()));
+        socket.on("close", () => {
+          resolve(data.split("\r\n")[0] ?? "");
+        });
+        socket.on("error", () => {
+          resolve("error");
+        });
+      });
+    expect(await raw("TRACE / HTTP/1.1")).toContain("405");
+    for (const line of [
+      "GET http:// HTTP/1.1",
+      "GET http://[/ HTTP/1.1",
+      "GET http://a:99999/ HTTP/1.1",
+      "GET http://%zz/ HTTP/1.1",
+    ]) {
+      const status = await raw(line);
+      expect(status === "error" || /HTTP\/1\.1 (400|200)/u.test(status)).toBe(true);
+    }
+    // Still alive afterwards.
+    expect((await fetch(`${base()}/`)).status).toBe(200);
   });
 
   it("rejects when the port is unavailable", async () => {

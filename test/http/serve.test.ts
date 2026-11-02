@@ -102,6 +102,21 @@ describe("serveHttp", () => {
     expect(await serveHttp(t.value)).toBeUndefined();
   });
 
+  it("refuses signing keys over plain http", async () => {
+    const t = io(remote, fakeFetch(metadata({ jwks_uri: "http://attacker.example/jwks" })).fn);
+    expect(await serveHttp(t.value)).toBe(1);
+    expect(t.stderr.join("")).toContain("Refusing to fetch signing keys over plain http");
+  });
+
+  it("warns when the token audience differs from the public URL", async () => {
+    const t = io(
+      { ...remote, LEGISLATION_NZ_OAUTH_AUDIENCE: "api://legislation" },
+      fakeFetch(metadata()).fn,
+    );
+    expect(await serveHttp(t.value)).toBeUndefined();
+    expect(t.stderr.join("")).toContain("token audience differs from the public URL");
+  });
+
   it("starts on loopback without OAuth and warns", async () => {
     const t = io({ LEGISLATION_NZ_API_KEY: DUMMY_KEY });
     expect(await serveHttp(t.value)).toBeUndefined();
