@@ -1,3 +1,7 @@
+import { mkdtempSync, readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fakeFetch, status } from "./api/fake-fetch.js";
 import { DUMMY_KEY } from "./dummy-key.js";
 import { describe, expect, it, vi } from "vitest";
 import { defaultIo, main, runCli, type MainIo } from "../src/main.js";
@@ -15,6 +19,7 @@ function io(env: Record<string, string>) {
     env,
     stderr: (t) => stderr.push(t),
     stdout: (t) => stderr.push(t),
+    stdin: process.stdin,
     serve: ((factory: () => unknown, options: { onerror?: (e: Error) => void }) => {
       factories.push(factory);
       serveOptions.push(options);
@@ -28,7 +33,7 @@ function io(env: Record<string, string>) {
 
 describe("main", () => {
   it("exits with code 1 and a clear message when the key is missing", () => {
-    const t = io({});
+    const t = io({ XDG_CONFIG_HOME: "/nonexistent-nzlm-test", APPDATA: "/nonexistent-nzlm-test" });
     expect(main(t.value)).toBe(1);
     expect(t.stderr.join("")).toContain("No API key found");
     expect(t.factories).toHaveLength(0);
@@ -51,6 +56,8 @@ describe("main", () => {
   it("uses the process by default (no key in this test environment)", () => {
     vi.stubEnv("LEGISLATION_NZ_API_KEY", "");
     vi.stubEnv("LEGISLATION_NZ_API_KEY_FILE", "");
+    vi.stubEnv("XDG_CONFIG_HOME", "/nonexistent-nzlm-test");
+    vi.stubEnv("APPDATA", "/nonexistent-nzlm-test");
     const spy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
     expect(main()).toBe(1);
     expect(String(spy.mock.calls[0]?.[0])).toContain("No API key found");
@@ -102,7 +109,7 @@ describe("runCli", () => {
     const t = io({});
     expect(await runCli(["--version"], t.value)).toBe(0);
     expect(await runCli(["-h"], t.value)).toBe(0);
-    expect(t.stderr.join("")).toContain("Usage: nz-legislation-mcp [stdio|http]");
+    expect(t.stderr.join("")).toContain("Usage: nz-legislation-mcp [stdio|http|setup|doctor]");
   });
 
   it("rejects unknown commands and extra arguments with usage on stderr", async () => {
@@ -129,5 +136,54 @@ describe("runCli", () => {
     const spy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
     expect(await runCli(["--version"])).toBe(0);
     expect(spy).toHaveBeenCalled();
+  });
+});
+
+describe("runCli setup and doctor", () => {
+  const fakeStdin = (text: string, tty = false) => {
+    const listeners = new Map<string, (chunk?: unknown) => void>();
+    return {
+      isTTY: tty,
+      setRawMode: () => undefined,
+      setEncoding: () => undefined,
+      on: (event: string, listener: (chunk?: unknown) => void) => {
+        listeners.set(event, listener);
+      },
+      removeAllListeners: () => undefined,
+      pause: () => undefined,
+      resume: () => {
+        listeners.get("data")?.(text);
+        listeners.get("end")?.();
+      },
+    };
+  };
+
+  it("runs setup from standard input and saves the key", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "nzlm-cli-"));
+    const t = io({ XDG_CONFIG_HOME: dir, APPDATA: dir });
+    const value = { ...t.value, stdin: fakeStdin(`${KEY}\n`) };
+    expect(await runCli(["setup", "--key-stdin", "--no-verify"], value)).toBe(0);
+    expect(readFileSync(join(dir, "nz-legislation-mcp", "key"), "utf8")).toBe(`${KEY}\n`);
+  });
+
+  it("runs setup with a prompt and verifies against the API", async () => {
+    vi.stubGlobal("fetch", fakeFetch(status(401)).fn);
+    const dir = mkdtempSync(join(tmpdir(), "nzlm-cli-"));
+    const t = io({ XDG_CONFIG_HOME: dir, APPDATA: dir });
+    const value = { ...t.value, stdin: fakeStdin(`${KEY}\r`, true) };
+    expect(await runCli(["setup"], value)).toBe(1);
+    expect(t.stderr.join("")).toContain("rejected the API key");
+  });
+
+  it("runs doctor", async () => {
+    vi.stubGlobal("fetch", fakeFetch(() => new Response(null, { status: 200 })).fn);
+    const t = io({ XDG_CONFIG_HOME: "/nonexistent-nzlm-test", APPDATA: "/nonexistent-nzlm-test" });
+    expect(await runCli(["doctor"], t.value)).toBe(1);
+    expect(t.stderr.join("")).toContain("[fail] Configuration");
+  });
+
+  it("rejects doctor with extra arguments", async () => {
+    const t = io({});
+    expect(await runCli(["doctor", "now"], t.value)).toBe(2);
   });
 });

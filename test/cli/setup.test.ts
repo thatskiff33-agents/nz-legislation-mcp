@@ -1,0 +1,109 @@
+import { mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { describe, expect, it, vi } from "vitest";
+import { apiErrors } from "../../src/api/errors.js";
+import { runSetup, verifyWithApi, type SetupIo } from "../../src/cli/setup.js";
+import { DUMMY_KEY } from "../dummy-key.js";
+import { fakeFetch, json, status } from "../api/fake-fetch.js";
+import { fixture } from "../fixtures.js";
+
+function io(overrides: Partial<SetupIo> = {}) {
+  const dir = mkdtempSync(join(tmpdir(), "nzlm-setup-"));
+  const out: string[] = [];
+  const err: string[] = [];
+  const value: SetupIo = {
+    env: {},
+    stdout: (t) => out.push(t),
+    stderr: (t) => err.push(t),
+    readSecret: () => Promise.resolve(` ${DUMMY_KEY} `),
+    readStdin: () => Promise.resolve(`${DUMMY_KEY}\n`),
+    verify: () => Promise.resolve(),
+    keyFilePath: join(dir, "nz-legislation-mcp", "key"),
+    ...overrides,
+  };
+  return { value, out, err, path: String(value.keyFilePath) };
+}
+
+describe("setup", () => {
+  it("verifies and saves the key privately, then points at client setup", async () => {
+    const t = io();
+    expect(await runSetup([], t.value)).toBe(0);
+    expect(readFileSync(t.path, "utf8")).toBe(`${DUMMY_KEY}\n`);
+    expect(statSync(t.path).mode & 0o777).toBe(0o600);
+    expect(statSync(join(t.path, "..")).mode & 0o777).toBe(0o700);
+    expect(t.out.join("")).toContain("Key checked with the Legislation API: OK.");
+    expect(t.out.join("")).toContain("readable only by you");
+    expect(t.out.join("") + t.err.join("")).not.toContain(DUMMY_KEY);
+  });
+
+  it("reads the key from standard input and can skip verification", async () => {
+    const verify = vi.fn(() => Promise.resolve());
+    const t = io({ verify });
+    expect(await runSetup(["--key-stdin", "--no-verify"], t.value)).toBe(0);
+    expect(verify).not.toHaveBeenCalled();
+    expect(readFileSync(t.path, "utf8")).toBe(`${DUMMY_KEY}\n`);
+  });
+
+  it("refuses to overwrite an existing key unless forced", async () => {
+    const t = io();
+    await runSetup([], t.value);
+    expect(await runSetup([], t.value)).toBe(1);
+    expect(t.err.join("")).toContain("Use --force to replace it");
+    expect(await runSetup(["--force"], t.value)).toBe(0);
+  });
+
+  it("rejects invalid keys without saving", async () => {
+    const t = io({ readSecret: () => Promise.resolve("YOUR_KEY") });
+    expect(await runSetup([], t.value)).toBe(1);
+    expect(t.err.join("")).toContain("placeholder");
+    expect(() => statSync(t.path)).toThrow();
+  });
+
+  it("does not save a key the API rejects", async () => {
+    const t = io({ verify: () => Promise.reject(apiErrors.unauthorised()) });
+    expect(await runSetup([], t.value)).toBe(1);
+    expect(t.err.join("")).toContain("rejected the API key");
+    expect(t.err.join("")).toContain("Nothing was saved");
+    expect(() => statSync(t.path)).toThrow();
+    const odd = io({ verify: () => Promise.reject(new Error("weird")) });
+    expect(await runSetup([], odd.value)).toBe(1);
+    expect(odd.err.join("")).toContain("The key could not be checked.");
+  });
+
+  it("rejects unknown options", async () => {
+    const t = io();
+    expect(await runSetup(["--save-everywhere"], t.value)).toBe(2);
+    expect(t.err.join("")).toContain("Usage: nz-legislation-mcp setup");
+  });
+
+  it("cleans up if the final rename fails", async () => {
+    const t = io();
+    // A directory where the key file should go makes the rename fail.
+    const { mkdirSync } = await import("node:fs");
+    mkdirSync(t.path, { recursive: true });
+    writeFileSync(join(t.path, "x"), "");
+    await expect(runSetup(["--force"], t.value)).rejects.toThrow();
+  });
+
+  it("uses the default key location when none is given", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "nzlm-xdg-"));
+    const t = io({ keyFilePath: undefined, env: { XDG_CONFIG_HOME: dir, APPDATA: dir } });
+    expect(await runSetup(["--no-verify"], t.value)).toBe(0);
+    expect(readFileSync(join(dir, "nz-legislation-mcp", "key"), "utf8")).toBe(`${DUMMY_KEY}\n`);
+  });
+});
+
+describe("verifyWithApi", () => {
+  it("makes one small search request", async () => {
+    const fake = fakeFetch(json(fixture("search-works")));
+    vi.stubGlobal("fetch", fake.fn);
+    await verifyWithApi(DUMMY_KEY);
+    expect(fake.calls[0]?.url).toContain("per_page=1");
+  });
+
+  it("rejects with the API error", async () => {
+    vi.stubGlobal("fetch", fakeFetch(status(401)).fn);
+    await expect(verifyWithApi(DUMMY_KEY)).rejects.toThrow("rejected the API key");
+  });
+});

@@ -4,6 +4,8 @@
  * Error messages name the variable at fault but never echo its value.
  */
 import { closeSync, constants, fstatSync, openSync, readSync } from "node:fs";
+import { homedir } from "node:os";
+import { join } from "node:path";
 import { z } from "zod";
 import { Secret } from "./secret.js";
 
@@ -62,7 +64,8 @@ const MAX_KEY_LENGTH = 512;
 /** Printable ASCII with no spaces: rules out pasted whitespace, quotes and control characters. */
 const KEY_CHARSET = /^[\x21-\x7e]+$/;
 
-function validateKey(raw: string, source: string): string | Error {
+/** Validates a key's format (placeholders, length, characters). Shared with `setup`. */
+export function validateKey(raw: string, source: string): string | Error {
   const key = raw.trim();
   if (key.length === 0) return new Error(`${source} is empty.`);
   if (PLACEHOLDER_KEYS.has(key.toLowerCase()) || PLACEHOLDER_PATTERN.test(key)) {
@@ -99,27 +102,55 @@ function parseOption<T>(
   return fallback;
 }
 
-type FileReader = (path: string) => string;
+interface ReadOptions {
+  /** Refuse files that other users can read (POSIX only). */
+  readonly requirePrivate: boolean;
+  /** Return undefined instead of failing when the file does not exist. */
+  readonly allowMissing: boolean;
+}
+
+type FileReader = (path: string, options: ReadOptions) => string | undefined;
 
 /** A key-file problem whose message is safe to show (it never includes file contents). */
 class KeyFileError extends Error {}
 
 /**
+ * Where `nz-legislation-mcp setup` stores the key, and where the server looks when no key
+ * variable is set: $XDG_CONFIG_HOME (or ~/.config) on Linux and macOS, %APPDATA% on Windows.
+ */
+export function defaultKeyFilePath(
+  env: Env = process.env,
+  platform: NodeJS.Platform = process.platform,
+  home: string = homedir(),
+): string {
+  const base =
+    platform === "win32"
+      ? (env["APPDATA"] ?? join(home, "AppData", "Roaming"))
+      : (env["XDG_CONFIG_HOME"] ?? join(home, ".config"));
+  return join(base, "nz-legislation-mcp", "key");
+}
+
+/**
  * Reads a key file, refusing anything that is not a small regular file. This prevents, for
  * example, pointing at /dev/stdin (which would swallow MCP stdio traffic) or a huge file.
  */
-const defaultReader: FileReader = (path) => {
+const defaultReader: FileReader = (path, options) => {
   // Open once and check/read through the same descriptor (no check-then-use race). O_NONBLOCK
   // stops a FIFO from blocking the open; the regular-file check then rejects it.
   let fd: number;
   try {
     fd = openSync(path, constants.O_RDONLY | constants.O_NONBLOCK);
-  } catch {
+  } catch (error) {
+    if (options.allowMissing && (error as NodeJS.ErrnoException).code === "ENOENT")
+      return undefined;
     throw new KeyFileError("cannot be read");
   }
   try {
     const stats = fstatSync(fd);
     if (!stats.isFile()) throw new KeyFileError("is not a regular file");
+    if (options.requirePrivate && process.platform !== "win32" && (stats.mode & 0o077) !== 0) {
+      throw new KeyFileError(`can be read by other users; run: chmod 600 ${path}`);
+    }
     // Read at most one byte more than the limit, so oversized files are detected without
     // trusting the size reported by stat.
     const buffer = Buffer.alloc(MAX_KEY_FILE_BYTES + 1);
@@ -142,9 +173,14 @@ const defaultReader: FileReader = (path) => {
  * Loads configuration from the environment.
  *
  * The key comes from `LEGISLATION_NZ_API_KEY`, or from a file named by
- * `LEGISLATION_NZ_API_KEY_FILE` (Docker/Kubernetes secrets pattern). Setting both is an error.
+ * `LEGISLATION_NZ_API_KEY_FILE` (Docker/Kubernetes secrets pattern), or else from the private
+ * key file written by `nz-legislation-mcp setup`. Setting both variables is an error.
  */
-export function loadConfig(env: Env = process.env, readFile: FileReader = defaultReader): Config {
+export function loadConfig(
+  env: Env = process.env,
+  readFile: FileReader = defaultReader,
+  keyFilePath: string = defaultKeyFilePath(env),
+): Config {
   const problems: string[] = [];
   const direct = env[ENV.apiKey];
   const file = env[ENV.apiKeyFile];
@@ -155,7 +191,7 @@ export function loadConfig(env: Env = process.env, readFile: FileReader = defaul
   } else if (file !== undefined && file !== "") {
     let contents: string | undefined;
     try {
-      contents = readFile(file);
+      contents = readFile(file, { requirePrivate: false, allowMissing: false });
     } catch (error) {
       const reason = error instanceof KeyFileError ? error.message : "cannot be read";
       problems.push(`${ENV.apiKeyFile} points to a file that ${reason}.`);
@@ -170,9 +206,22 @@ export function loadConfig(env: Env = process.env, readFile: FileReader = defaul
     if (result instanceof Error) problems.push(result.message);
     else key = result;
   } else {
-    problems.push(
-      `No API key found. Set ${ENV.apiKey} to your NZ Legislation API key (request one from contact@pco.govt.nz).`,
-    );
+    let contents: string | undefined;
+    try {
+      contents = readFile(keyFilePath, { requirePrivate: true, allowMissing: true });
+    } catch (error) {
+      const reason = error instanceof KeyFileError ? error.message : "cannot be read";
+      problems.push(`The key file ${keyFilePath} ${reason}.`);
+    }
+    if (contents === undefined && problems.length === 0) {
+      problems.push(
+        `No API key found. Run "npx nz-legislation-mcp setup", or set ${ENV.apiKey} (request a key from contact@pco.govt.nz).`,
+      );
+    } else if (contents !== undefined) {
+      const result = validateKey(contents, `The key file ${keyFilePath}`);
+      if (result instanceof Error) problems.push(result.message);
+      else key = result;
+    }
   }
 
   const timeoutMs = parseOption(
