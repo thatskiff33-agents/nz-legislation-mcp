@@ -1,7 +1,7 @@
 /** Shared pieces for the tools that read legislation text. */
 import { z } from "zod";
 import { cleanText, versionDate } from "./shared.js";
-import type { OutlineEntry } from "../text/document.js";
+import type { Match, OutlineEntry } from "../text/document.js";
 import type { VersionRecord } from "../api/client.js";
 
 /** Upper bound for section/schedule labels supplied by the caller. */
@@ -16,6 +16,11 @@ export const LabelSchema = z
   .regex(LABEL_PATTERN, { error: "Use the label as printed, e.g. 13, 6A or CA 1." });
 
 export const ProvisionShape = {
+  part: LabelSchema.min(1)
+    .optional()
+    .describe(
+      'Only look inside this part or subpart (label, e.g. "CB" or "A"). Use it when a label appears more than once, e.g. clause numbers repeated across the parts of a schedule.',
+    ),
   section: LabelSchema.min(1)
     .optional()
     .describe('Section (or clause) label as printed, e.g. "13", "6A" or "CA 1".'),
@@ -29,6 +34,9 @@ export const ProvisionInfoSchema = z.object({
   label: z.string(),
   heading: z.string(),
   schedule: z.string().nullable().describe("Schedule label if the provision is in a schedule."),
+  repealed: z
+    .boolean()
+    .describe("True if this provision has been repealed (its text is just a marker)."),
   within: z.array(z.string()).describe("Enclosing part/subpart labels, outermost first."),
 });
 
@@ -38,6 +46,7 @@ export function provisionInfo(entry: OutlineEntry): z.output<typeof ProvisionInf
     label: cleanText(entry.label),
     heading: cleanText(entry.heading),
     schedule: entry.schedule === null ? null : cleanText(entry.schedule),
+    repealed: entry.repealed,
     within: [...entry.within],
   };
 }
@@ -49,6 +58,15 @@ export function describeTarget(section: string | undefined, schedule: string | u
   }
   if (section !== undefined) return `section ${section}`;
   return `schedule ${schedule === "" || schedule === undefined ? "(unnumbered)" : schedule}`;
+}
+
+/** A note when the same label matched more than once, explaining which was used. */
+export function duplicatesNote(matches: readonly Match[], chosen: OutlineEntry): string | null {
+  if (matches.length < 2) return null;
+  const describe = (e: OutlineEntry): string =>
+    `${e.within.length > 0 ? `in ${e.within.join(" > ")}` : "at the top level"}${e.repealed ? " (repealed)" : ""}`;
+  const list = matches.map((m) => describe(m.entry)).join("; ");
+  return `This label appears ${String(matches.length)} times (${list}). Used the one ${describe(chosen)}. Pass part to choose another.`;
 }
 
 /** Suggests nearby labels when a provision is not found. */

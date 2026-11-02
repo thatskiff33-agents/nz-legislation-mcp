@@ -14,6 +14,8 @@ import { SERVER_NAME, VERSION } from "./version.js";
 
 /** Bounded size of the optional response cache. */
 const CACHE_MAX_ENTRIES = 500;
+/** Bounded size of the optional rendered-text cache (entries can be large). */
+const TEXT_CACHE_MAX_ENTRIES = 50;
 
 export interface MainIo {
   readonly env: Readonly<Record<string, string | undefined>>;
@@ -40,10 +42,11 @@ function buildDeps(env: MainIo["env"], stderr: MainIo["stderr"]): ToolDeps {
     redact: (text) => config.apiKey.redact(text),
     write: stderr,
   });
+  const memory = config.cache === "memory";
   const client = new LegislationClient({
     apiKey: config.apiKey,
     timeoutMs: config.timeoutMs,
-    cache: config.cache === "memory" ? new MemoryCache(CACHE_MAX_ENTRIES) : undefined,
+    cache: memory ? new MemoryCache(CACHE_MAX_ENTRIES) : undefined,
     logger,
   });
   logger.info("starting", { server: SERVER_NAME, version: VERSION, cache: config.cache });
@@ -51,6 +54,7 @@ function buildDeps(env: MainIo["env"], stderr: MainIo["stderr"]): ToolDeps {
     client,
     logger,
     today: todayInNewZealand,
+    textCache: memory ? new MemoryCache(TEXT_CACHE_MAX_ENTRIES) : undefined,
     xml: streamVersionXml,
   };
 }

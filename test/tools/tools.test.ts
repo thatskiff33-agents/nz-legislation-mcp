@@ -398,11 +398,27 @@ describe("text helpers", () => {
       label,
       heading: "",
       id: null,
+      repealed: false,
       depth: 0,
       schedule: null,
       within: [],
     }));
     expect(suggestLabels(outline, "zz")).toEqual(["1", "2", "6", "6A"]);
+    const { duplicatesNote } = await import("../../src/tools/text-common.js");
+    const [a, b] = outline;
+    if (a === undefined || b === undefined) throw new Error("fixture");
+    expect(duplicatesNote([{ entry: a, text: "" }], a)).toBeNull();
+    expect(
+      duplicatesNote(
+        [
+          { entry: a, text: "" },
+          { entry: b, text: "" },
+        ],
+        a,
+      ),
+    ).toBe(
+      "This label appears 2 times (at the top level; at the top level). Used the one at the top level. Pass part to choose another.",
+    );
     expect(suggestLabels(outline, "  ")).toEqual(["1", "2", "6", "6A"]);
   });
 });

@@ -70,7 +70,9 @@ const OutputSchema = z.object({
   lines_removed: z.number().int(),
   diff: z
     .string()
-    .describe('Line diff: "- " removed, "+ " added, "  " unchanged. Empty if nothing changed.'),
+    .describe(
+      'Changed lines only: "- " removed, "+ " added, "  " two lines of context, "…" between separate changes. Empty if nothing changed.',
+    ),
   diff_truncated: z.boolean(),
   notes: z.array(z.string()),
 });
@@ -78,11 +80,14 @@ const OutputSchema = z.object({
 async function readSide(
   deps: ToolDeps,
   versionId: string,
-  section: string | undefined,
-  schedule: string | undefined,
+  target: {
+    section?: string | undefined;
+    schedule?: string | undefined;
+    part?: string | undefined;
+  },
   signal: AbortSignal,
 ): Promise<ReadResult> {
-  return readLegislation(deps.xml(versionId, signal), { target: { section, schedule } });
+  return readLegislation(deps.xml(versionId, signal), { target });
 }
 
 export const compareVersions = defineTool({
@@ -117,8 +122,9 @@ export const compareVersions = defineTool({
     const toId = to.record.version_id;
     const same = fromId === toId;
 
-    const before = await readSide(deps, fromId, args.section, args.schedule, signal);
-    const after = same ? before : await readSide(deps, toId, args.section, args.schedule, signal);
+    const target = { section: args.section, schedule: args.schedule, part: args.part };
+    const before = await readSide(deps, fromId, target, signal);
+    const after = same ? before : await readSide(deps, toId, target, signal);
     const found = after.found ?? before.found;
     if (found === null) {
       throw new ToolInputError(

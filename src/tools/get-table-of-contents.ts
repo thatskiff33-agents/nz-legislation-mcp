@@ -1,6 +1,6 @@
 /** get_table_of_contents: the structure of one version (parts, subparts, sections, schedules). */
 import { z } from "zod";
-import { readLegislation, normaliseLabel, type OutlineEntry } from "../text/document.js";
+import { normalisePartLabel, readLegislation, type OutlineEntry } from "../text/document.js";
 import { cleanText, defineTool, permalink, PermalinkSchema, READ_ONLY_API_TOOL } from "./shared.js";
 import { LabelSchema, versionInfo, VersionInfoShape } from "./text-common.js";
 import { refineSelector, selectVersion, VersionSelectorShape } from "./versions.js";
@@ -27,6 +27,7 @@ const EntrySchema = z.object({
   heading: z.string(),
   depth: z.number().int(),
   schedule: z.string().nullable(),
+  repealed: z.boolean(),
 });
 
 const OutputSchema = z.object({
@@ -47,6 +48,7 @@ function toEntry(e: OutlineEntry): z.output<typeof EntrySchema> {
     heading: cleanText(e.heading),
     depth: e.depth,
     schedule: e.schedule === null ? null : cleanText(e.schedule),
+    repealed: e.repealed,
   };
 }
 
@@ -69,17 +71,26 @@ export const getTableOfContents = defineTool({
     let chosen: OutlineEntry[];
     let scope: string;
     if (args.part !== undefined) {
-      const wanted = normaliseLabel(args.part);
+      const wanted = normalisePartLabel(args.part);
       chosen = doc.outline.filter(
         (e) =>
-          e.within.some((label) => normaliseLabel(label) === wanted) ||
-          ((e.kind === "part" || e.kind === "subpart") && normaliseLabel(e.label) === wanted),
+          e.within.some((label) => normalisePartLabel(label) === wanted) ||
+          ((e.kind === "part" || e.kind === "subpart") && normalisePartLabel(e.label) === wanted),
       );
       scope = `Everything in part/subpart ${args.part}.`;
       if (chosen.length === 0) {
         notes.push(
           `No part or subpart labelled "${args.part}" was found. Omit part to see the top level.`,
         );
+      } else if (chosen.length > MAX_ENTRIES) {
+        const subparts = chosen.filter((e) => e.kind === "part" || e.kind === "subpart");
+        if (subparts.length > 1) {
+          chosen = subparts;
+          scope = `Subparts of ${args.part} (it has too many entries to list at once).`;
+          notes.push(
+            `Part ${args.part} has ${String(doc.outline.length)} entries in the whole document; pass one of the subpart labels above to list its sections.`,
+          );
+        }
       }
     } else if (doc.outline.length <= FULL_OUTLINE_LIMIT) {
       chosen = [...doc.outline];
@@ -87,12 +98,13 @@ export const getTableOfContents = defineTool({
     } else {
       chosen = doc.outline.filter(
         (e) =>
-          e.kind === "part" ||
-          e.kind === "subpart" ||
           e.kind === "schedule" ||
-          (e.kind === "section" && e.within.length === 0 && e.schedule === null),
+          (e.schedule === null &&
+            (e.kind === "part" ||
+              e.kind === "subpart" ||
+              (e.kind === "section" && e.within.length === 0))),
       );
-      scope = "Parts, subparts, schedules and sections outside any part.";
+      scope = "Body parts and subparts, schedules, and sections outside any part.";
       notes.push(
         `This document has ${String(doc.outline.length)} entries. Pass part (e.g. a part or subpart label above) to list its sections.`,
       );

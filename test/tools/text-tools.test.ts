@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { MemoryCache } from "../../src/api/cache.js";
 import { compareVersions } from "../../src/tools/compare-versions.js";
 import { getProvisionText } from "../../src/tools/get-provision-text.js";
 import { getTableOfContents } from "../../src/tools/get-table-of-contents.js";
@@ -31,6 +32,7 @@ describe("get_table_of_contents", () => {
       heading: "Relationship with Holidays Act 2003",
       depth: 0,
       schedule: null,
+      repealed: false,
     });
   });
 
@@ -58,13 +60,24 @@ describe("get_table_of_contents", () => {
     expect(missing.notes.join(" ")).toContain('No part or subpart labelled "Z"');
   });
 
-  it("caps very long listings", async () => {
-    const big = bigAct(1, 600);
+  it("lists subparts when a part is too big, and caps listings without subparts", async () => {
     const id = "act_public_2099_2_en_2099-01-01";
-    const { deps: d } = deps([versionRecord(id)], "2026-11-02", { [id]: big });
-    const out = await getTableOfContents.run({ version_id: id, part: "1" }, d, signal);
-    expect(out.truncated).toBe(true);
-    expect(out.entries).toHaveLength(500);
+    const { deps: d } = deps([versionRecord(id), versionRecord(id)], "2026-11-02", {
+      [id]: bigAct(1, 600),
+    });
+    const out = await getTableOfContents.run({ version_id: id, part: "Part 1" }, d, signal);
+    expect(out.entries.map((e) => `${e.kind}:${e.label}`)).toEqual(["part:1", "subpart:1A"]);
+    expect(out.notes.join(" ")).toContain("pass one of the subpart labels");
+    const sections = Array.from(
+      { length: 600 },
+      (_, i) => `<prov><label>${String(i + 1)}</label><heading>S</heading></prov>`,
+    ).join("");
+    const flat = `<act><body><part><label>1</label><heading>Only</heading>${sections}</part></body></act>`;
+    const flatId = "act_public_2099_7_en_2099-01-01";
+    const { deps: d2 } = deps([versionRecord(flatId)], "x", { [flatId]: flat });
+    const capped = await getTableOfContents.run({ version_id: flatId, part: "1" }, d2, signal);
+    expect(capped.truncated).toBe(true);
+    expect(capped.entries).toHaveLength(500);
   });
 
   it("falls back to the API title when the XML has none", async () => {
@@ -194,6 +207,41 @@ describe("get_provision_text", () => {
     expect(out.text).toBe("1 Application\nThis clause applies from 2099.");
   });
 
+  it("notes duplicates and repeals (real extracts)", async () => {
+    const id = "act_public_2099_8_en_2099-01-01";
+    const real = loadXml("real-extracts.xml");
+    const { deps: d } = deps([versionRecord(id), versionRecord(id)], "x", { [id]: real });
+    const cz23 = await getProvisionText.run({ version_id: id, section: "CZ 23" }, d, signal);
+    expect(cz23.provision.repealed).toBe(false);
+    expect(cz23.notes.join(" ")).toContain(
+      "This label appears 2 times (in C > CZ (repealed); in C > CZ). Used the one in C > CZ.",
+    );
+    const s24 = await getProvisionText.run({ version_id: id, section: "24" }, d, signal);
+    expect(s24.provision.repealed).toBe(true);
+    expect(s24.notes.join(" ")).toContain("has been repealed");
+  });
+
+  it("reuses rendered text from the optional cache when paging", async () => {
+    let downloads = 0;
+    const base = deps([versionRecord(V2014), versionRecord(V2014)], "x", { [V2014]: WAITANGI });
+    const counting: typeof base.deps.xml = (versionId, s) => {
+      downloads += 1;
+      return base.deps.xml(versionId, s);
+    };
+    const d = { ...base.deps, xml: counting, textCache: new MemoryCache(10) };
+    const first = await getProvisionText.run(
+      { version_id: V2014, schedule: "", max_chars: 1000 },
+      d,
+      signal,
+    );
+    await getProvisionText.run(
+      { version_id: V2014, schedule: "", max_chars: 1000, offset: first.next_offset ?? 0 },
+      d,
+      signal,
+    );
+    expect(downloads).toBe(1);
+  });
+
   it("explains a missing schedule", async () => {
     const { deps: d } = deps([versionRecord(V2014)], "2026-11-02", { [V2014]: WAITANGI });
     await expect(
@@ -296,23 +344,38 @@ describe("compare_versions", () => {
     ).rejects.toThrow("not found in either version");
   });
 
-  it("refuses provisions too long to diff", async () => {
-    const lines = Array.from(
-      { length: 2100 },
-      (_, i) => `<para><text>line ${String(i)}</text></para>`,
-    ).join("");
-    const long = `<act><body><prov><label>1</label><heading>Long</heading><prov.body><subprov><label/>${lines}</subprov></prov.body></prov></body></act>`;
-    const { deps: d } = deps([versionRecord(V2007), versionRecord(V2014)], "x", {
-      [V2007]: long,
-      [V2014]: long.replace("line 5<", "line five<"),
+  it("refuses changes too large to diff, but compares long provisions with small changes", async () => {
+    const doc = (word: string, n: number) =>
+      `<act><body><prov><label>1</label><heading>Long</heading><prov.body><subprov><label/>${Array.from(
+        { length: n },
+        (_, i) => `<para><text>${word} ${String(i)}</text></para>`,
+      ).join("")}</subprov></prov.body></prov></body></act>`;
+    const tooBig = deps([versionRecord(V2007), versionRecord(V2014)], "x", {
+      [V2007]: doc("old", 2100),
+      [V2014]: doc("new", 2100),
     });
     await expect(
       compareVersions.run(
         { work_id: WORK, section: "1", from_version_id: V2007, to_version_id: V2014 },
-        d,
+        tooBig.deps,
         signal,
       ),
     ).rejects.toThrow("too long to compare");
+
+    // 5,000 lines with one change near the end: still compared, and the change is visible.
+    const long = doc("same", 5000);
+    const small = deps([versionRecord(V2007), versionRecord(V2014)], "x", {
+      [V2007]: long,
+      [V2014]: long.replace("same 4990<", "changed 4990<"),
+    });
+    const out = await compareVersions.run(
+      { work_id: WORK, section: "1", from_version_id: V2007, to_version_id: V2014 },
+      small.deps,
+      signal,
+    );
+    expect(out.diff).toBe(
+      "  same 4988\n  same 4989\n- same 4990\n+ changed 4990\n  same 4991\n  same 4992",
+    );
   });
 
   it("truncates very long diffs", async () => {

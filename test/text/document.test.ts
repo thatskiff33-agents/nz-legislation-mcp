@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ApiError } from "../../src/api/errors.js";
-import { normaliseLabel, readLegislation } from "../../src/text/document.js";
+import { normaliseLabel, normalisePartLabel, readLegislation } from "../../src/text/document.js";
 import { chunked, loadXml } from "./xml.js";
 
 const WAITANGI = loadXml("waitangi-day-act-1976.xml");
@@ -208,9 +208,156 @@ describe("normaliseLabel", () => {
     ["  s 13 ", "13"],
     ["section 6A", "6a"],
     ["Schedule 1", "1"],
-    ["cl. 2", "2"],
-    ["ss 3", "3"],
+    ["cl. 2", "cl. 2"],
+    ["ss 3", "ss 3"],
+    ["CL 1", "cl 1"],
+    ["s2", "2"],
+    ["section 2.", "2"],
+    ["sections CB 6A", "cb 6a"],
+    ["Sch. 1A", "1a"],
   ])("%j -> %j", (input, expected) => {
     expect(normaliseLabel(input)).toBe(expected);
+  });
+});
+
+describe("normalisePartLabel", () => {
+  it.each([
+    ["Part C", "c"],
+    ["subpart CB", "cb"],
+    ["C", "c"],
+    ["Part 3B", "3b"],
+  ])("%j -> %j", (input, expected) => {
+    expect(normalisePartLabel(input)).toBe(expected);
+  });
+});
+
+describe("real extracts (GST Act 1985, Income Tax Act 2007)", () => {
+  const REAL = loadXml("real-extracts.xml");
+  const read = (target: { section?: string; schedule?: string; part?: string }) =>
+    readLegislation(chunked(REAL), { target });
+
+  it("keeps quoted statutory words, in quotation marks (ITA YC 20)", async () => {
+    const doc = await read({ section: "YC 20" });
+    expect(doc.text).toContain(
+      "(b) each other reference to “excluded fixed rate security” were omitted.",
+    );
+    expect(doc.text).toContain("the words “an excluded fixed rate security” were replaced by “a”.");
+  });
+
+  it("marks repealed provisions and parts of provisions", async () => {
+    expect((await read({ section: "24" })).text).toBe("24 Tax invoices [Repealed]");
+    const cb6 = await read({ section: "CB 6" });
+    expect(cb6.found?.repealed).toBe(false);
+    expect(cb6.text?.split("\n").at(-1)).toBe("(3) [Repealed]");
+  });
+
+  it("prefers the live provision when a label is duplicated (ITA CZ 23)", async () => {
+    const doc = await read({ section: "CZ 23" });
+    expect(doc.matches.map((m) => m.entry.repealed)).toEqual([true, false]);
+    expect(doc.found?.repealed).toBe(false);
+    expect(doc.text?.startsWith("CZ 23 Employee benefits for Canterbury earthquake relief")).toBe(
+      true,
+    );
+  });
+
+  it("puts formula variables at the start of their definition (GST s 19C)", async () => {
+    const lines = (await read({ section: "19C" })).text?.split("\n") ?? [];
+    expect(lines).toContain("a − b");
+    expect(lines.some((l) => l.startsWith("a is an amount equal to"))).toBe(true);
+    expect(lines.some((l) => l.startsWith("b is an amount equal to"))).toBe(true);
+    expect(lines.some((l) => /[a-z]b$/u.test(l) || l.endsWith("andb"))).toBe(false);
+  });
+
+  it("puts list numbers on their own items (ITA schedule 21)", async () => {
+    const lines = (await read({ schedule: "21" })).text?.split("\n") ?? [];
+    expect(lines).toContain(
+      "1 Preproduction activities, including demonstration of commercial viability and tooling up.",
+    );
+    expect(lines).toContain("2 Routine de-bugging of existing computer software.");
+    expect(lines).toContain("5 [Repealed]");
+    expect(lines[1]?.startsWith("Part A ")).toBe(true);
+  });
+
+  it("does not duplicate headings that contain markup (ITA CB 15D)", async () => {
+    const first = (await read({ section: "CB 15D" })).text?.split("\n")[0];
+    expect(first).toBe("CB 15D Kāinga Ora–Homes and Communities and wholly-owned group");
+  });
+
+  it("excludes amending-Act skeletons from the outline and from matching", async () => {
+    const doc = await readLegislation(chunked(REAL), {
+      fullOutline: true,
+      target: { section: "1" },
+    });
+    expect(doc.found).toBeNull();
+    expect(doc.outline.some((e) => e.label === "1" && e.kind === "section")).toBe(false);
+  });
+
+  it("lists ird-crosshead cross-headings and repealed flags in the outline", async () => {
+    const doc = await readLegislation(chunked(REAL), { fullOutline: true });
+    expect(doc.outline.find((e) => e.kind === "crosshead")?.heading).toBe("Business generally");
+    expect(doc.outline.filter((e) => e.label === "CZ 23").map((e) => e.repealed)).toEqual([
+      true,
+      false,
+    ]);
+    expect(doc.outline.find((e) => e.label === "24")?.repealed).toBe(true);
+  });
+
+  it("narrows matches to a part or subpart", async () => {
+    expect((await read({ section: "CZ 23", part: "CB" })).found).toBeNull();
+    expect((await read({ section: "CZ 23", part: "Subpart CZ" })).matches).toHaveLength(2);
+  });
+});
+
+describe("repealed markers", () => {
+  it("marks a repealed provision that has no heading", async () => {
+    const xml =
+      '<act><body><prov deletion-status="repealed"><label>9</label><prov.body/></prov></body></act>';
+    expect((await readLegislation(chunked(xml), { target: { section: "9" } })).text).toBe(
+      "9\n[Repealed]",
+    );
+  });
+});
+
+describe("schedule parts and lists", () => {
+  it("labels parts and subparts inside a schedule, and unnumbered list items", async () => {
+    const xml =
+      "<act><body/><schedule.group><schedule><label>3</label><heading>S</heading><schedule.provisions>" +
+      "<part><label>Part 1</label><heading>Already worded</heading></part>" +
+      "<part><label/><heading>Unnumbered part</heading></part>" +
+      "<part><label>2</label><heading>Bare</heading><subpart><label>2A</label><heading>Sub</heading></subpart></part>" +
+      "<para><list><item><label/><para><text>unnumbered item</text></para></item></list></para>" +
+      "</schedule.provisions></schedule></schedule.group></act>";
+    const doc = await readLegislation(chunked(xml), { target: { schedule: "3" } });
+    expect(doc.text).toBe(
+      [
+        "3 S",
+        "Part 1 Already worded",
+        "Unnumbered part",
+        "Part 2 Bare",
+        "Subpart 2A Sub",
+        "unnumbered item",
+      ].join("\n"),
+    );
+  });
+});
+
+describe("matching rules", () => {
+  it("never matches an element that has no label of its own", async () => {
+    const xml =
+      "<act><body/><schedule.group><schedule><heading>Unlabelled</heading><para><text>x</text></para></schedule></schedule.group></act>";
+    expect((await readLegislation(chunked(xml), { target: { schedule: "2" } })).found).toBeNull();
+    expect((await readLegislation(chunked(xml), { target: { section: "99" } })).found).toBeNull();
+  });
+
+  it("collects clause numbers repeated across parts of a schedule", async () => {
+    const clause = (n: string, word: string) =>
+      `<prov><label>${n}</label><heading>${word}</heading><prov.body><subprov><label/><para><text>${word}</text></para></subprov></prov.body></prov>`;
+    const xml = `<act><body/><schedule.group><schedule><label>1</label><heading>S</heading><schedule.provisions><part><label>1</label><heading>P1</heading>${clause("1", "First")}</part><part><label>2</label><heading>P2</heading>${clause("1", "Second")}</part></schedule.provisions></schedule><schedule><label>2</label><heading>T</heading></schedule></schedule.group></act>`;
+    const doc = await readLegislation(chunked(xml), { target: { section: "1", schedule: "1" } });
+    expect(doc.matches.map((m) => m.entry.within)).toEqual([["1"], ["2"]]);
+    const second = await readLegislation(chunked(xml), {
+      target: { section: "1", schedule: "1", part: "2" },
+    });
+    expect(second.text).toBe("1 Second\nSecond");
   });
 });

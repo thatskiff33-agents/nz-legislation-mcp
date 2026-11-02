@@ -1,6 +1,6 @@
 /** get_provision_text: the text of one section, schedule clause or schedule. */
 import { z } from "zod";
-import { readLegislation } from "../text/document.js";
+import { readLegislation, type ReadResult } from "../text/document.js";
 import {
   cleanText,
   defineTool,
@@ -8,9 +8,11 @@ import {
   PermalinkSchema,
   READ_ONLY_API_TOOL,
   ToolInputError,
+  type ToolDeps,
 } from "./shared.js";
 import {
   describeTarget,
+  duplicatesNote,
   provisionInfo,
   ProvisionInfoSchema,
   ProvisionShape,
@@ -22,6 +24,54 @@ import {
 import { refineSelector, selectVersion, VersionSelectorShape } from "./versions.js";
 
 const DEFAULT_MAX_CHARS = 15_000;
+/** How long rendered text is kept when the optional cache is enabled. */
+const TEXT_CACHE_TTL_MS = 60 * 60 * 1000;
+
+interface Rendered {
+  readonly title: string;
+  readonly matches: ReadResult["matches"];
+  readonly found: ReadResult["found"];
+  readonly text: ReadResult["text"];
+  readonly outline: ReadResult["outline"];
+}
+
+/**
+ * Reads (or, with the optional cache enabled, reuses) the rendered provision, so paging
+ * through a long provision does not download the whole document again for every page.
+ */
+async function readCached(
+  deps: ToolDeps,
+  versionId: string,
+  args: {
+    section?: string | undefined;
+    schedule?: string | undefined;
+    part?: string | undefined;
+    include_history?: boolean | undefined;
+  },
+  signal: AbortSignal,
+): Promise<Rendered> {
+  const key = JSON.stringify([
+    versionId,
+    args.section,
+    args.schedule,
+    args.part,
+    args.include_history === true,
+  ]);
+  const cached = deps.textCache?.get(key) as Rendered | undefined;
+  if (cached !== undefined) return cached;
+  const doc = await readLegislation(deps.xml(versionId, signal), {
+    target: { section: args.section, schedule: args.schedule, part: args.part },
+    includeHistory: args.include_history === true,
+  });
+  // Keep only what later pages need (not the outline of a successful read).
+  const rendered: Rendered = doc.found === null ? doc : { ...doc, outline: [] };
+  if (doc.found !== null) deps.textCache?.set(key, rendered, TEXT_CACHE_TTL_MS);
+  return rendered;
+}
+
+function nonNull<T>(value: T | null): T[] {
+  return value === null ? [] : [value];
+}
 const MAX_MAX_CHARS = 50_000;
 
 const InputSchema = z
@@ -75,7 +125,8 @@ export const getProvisionText = defineTool({
   description: [
     "Get the text of one section, a clause in a schedule, or a whole schedule, from the official XML.",
     "Choose the version with work_id (+ as_at, default today in New Zealand) or version_id. Labels come from get_table_of_contents.",
-    "Long text is paged: pass next_offset as offset to continue.",
+    "Long text is paged: pass next_offset as offset to continue (or raise max_chars for very long provisions such as definitions sections).",
+    "Repealed provisions are marked [Repealed]; quoted words appear in quotation marks.",
   ].join(" "),
   inputSchema: InputSchema,
   outputSchema: OutputSchema,
@@ -83,10 +134,7 @@ export const getProvisionText = defineTool({
   async run(args, deps, signal) {
     const selected = await selectVersion(args, deps, signal);
     const { record } = selected;
-    const doc = await readLegislation(deps.xml(record.version_id, signal), {
-      target: { section: args.section, schedule: args.schedule },
-      includeHistory: args.include_history === true,
-    });
+    const doc = await readCached(deps, record.version_id, args, signal);
     if (doc.found === null || doc.text === null) {
       const what = describeTarget(args.section, args.schedule);
       const hint =
@@ -110,7 +158,14 @@ export const getProvisionText = defineTool({
       offset,
       next_offset: end < doc.text.length ? end : null,
       total_chars: doc.text.length,
-      notes: [TEXT_SOURCE_NOTE, ...selected.notes],
+      notes: [
+        TEXT_SOURCE_NOTE,
+        ...selected.notes,
+        ...(doc.found.repealed
+          ? ["This provision has been repealed; only a marker remains in this version."]
+          : []),
+        ...nonNull(duplicatesNote(doc.matches, doc.found)),
+      ],
     };
   },
 });
