@@ -12,3 +12,4 @@ coverage/
 deploy/.env
 deploy/secrets/*
 !deploy/secrets/README.md
+release/

@@ -3,12 +3,23 @@
  * never need the key inline. The key is checked (format, then one API call) before it is saved.
  */
 import { randomBytes } from "node:crypto";
-import { mkdirSync, renameSync, rmSync, writeFileSync, existsSync } from "node:fs";
+import {
+  chmodSync,
+  closeSync,
+  existsSync,
+  fsyncSync,
+  mkdirSync,
+  openSync,
+  renameSync,
+  rmSync,
+  writeSync,
+} from "node:fs";
 import { dirname, join } from "node:path";
 import { LegislationClient } from "../api/client.js";
 import { ApiError } from "../api/errors.js";
 import { defaultKeyFilePath, validateKey } from "../config.js";
 import { Secret } from "../secret.js";
+import { InputCancelledError } from "./terminal.js";
 import { CLIENT_SETUP_HINT } from "./clients.js";
 
 export interface SetupIo {
@@ -22,6 +33,8 @@ export interface SetupIo {
   /** Checks a key against the API: resolves on success, rejects with ApiError otherwise. */
   readonly verify: (key: string) => Promise<void>;
   readonly keyFilePath?: string | undefined;
+  /** Defaults to process.platform (overridable for tests). */
+  readonly platform?: NodeJS.Platform | undefined;
 }
 
 const USAGE = `Usage: nz-legislation-mcp setup [--key-stdin] [--no-verify] [--force]
@@ -41,11 +54,20 @@ export async function verifyWithApi(key: string): Promise<void> {
 }
 
 /** Writes a file readable only by the owner, atomically (temporary file, then rename). */
-function writePrivate(path: string, contents: string): void {
-  mkdirSync(dirname(path), { recursive: true, mode: 0o700 });
-  const temporary = join(dirname(path), `.key-${randomBytes(6).toString("hex")}`);
+function writePrivate(path: string, contents: string, platform: NodeJS.Platform): void {
+  const directory = dirname(path);
+  mkdirSync(directory, { recursive: true, mode: 0o700 });
+  // Tighten a folder that already existed (mkdir's mode only applies when it creates one).
+  if (platform !== "win32") chmodSync(directory, 0o700);
+  const temporary = join(directory, `.key-${randomBytes(6).toString("hex")}`);
   try {
-    writeFileSync(temporary, contents, { mode: 0o600, flag: "wx" });
+    const fd = openSync(temporary, "wx", 0o600);
+    try {
+      writeSync(fd, contents);
+      fsyncSync(fd); // the key is on disk before the rename makes it visible
+    } finally {
+      closeSync(fd);
+    }
     renameSync(temporary, path);
   } finally {
     rmSync(temporary, { force: true });
@@ -65,9 +87,17 @@ export async function runSetup(argv: readonly string[], io: SetupIo): Promise<nu
     return 1;
   }
 
-  const raw = flags.has("--key-stdin")
-    ? await io.readStdin()
-    : await io.readSecret("Paste your NZ Legislation API key (input hidden): ");
+  let raw: string;
+  try {
+    raw = flags.has("--key-stdin")
+      ? await io.readStdin()
+      : await io.readSecret("Paste your NZ Legislation API key (input hidden): ");
+  } catch (error) {
+    io.stderr(
+      `${error instanceof InputCancelledError ? error.message : "Could not read the key."} Nothing was saved.\n`,
+    );
+    return 130;
+  }
   const key = validateKey(raw, "The key");
   if (key instanceof Error) {
     io.stderr(`${key.message}\n`);
@@ -85,7 +115,12 @@ export async function runSetup(argv: readonly string[], io: SetupIo): Promise<nu
     }
   }
 
-  writePrivate(path, `${key}\n`);
-  io.stdout(`Saved your key to ${path} (readable only by you).\n\n${CLIENT_SETUP_HINT}`);
+  const platform = io.platform ?? process.platform;
+  writePrivate(path, `${key}\n`, platform);
+  const privacy =
+    platform === "win32"
+      ? "in your user profile, protected by your Windows account's file permissions"
+      : "readable only by you";
+  io.stdout(`Saved your key to ${path} (${privacy}).\n\n${CLIENT_SETUP_HINT}`);
   return 0;
 }

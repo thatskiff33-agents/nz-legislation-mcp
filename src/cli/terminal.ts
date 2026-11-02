@@ -11,7 +11,7 @@ export interface Input {
   pause: () => unknown;
 }
 
-/** @internal Exported for tests. */
+/** Key entry was cancelled (Ctrl-C) or the terminal could not be read. */
 export class InputCancelledError extends Error {
   override readonly name = "InputCancelledError";
 }
@@ -26,13 +26,14 @@ export function readSecret(
   output: (text: string) => void,
 ): Promise<string> {
   output(prompt);
-  return new Promise((resolve, reject) => {
+  return new Promise<string>((resolve, reject) => {
     let value = "";
     const raw = input.isTTY === true && typeof input.setRawMode === "function";
     const finish = (error?: Error): void => {
       if (raw) input.setRawMode?.(false);
       input.removeAllListeners("data");
       input.removeAllListeners("end");
+      input.removeAllListeners("error");
       input.pause();
       output("\n");
       if (error === undefined) resolve(value);
@@ -57,8 +58,16 @@ export function readSecret(
     input.on("end", () => {
       finish();
     });
+    input.on("error", () => {
+      finish(new InputCancelledError("Could not read from the terminal."));
+    });
     input.resume();
-  });
+  }).then(stripPasteMarkers);
+}
+
+/** Removes bracketed-paste markers (ESC [200~ and ESC [201~) that some terminals wrap pastes in. */
+function stripPasteMarkers(value: string): string {
+  return value.replaceAll(/\[20[01]~/gu, "");
 }
 
 /** Reads all of standard input as text. */

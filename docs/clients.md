@@ -86,7 +86,7 @@ Or add to `~/.cursor/mcp.json` (all projects) or `.cursor/mcp.json` (one project
 }
 ```
 
-Vendor documentation: https://cursor.com/docs/context/mcp
+Vendor documentation: https://cursor.com/docs/mcp
 
 ## VS Code (GitHub Copilot)
 

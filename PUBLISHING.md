@@ -11,17 +11,26 @@ Nothing leaves GitHub until someone approves the `release` environment.
    (`server.json`, the Claude Code plugin and the Claude Desktop bundle). A test checks that
    none is missed.
 2. Merging the release pull request creates the Git tag and GitHub release.
-3. Three publishing jobs then wait for approval on the `release` environment:
-   - npm: `pnpm check`, then `npm publish` with provenance, using trusted publishing (no npm
+3. A build job with no publishing rights runs `pnpm check`, packs the npm tarball and builds
+   the Claude Desktop bundle from that same tarball. Three publishing jobs then wait for
+   approval on the `release` environment. They install nothing and run no project tooling:
+   - npm: publishes the checked tarball with provenance, using trusted publishing (no npm
      token is stored).
-   - Claude Desktop bundle: built from the npm package contents and attached to the GitHub
-     release with a SHA-256 checksum.
+   - Claude Desktop bundle: attached to the GitHub release with SHA-256 checksums.
    - Container: scanned, then pushed to `ghcr.io/thatskiff33-agents/nz-legislation-mcp`
      with an SBOM and provenance, and signed with cosign (keyless).
 4. After npm has the new version, publish to the MCP Registry by hand (see below).
 
 The Claude Code plugin is served straight from this repository, so it updates when `main`
-changes. It runs `npx -y nz-legislation-mcp`, so it only works once the package is on npm.
+changes. It runs a pinned `npx -y nz-legislation-mcp@<version>`, so it only works once that
+version is on npm. release-please cannot edit part of a string, so a small job
+(`scripts/sync-release-files.mjs`) updates the pin in each release pull request.
+
+## Known limits
+
+- The bundle is built with the `@anthropic-ai/mcpb` CLI (2.1.2, pinned, install scripts
+  disabled). It is not a dev dependency because its dependency tree has open audit findings;
+  it runs only in the build job, which has no write or publishing rights.
 
 ## One-time setup (before the first release)
 
@@ -35,9 +44,12 @@ Do these in order. Each one is an outward-facing change, so a maintainer does th
    authentication.
 4. npm trusted publisher: on the package's settings page, add a GitHub Actions trusted
    publisher with owner `thatskiff33-agents`, repository `nz-legislation-mcp`, workflow
-   `release.yml` and environment `release`.
-   - To confirm: whether npm lets you add a trusted publisher before the package exists. If it
-     does not, publish the first version by hand from a clean checkout of the release tag
+   `release.yml` and environment `release`. Trusted publishing needs npm 11.5.1 or later
+   (the workflow publishes with Node 24's npm). A new trusted publisher must complete a
+   successful publish within 2 days or it expires, so add it shortly before releasing.
+   - To confirm: npm's documentation does not say whether a trusted publisher can be added
+     before the package exists (third-party guides say it cannot). If it cannot, publish the
+     first version by hand from a clean checkout of the release tag
      (`pnpm install --frozen-lockfile && pnpm check && npm publish --access public`), then add
      the trusted publisher, and from then on disallow token publishing in the package settings.
 5. GitHub Container Registry: after the first image is pushed, set the package's visibility to
@@ -58,6 +70,7 @@ The registry checks that the npm package belongs to this server through the `mcp
 ## Checks before approving
 
 - The release pull request's changelog reads correctly.
-- CI is green on the release commit. (Pull requests opened by release-please with the default
-  token do not start CI; push an empty commit to the release branch, or rerun CI, if needed.)
+- CI is green on the release commit. Pull requests opened by release-please with the default
+  token do not start CI, so there is no run to rerun: push an empty commit to the release
+  branch to start one.
 - `docs/clients.md` and the README quick start still match the release.

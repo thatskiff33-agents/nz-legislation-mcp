@@ -43,6 +43,21 @@ describe("readSecret", () => {
     await expect(result).rejects.toBeInstanceOf(InputCancelledError);
   });
 
+  it("strips bracketed-paste markers from a pasted key", async () => {
+    const input = fakeInput(true);
+    const result = readSecret("", input, () => undefined);
+    input.emit("data", "\u001b[200~my-key\u001b[201~\r");
+    expect(await result).toBe("my-key");
+  });
+
+  it("cancels (and restores the terminal) if the input stream fails", async () => {
+    const input = fakeInput(true);
+    const result = readSecret("", input, () => undefined);
+    input.emit("error", new Error("EIO"));
+    await expect(result).rejects.toBeInstanceOf(InputCancelledError);
+    expect(input.raw.at(-1)).toBe(false);
+  });
+
   it("reads a line without a terminal, and accepts end of input", async () => {
     const input = fakeInput(false);
     const result = readSecret("", input, () => undefined);

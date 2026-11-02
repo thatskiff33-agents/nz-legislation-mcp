@@ -106,6 +106,16 @@ describe("loadConfig", () => {
       expect(defaultKeyFilePath({}, "win32", "/h")).toContain("AppData");
       expect(typeof defaultKeyFilePath()).toBe("string");
     });
+
+    it("ignores empty or relative config directories (never the current directory)", () => {
+      for (const XDG_CONFIG_HOME of ["", "relative/dir"]) {
+        expect(defaultKeyFilePath({ XDG_CONFIG_HOME }, "linux", "/home/u")).toBe(
+          "/home/u/.config/nz-legislation-mcp/key",
+        );
+      }
+      expect(defaultKeyFilePath({ APPDATA: "" }, "win32", "/h")).toContain("AppData");
+      expect(defaultKeyFilePath({ APPDATA: "rel" }, "win32", "/h")).toContain("AppData");
+    });
   });
 
   describe("key file safety (real file system)", () => {

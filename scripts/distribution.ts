@@ -37,15 +37,16 @@ const SHORT_DESCRIPTION =
   "Search and read New Zealand legislation via the official PCO Legislation API.";
 
 const KEY_DESCRIPTION =
-  "Your own API key for api.legislation.govt.nz (apply on legislation.govt.nz). It is sent only to that API.";
+  "Your own API key for api.legislation.govt.nz (request one at https://www.legislation.govt.nz/developer-api/). It is sent only to that API.";
 
 /** Directory of the Claude Code plugin (a subfolder, so it is not confused with the npm package). */
 const PLUGIN_DIR = "plugins/nz-legislation-mcp";
 
 /** First sentence of a tool description, for catalogue listings. */
 function summary(description: string): string {
-  const end = description.indexOf(". ");
-  return end === -1 ? description : description.slice(0, end + 1);
+  // A sentence ends at ". " before a capital letter (so "e.g. an Act" is not cut).
+  const end = /\.\s+(?=[A-Z])/u.exec(description);
+  return end === null ? description : description.slice(0, end.index + 1);
 }
 
 const json = (value: unknown): string => `${JSON.stringify(value, null, 2)}\n`;
@@ -78,7 +79,10 @@ function pluginMcpConfig(): string {
   return json({
     mcpServers: {
       [SERVER_ID]: {
-        ...CLIENT_LAUNCH,
+        // Pinned to this release so a plugin install runs the reviewed version, not whatever
+        // is newest on npm. scripts/sync-release-files.mjs updates it in release pull requests.
+        command: CLIENT_LAUNCH.command,
+        args: ["-y", `${SERVER_NAME}@${pkg.version}`],
         env: { [ENV.apiKey]: "${user_config.legislation_nz_api_key}" },
       },
     },

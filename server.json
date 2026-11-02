@@ -19,7 +19,7 @@
       "environmentVariables": [
         {
           "name": "LEGISLATION_NZ_API_KEY",
-          "description": "Your own API key for api.legislation.govt.nz (apply on legislation.govt.nz). It is sent only to that API. Optional if you have run \"npx nz-legislation-mcp setup\".",
+          "description": "Your own API key for api.legislation.govt.nz (request one at https://www.legislation.govt.nz/developer-api/). It is sent only to that API. Optional if you have run \"npx nz-legislation-mcp setup\".",
           "isRequired": false,
           "isSecret": true,
           "format": "string"

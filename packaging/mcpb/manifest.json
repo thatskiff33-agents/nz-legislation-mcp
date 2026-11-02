@@ -49,7 +49,7 @@
     },
     {
       "name": "list_versions",
-      "description": "List the versions of one work (e.g."
+      "description": "List the versions of one work (e.g. an Act as at each amendment date), newest first by default."
     },
     {
       "name": "get_table_of_contents",
@@ -73,7 +73,7 @@
     "api_key": {
       "type": "string",
       "title": "Legislation API key",
-      "description": "Your own API key for api.legislation.govt.nz (apply on legislation.govt.nz). It is sent only to that API.",
+      "description": "Your own API key for api.legislation.govt.nz (request one at https://www.legislation.govt.nz/developer-api/). It is sent only to that API.",
       "required": true,
       "sensitive": true
     }

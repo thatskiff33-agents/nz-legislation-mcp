@@ -1,4 +1,5 @@
 // Generated files must match their source of truth. To regenerate after a change: pnpm generate
+import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { format, resolveConfig } from "prettier";
@@ -47,6 +48,19 @@ describe("release-please", () => {
       .flatMap(([path, content]) => versionPaths(JSON.parse(content)).map((p) => `${path} ${p}`));
     expect(found.length).toBeGreaterThan(0);
     expect(found.filter((entry) => !bumped.has(entry))).toEqual([]);
+  });
+
+  it("pins the plugin to the package version (scripts/sync-release-files.mjs agrees)", () => {
+    const result = spawnSync(process.execPath, ["scripts/sync-release-files.mjs", "--check"], {
+      cwd: ROOT,
+      encoding: "utf8",
+    });
+    expect(result.stderr).toBe("");
+    expect(result.status).toBe(0);
+    const mcp = JSON.parse(generatedFiles()["plugins/nz-legislation-mcp/.mcp.json"] ?? "{}") as {
+      mcpServers: Record<string, { args: string[] }>;
+    };
+    expect(mcp.mcpServers["nz-legislation"]?.args).toContain(`nz-legislation-mcp@${pkg.version}`);
   });
 
   it("tracks the package.json version", () => {

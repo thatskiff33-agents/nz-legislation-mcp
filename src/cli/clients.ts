@@ -90,7 +90,7 @@ const CLIENTS: readonly ClientGuide[] = [
   },
   {
     name: "Cursor",
-    docs: "https://cursor.com/docs/context/mcp",
+    docs: "https://cursor.com/docs/mcp",
     body: [
       `One click: [Add to Cursor](${cursorInstallLink()}).`,
       "Or add to `~/.cursor/mcp.json` (all projects) or `.cursor/mcp.json` (one project):",

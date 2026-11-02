@@ -5,7 +5,7 @@
  */
 import { closeSync, constants, fstatSync, openSync, readSync } from "node:fs";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, posix, win32 } from "node:path";
 import { z } from "zod";
 import { Secret } from "./secret.js";
 
@@ -123,10 +123,15 @@ export function defaultKeyFilePath(
   platform: NodeJS.Platform = process.platform,
   home: string = homedir(),
 ): string {
+  // Empty or relative values are ignored (as the XDG spec requires), so the key file is never
+  // resolved against the current directory, where it could be committed or supplied by a repo.
+  const paths = platform === "win32" ? win32 : posix;
+  const absolute = (value: string | undefined): string | undefined =>
+    value !== undefined && paths.isAbsolute(value) ? value : undefined;
   const base =
     platform === "win32"
-      ? (env["APPDATA"] ?? join(home, "AppData", "Roaming"))
-      : (env["XDG_CONFIG_HOME"] ?? join(home, ".config"));
+      ? (absolute(env["APPDATA"]) ?? join(home, "AppData", "Roaming"))
+      : (absolute(env["XDG_CONFIG_HOME"]) ?? join(home, ".config"));
   return join(base, "nz-legislation-mcp", "key");
 }
 

@@ -4,7 +4,7 @@
       "command": "npx",
       "args": [
         "-y",
-        "nz-legislation-mcp"
+        "nz-legislation-mcp@0.0.0"
       ],
       "env": {
         "LEGISLATION_NZ_API_KEY": "${user_config.legislation_nz_api_key}"

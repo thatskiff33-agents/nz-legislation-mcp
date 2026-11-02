@@ -23,9 +23,9 @@ version on [legislation.govt.nz](https://www.legislation.govt.nz) before relying
 
 ## Quick start
 
-You need Node.js 22 or later and your own Legislation API key from the Parliamentary
-Counsel Office (see the [API documentation](https://api.legislation.govt.nz/docs/)). The
-key is personal: PCO's terms do not allow it to be shared.
+You need Node.js 22 or later and your own Legislation API key. Request one from the
+Parliamentary Counsel Office: see [legislation.govt.nz/developer-api](https://www.legislation.govt.nz/developer-api/).
+The key is personal: PCO's terms do not allow it to be shared.
 
 1. Save your key once. Input is hidden, the key is checked with the API, and it is stored
    in a file only you can read:

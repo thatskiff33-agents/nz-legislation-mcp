@@ -1,9 +1,10 @@
-import { mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { apiErrors } from "../../src/api/errors.js";
 import { runSetup, verifyWithApi, type SetupIo } from "../../src/cli/setup.js";
+import { InputCancelledError } from "../../src/cli/terminal.js";
 import { DUMMY_KEY } from "../dummy-key.js";
 import { fakeFetch, json, status } from "../api/fake-fetch.js";
 import { fixture } from "../fixtures.js";
@@ -35,6 +36,28 @@ describe("setup", () => {
     expect(t.out.join("")).toContain("Key checked with the Legislation API: OK.");
     expect(t.out.join("")).toContain("readable only by you");
     expect(t.out.join("") + t.err.join("")).not.toContain(DUMMY_KEY);
+  });
+
+  it("tightens an existing folder and words the message for Windows", async () => {
+    const t = io({ platform: "win32" });
+    expect(await runSetup([], t.value)).toBe(0);
+    expect(t.out.join("")).toContain("protected by your Windows account");
+    const u = io();
+    mkdirSync(join(u.path, ".."), { recursive: true, mode: 0o755 });
+    expect(await runSetup([], u.value)).toBe(0);
+    expect(statSync(join(u.path, "..")).mode & 0o777).toBe(0o700);
+  });
+
+  it("saves nothing when key entry is cancelled or fails", async () => {
+    const cancelled = io({
+      readSecret: () => Promise.reject(new InputCancelledError("Cancelled.")),
+    });
+    expect(await runSetup([], cancelled.value)).toBe(130);
+    expect(cancelled.err.join("")).toContain("Cancelled. Nothing was saved.");
+    const failed = io({ readStdin: () => Promise.reject(new Error("EIO")) });
+    expect(await runSetup(["--key-stdin"], failed.value)).toBe(130);
+    expect(failed.err.join("")).toContain("Could not read the key.");
+    expect(() => statSync(failed.path)).toThrow();
   });
 
   it("reads the key from standard input and can skip verification", async () => {
