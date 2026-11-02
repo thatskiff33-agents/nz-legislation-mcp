@@ -66,7 +66,11 @@ export function duplicatesNote(matches: readonly Match[], chosen: OutlineEntry):
   const describe = (e: OutlineEntry): string =>
     `${e.within.length > 0 ? `in ${e.within.join(" > ")}` : "at the top level"}${e.repealed ? " (repealed)" : ""}`;
   const list = matches.map((m) => describe(m.entry)).join("; ");
-  return `This label appears ${String(matches.length)} times (${list}). Used the one ${describe(chosen)}. Pass part to choose another.`;
+  const how =
+    chosen.kind === "schedule"
+      ? "Duplicated schedules are usually a repealed and a current version."
+      : "Pass part to choose another.";
+  return `This label appears ${String(matches.length)} times (${list}). Used the one ${describe(chosen)}. ${how}`;
 }
 
 /** Suggests nearby labels when a provision is not found. */

@@ -67,7 +67,7 @@ describe("get_table_of_contents", () => {
     });
     const out = await getTableOfContents.run({ version_id: id, part: "Part 1" }, d, signal);
     expect(out.entries.map((e) => `${e.kind}:${e.label}`)).toEqual(["part:1", "subpart:1A"]);
-    expect(out.notes.join(" ")).toContain("pass one of the subpart labels");
+    expect(out.notes.join(" ")).toContain('"Part 1" has 602 entries, too many to list at once');
     const sections = Array.from(
       { length: 600 },
       (_, i) => `<prov><label>${String(i + 1)}</label><heading>S</heading></prov>`,
@@ -89,6 +89,16 @@ describe("get_table_of_contents", () => {
 });
 
 describe("table of contents with schedules", () => {
+  it("lists only body parts for a part filter, not schedule parts with the same label", async () => {
+    const id = "act_public_2099_10_en_2099-01-01";
+    const xml =
+      "<act><body><part><label>A</label><heading>Body A</heading><prov><label>1</label><heading>S</heading></prov></part></body>" +
+      "<schedule.group><schedule><label>1</label><heading>Sch</heading><schedule.provisions><part><label>A</label><heading>Sched A</heading><prov><label>1</label><heading>C</heading></prov></part></schedule.provisions></schedule></schedule.group></act>";
+    const { deps: d } = deps([versionRecord(id)], "x", { [id]: xml });
+    const out = await getTableOfContents.run({ version_id: id, part: "A" }, d, signal);
+    expect(out.entries.map((e) => `${e.kind}:${e.heading}`)).toEqual(["part:Body A", "section:S"]);
+  });
+
   it("labels schedule clauses with their schedule", async () => {
     const id = "act_public_2099_9_en_2099-01-01";
     const { deps: d } = deps([versionRecord(id)], "x", {

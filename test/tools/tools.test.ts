@@ -419,6 +419,16 @@ describe("text helpers", () => {
     ).toBe(
       "This label appears 2 times (at the top level; at the top level). Used the one at the top level. Pass part to choose another.",
     );
+    const schedule = { ...a, kind: "schedule" as const };
+    expect(
+      duplicatesNote(
+        [
+          { entry: schedule, text: "" },
+          { entry: b, text: "" },
+        ],
+        schedule,
+      ),
+    ).toContain("Duplicated schedules are usually a repealed and a current version.");
     expect(suggestLabels(outline, "  ")).toEqual(["1", "2", "6", "6A"]);
   });
 });

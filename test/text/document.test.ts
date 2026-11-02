@@ -118,7 +118,11 @@ describe("rendering", () => {
       "1 Transitional provisions\n1 Application\nThis clause applies from 2099.",
     );
     const unnumbered = await readLegislation(chunked(WAITANGI), { target: { schedule: "" } });
-    expect(unnumbered.text?.startsWith("The Treaty of Waitangi\nHER MAJESTY VICTORIA")).toBe(true);
+    expect(
+      unnumbered.text?.startsWith(
+        "The Treaty of Waitangi\n[Empowering provision: s 3]\nHER MAJESTY VICTORIA",
+      ),
+    ).toBe(true);
   });
 
   it("does not confuse a body section with a schedule clause of the same number", async () => {
@@ -275,7 +279,8 @@ describe("real extracts (GST Act 1985, Income Tax Act 2007)", () => {
     );
     expect(lines).toContain("2 Routine de-bugging of existing computer software.");
     expect(lines).toContain("5 [Repealed]");
-    expect(lines[1]?.startsWith("Part A ")).toBe(true);
+    expect(lines[1]).toBe("[Empowering provision: s LY 2]");
+    expect(lines[2]?.startsWith("Part A ")).toBe(true);
   });
 
   it("does not duplicate headings that contain markup (ITA CB 15D)", async () => {
@@ -359,5 +364,77 @@ describe("matching rules", () => {
       target: { section: "1", schedule: "1", part: "2" },
     });
     expect(second.text).toBe("1 Second\nSecond");
+  });
+});
+
+describe("review follow-ups", () => {
+  const one = (inner: string) =>
+    `<act><body><prov><label>1</label><heading>H</heading><prov.body><subprov><label>1</label><para>${inner}</para></subprov></prov.body></prov></body></act>`;
+
+  it("quotes inline words once, and never quotes whole quoted provisions element by element", async () => {
+    const inline = one(
+      '<text>the words <amend.in quote="1">old <emphasis>words</emphasis></amend.in> are replaced</text>',
+    );
+    expect((await readLegislation(chunked(inline), { target: { section: "1" } })).text).toBe(
+      "1 H\n(1) the words “old words” are replaced",
+    );
+    const block = one(
+      '<text>replace by:</text><amend quote="1"><prov quote="1"><label quote="1">23</label><heading>Amendment</heading><prov.body quote="1"><subprov quote="1"><label quote="1">a</label><para quote="1"><text>new <quote.in quote="1">inner</quote.in> text</text></para></subprov></prov.body></prov></amend>',
+    );
+    const text = (await readLegislation(chunked(block), { target: { section: "1" } })).text ?? "";
+    expect(text).toContain("23 Amendment");
+    expect(text).toContain("(a) new “inner” text");
+    expect(text.split("“").length).toBe(text.split("”").length);
+    expect(text).not.toContain("““");
+  });
+
+  it("keeps a repealed definition's marker on the same line as its term", async () => {
+    const xml = one(
+      '<text>In this Act,—</text><def-para deletion-status="repealed"><para><text><def-term>excluded day</def-term></text></para></def-para>',
+    );
+    expect((await readLegislation(chunked(xml), { target: { section: "1" } })).text).toBe(
+      "1 H\n(1) In this Act,—\n  [Repealed] excluded day",
+    );
+  });
+
+  it("removes zero-width characters inside citations", async () => {
+    const xml = one("<text>section 20(3)\uFEFF(h) and CB 11(1)\u200B(b)</text>");
+    expect((await readLegislation(chunked(xml), { target: { section: "1" } })).text).toBe(
+      "1 H\n(1) section 20(3)(h) and CB 11(1)(b)",
+    );
+  });
+
+  it("lets part pick a clause inside a schedule part marked up as head1", async () => {
+    const clause = (word: string) =>
+      `<prov><label>1</label><heading>${word}</heading><prov.body><subprov><label/><para><text>${word}</text></para></subprov></prov.body></prov>`;
+    const xml = `<act><body/><schedule.group><schedule><label>1</label><heading>Rates</heading><schedule.misc><head1 type="part"><label>Part A</label><heading>First</heading>${clause("Alpha")}</head1><head1 type="part"><label>Part B</label><heading>Second</heading>${clause("Beta")}</head1></schedule.misc></schedule></schedule.group></act>`;
+    const all = await readLegislation(chunked(xml), { target: { section: "1", schedule: "1" } });
+    expect(all.matches.map((m) => m.entry.within)).toEqual([["Part A"], ["Part B"]]);
+    const b = await readLegislation(chunked(xml), {
+      target: { section: "1", schedule: "1", part: "B" },
+    });
+    expect(b.text).toBe("1 Beta\nBeta");
+  });
+
+  it("shows the empowering provision after the header whatever its position, and skips empty ones", async () => {
+    const xml =
+      "<act><body/><schedule.group>" +
+      "<schedule><label>1</label><heading>After</heading><empowering-prov><citation>s 9</citation></empowering-prov><para><text>Body.</text></para></schedule>" +
+      "<schedule><label>2</label><empowering-prov> </empowering-prov><heading>Empty</heading><para><text>Body.</text></para></schedule>" +
+      "</schedule.group></act>";
+    expect((await readLegislation(chunked(xml), { target: { schedule: "1" } })).text).toBe(
+      "1 After\n[Empowering provision: s 9]\nBody.",
+    );
+    expect((await readLegislation(chunked(xml), { target: { schedule: "2" } })).text).toBe(
+      "2 Empty\nBody.",
+    );
+  });
+
+  it("reports duplicated whole schedules", async () => {
+    const xml =
+      '<act><body/><schedule.group><schedule deletion-status="repealed"><label>21</label><heading>Old</heading></schedule><schedule><label>21</label><heading>Current</heading></schedule></schedule.group></act>';
+    const doc = await readLegislation(chunked(xml), { target: { schedule: "21" } });
+    expect(doc.matches.map((m) => m.entry.repealed)).toEqual([true, false]);
+    expect(doc.text).toBe("21 Current");
   });
 });

@@ -72,10 +72,13 @@ export const getTableOfContents = defineTool({
     let scope: string;
     if (args.part !== undefined) {
       const wanted = normalisePartLabel(args.part);
+      // Body parts only: schedules have their own parts, often reusing labels such as "A".
       chosen = doc.outline.filter(
         (e) =>
-          e.within.some((label) => normalisePartLabel(label) === wanted) ||
-          ((e.kind === "part" || e.kind === "subpart") && normalisePartLabel(e.label) === wanted),
+          e.schedule === null &&
+          (e.within.some((label) => normalisePartLabel(label) === wanted) ||
+            ((e.kind === "part" || e.kind === "subpart") &&
+              normalisePartLabel(e.label) === wanted)),
       );
       scope = `Everything in part/subpart ${args.part}.`;
       if (chosen.length === 0) {
@@ -85,10 +88,11 @@ export const getTableOfContents = defineTool({
       } else if (chosen.length > MAX_ENTRIES) {
         const subparts = chosen.filter((e) => e.kind === "part" || e.kind === "subpart");
         if (subparts.length > 1) {
+          const count = chosen.length;
           chosen = subparts;
           scope = `Subparts of ${args.part} (it has too many entries to list at once).`;
           notes.push(
-            `Part ${args.part} has ${String(doc.outline.length)} entries in the whole document; pass one of the subpart labels above to list its sections.`,
+            `"${args.part}" has ${String(count)} entries, too many to list at once; pass one of the subpart labels above to list its sections.`,
           );
         }
       }

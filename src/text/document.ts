@@ -98,6 +98,7 @@ const OUTLINE_ELEMENTS: Readonly<Partial<Record<string, OutlineKind>>> = {
   crosshead: "crosshead",
   "ird-crosshead": "crosshead",
   prov: "section",
+  head1: "part",
   schedule: "schedule",
 };
 
@@ -113,11 +114,13 @@ const NOT_THIS_ACT = new Set([
   "history",
 ]);
 
+/** Inline elements whose quote="1" means "show these words in quotation marks". */
+const INLINE_QUOTES = new Set(["amend.in", "quote.in"]);
+
 /** Subtrees never rendered: editorial aids, comparison notes, table summaries, metadata. */
 const ALWAYS_SKIP = new Set([
   "ird.aids",
   "cf",
-  "empowering-prov",
   "skeletons",
   "end",
   "summary",
@@ -176,10 +179,13 @@ const LABELLED = new Set([
 // eslint-disable-next-line no-control-regex -- removing control characters is the purpose
 const CONTROL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/gu;
 
+/** Zero-width and byte-order-mark characters (U+FEFF appears inside some citations). */
+const INVISIBLE = /[\u200B-\u200D\u2060\uFEFF]/gu;
+
 /** Upper bound on rendered characters for a single provision or schedule. */
 const MAX_RENDERED_CHARS = 2_000_000;
 /** Upper bound on matches collected for a duplicated label. */
-const MAX_MATCHES = 10;
+const MAX_MATCHES = 25;
 
 /** Accumulates rendered text as indented lines. */
 class TextWriter {
@@ -205,7 +211,7 @@ class TextWriter {
 
   write(text: string): void {
     if (this.truncated) return;
-    const clean = text.replace(CONTROL, "").replace(/\s+/gu, " ");
+    const clean = text.replace(CONTROL, "").replace(INVISIBLE, "").replace(/\s+/gu, " ");
     if (clean.trim() !== "") this.#onlyLabel = false;
     if (this.#current === "") this.#current = clean.trimStart();
     else if (this.#current.endsWith(" ") && clean.startsWith(" ")) this.#current += clean.slice(1);
@@ -286,6 +292,12 @@ export async function readLegislation(
   let capture: Capture | null = null;
   let headerDepth = -1;
   let skipDepth = -1;
+  let quoteDepth = -1;
+  /** A schedule's empowering provision: collected, then shown after the header line. */
+  let empoweringDepth = -1;
+  let empoweringText = "";
+  let empoweringPending = false;
+  let headerDone = false;
   let indent = 0;
   let inlineLabel: { text: string; parent: string; depth: number; repealed: boolean } | null = null;
 
@@ -319,6 +331,21 @@ export async function readLegislation(
     return entry.kind === "schedule" && normaliseLabel(entry.label) === wantSchedule;
   };
 
+  const writeEmpowering = (w: TextWriter): void => {
+    const text = empoweringText.replace(/\s+/gu, " ").trim();
+    empoweringText = "";
+    empoweringPending = false;
+    if (text === "") return;
+    w.newline(0);
+    w.write(`[Empowering provision: ${text}]`);
+  };
+  const resetEmpowering = (): void => {
+    empoweringDepth = -1;
+    empoweringText = "";
+    empoweringPending = false;
+    headerDone = false;
+  };
+
   parser.onerror = (error: Error) => {
     state.parseError ??= error;
   };
@@ -329,7 +356,9 @@ export async function readLegislation(
     const parentName = names.at(-1);
     const parentEntry = owners.at(-1) ?? null;
     const repealed = node.attributes["deletion-status"] === "repealed";
-    const quoted = node.attributes["quote"] === "1";
+    // Quotation marks for inline quoted words only (whole quoted provisions in amending
+    // schedules also carry quote="1" on every element), and never nested.
+    const quoted = node.attributes["quote"] === "1" && INLINE_QUOTES.has(name) && quoteDepth < 0;
 
     if (name === "title" && parentName === "cover") titleDepth = depth;
     if (notThisActDepth < 0 && NOT_THIS_ACT.has(name)) notThisActDepth = depth;
@@ -374,6 +403,7 @@ export async function readLegislation(
           repealedPending: repealed,
         };
         indent = 0;
+        resetEmpowering();
       }
     }
 
@@ -387,6 +417,7 @@ export async function readLegislation(
       if (skipDepth < 0 && (ALWAYS_SKIP.has(name) || (!includeHistory && HISTORY.has(name)))) {
         skipDepth = depth;
       }
+      if (name === "empowering-prov" && skipDepth < 0) empoweringDepth = depth;
       if (skipDepth < 0 && headerDepth < 0) {
         if (name === "label-para" || name === "def-para") indent += 1;
         const continuesHeader = name === "heading" && HEADER_PARENTS.has(String(parentName));
@@ -399,11 +430,14 @@ export async function readLegislation(
         if (name === "graphic") w.write(" [graphic omitted] ");
         if (name === "entry") w.write(" | ");
         if (name === "history-note") w.write("[History] ");
-        if (repealed && !LABELLED.has(name)) w.write("[Repealed] ");
+        // The marker leads the element's line; its first paragraph continues on that line.
+        if (repealed && !LABELLED.has(name)) w.label("[Repealed] ");
         if (quoted) {
           w.write("“");
           closer = "”";
+          quoteDepth = depth;
         }
+
         const parentRepealed = repealedFlags.at(-1) === true;
         if (name === "label" && depth > capture.depth + 1) {
           inlineLabel = { text: "", parent: String(parentName), depth, repealed: parentRepealed };
@@ -424,6 +458,10 @@ export async function readLegislation(
     if (titleDepth >= 0) title += raw;
     if (collect !== null) collect.entry[collect.field] += raw;
     if (capture === null || skipDepth >= 0 || headerDepth >= 0) return;
+    if (empoweringDepth >= 0) {
+      empoweringText += raw;
+      return;
+    }
     if (inlineLabel !== null) {
       inlineLabel.text += raw;
       return;
@@ -471,6 +509,8 @@ export async function readLegislation(
             w.write(" [Repealed]");
             capture.repealedPending = false;
           }
+          headerDone = true;
+          if (empoweringPending) writeEmpowering(w);
         }
       } else if (inlineLabel !== null && depth === inlineLabel.depth) {
         const label = inlineLabel.text.replace(/\s+/gu, " ").trim();
@@ -489,12 +529,18 @@ export async function readLegislation(
         }
         inlineLabel = null;
       }
+      if (capture !== null && depth === empoweringDepth) {
+        empoweringDepth = -1;
+        if (headerDone) writeEmpowering(w);
+        else empoweringPending = true;
+      }
       if (capture !== null && depth === skipDepth) skipDepth = -1;
       else if (capture !== null && skipDepth < 0 && headerDepth < 0) {
         if (name === "label-para" || name === "def-para") indent -= 1;
         if (name === "row") w.write(" |");
         if (name === "table") w.newline(indent);
         if (closer !== "") w.write(closer);
+        if (depth === quoteDepth) quoteDepth = -1;
       }
       if (capture !== null && depth === capture.depth) {
         // Only an element whose label was checked can match (an element with no <label> never
@@ -511,6 +557,7 @@ export async function readLegislation(
           }
         }
         capture = null;
+        resetEmpowering();
       }
     }
 
@@ -527,7 +574,11 @@ export async function readLegislation(
     // Stop once a live match is found (and any schedule being scanned for duplicate clause
     // numbers has ended), or enough matches are collected.
     const live = state.matches.some((m) => !m.entry.repealed);
-    if (state.matches.length >= MAX_MATCHES || (live && state.scheduleScope < 0)) {
+    const wholeSchedule = wantSection === undefined;
+    if (
+      state.matches.length >= MAX_MATCHES ||
+      (live && state.scheduleScope < 0 && !wholeSchedule)
+    ) {
       state.stop = true;
     }
   };
