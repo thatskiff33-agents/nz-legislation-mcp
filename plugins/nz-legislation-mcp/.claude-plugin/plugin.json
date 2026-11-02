@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "nz-legislation-mcp",
+  "displayName": "NZ Legislation",
+  "version": "0.0.0",
+  "description": "Search and read New Zealand legislation via the official PCO Legislation API.",
+  "author": {
+    "name": "nz-legislation-mcp contributors",
+    "url": "https://github.com/thatskiff33-agents/nz-legislation-mcp"
+  },
+  "homepage": "https://github.com/thatskiff33-agents/nz-legislation-mcp",
+  "repository": "https://github.com/thatskiff33-agents/nz-legislation-mcp",
+  "license": "Apache-2.0",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "new-zealand",
+    "legislation",
+    "law"
+  ],
+  "userConfig": {
+    "legislation_nz_api_key": {
+      "type": "string",
+      "title": "Legislation API key",
+      "description": "Your own API key for api.legislation.govt.nz (apply on legislation.govt.nz). It is sent only to that API.",
+      "required": true,
+      "sensitive": true
+    }
+  }
+}

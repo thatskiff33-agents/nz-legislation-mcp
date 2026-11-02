@@ -1,0 +1,30 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.thatskiff33-agents/nz-legislation-mcp",
+  "title": "NZ Legislation",
+  "description": "Search and read New Zealand legislation via the official PCO Legislation API.",
+  "repository": {
+    "url": "https://github.com/thatskiff33-agents/nz-legislation-mcp",
+    "source": "github"
+  },
+  "version": "0.0.0",
+  "packages": [
+    {
+      "registryType": "npm",
+      "identifier": "nz-legislation-mcp",
+      "version": "0.0.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "LEGISLATION_NZ_API_KEY",
+          "description": "Your own API key for api.legislation.govt.nz (apply on legislation.govt.nz). It is sent only to that API. Optional if you have run \"npx nz-legislation-mcp setup\".",
+          "isRequired": false,
+          "isSecret": true,
+          "format": "string"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,91 @@
+{
+  "manifest_version": "0.3",
+  "name": "nz-legislation-mcp",
+  "display_name": "NZ Legislation",
+  "version": "0.0.0",
+  "description": "Search and read New Zealand legislation via the official PCO Legislation API.",
+  "long_description": "Unofficial, security-hardened MCP server for the New Zealand Legislation API. Bring your own API key. Unofficial: not affiliated with the Parliamentary Counsel Office. Check the official version on legislation.govt.nz.",
+  "author": {
+    "name": "nz-legislation-mcp contributors",
+    "url": "https://github.com/thatskiff33-agents/nz-legislation-mcp"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/thatskiff33-agents/nz-legislation-mcp"
+  },
+  "homepage": "https://github.com/thatskiff33-agents/nz-legislation-mcp",
+  "documentation": "https://github.com/thatskiff33-agents/nz-legislation-mcp#readme",
+  "support": "https://github.com/thatskiff33-agents/nz-legislation-mcp/issues",
+  "license": "Apache-2.0",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "new-zealand",
+    "legislation",
+    "law"
+  ],
+  "server": {
+    "type": "node",
+    "entry_point": "dist/cli.js",
+    "mcp_config": {
+      "command": "node",
+      "args": [
+        "${__dirname}/dist/cli.js",
+        "stdio"
+      ],
+      "env": {
+        "LEGISLATION_NZ_API_KEY": "${user_config.api_key}"
+      }
+    }
+  },
+  "tools": [
+    {
+      "name": "search_legislation",
+      "description": "Search New Zealand Acts, Bills, secondary legislation (regulations, orders, rules, etc.) and amendment papers on legislation.govt.nz."
+    },
+    {
+      "name": "get_legislation",
+      "description": "Get metadata and links for one version of a piece of NZ legislation."
+    },
+    {
+      "name": "list_versions",
+      "description": "List the versions of one work (e.g."
+    },
+    {
+      "name": "get_table_of_contents",
+      "description": "List the structure of a version of NZ legislation: parts, subparts, cross-headings, sections and schedules, with labels to pass to get_provision_text."
+    },
+    {
+      "name": "get_provision_text",
+      "description": "Get the text of one section, a clause in a schedule, or a whole schedule, from the official XML."
+    },
+    {
+      "name": "compare_versions",
+      "description": "Show what changed in one section, schedule clause or schedule between two versions of a work, as a line diff."
+    },
+    {
+      "name": "get_api_quota",
+      "description": "Show how many Legislation API requests remain today for this API key (10,000 per day by default, resetting at midnight NZ time)."
+    }
+  ],
+  "tools_generated": false,
+  "user_config": {
+    "api_key": {
+      "type": "string",
+      "title": "Legislation API key",
+      "description": "Your own API key for api.legislation.govt.nz (apply on legislation.govt.nz). It is sent only to that API.",
+      "required": true,
+      "sensitive": true
+    }
+  },
+  "compatibility": {
+    "platforms": [
+      "darwin",
+      "win32",
+      "linux"
+    ],
+    "runtimes": {
+      "node": ">=22"
+    }
+  }
+}

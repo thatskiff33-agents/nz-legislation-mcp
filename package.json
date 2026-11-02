@@ -1,5 +1,6 @@
 {
   "name": "nz-legislation-mcp",
+  "mcpName": "io.github.thatskiff33-agents/nz-legislation-mcp",
   "version": "0.0.0",
   "description": "Unofficial, security-hardened MCP server for the New Zealand Legislation API. Bring your own API key.",
   "license": "Apache-2.0",
@@ -37,6 +38,7 @@
     "knip": "knip && knip --production --strict",
     "test": "vitest run --coverage",
     "test:watch": "vitest",
+    "generate": "vitest run test/generated.test.ts --update",
     "check": "pnpm run typecheck && pnpm run lint && pnpm run format:check && pnpm run knip && pnpm run test && pnpm run build",
     "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
     "start": "node dist/cli.js"
