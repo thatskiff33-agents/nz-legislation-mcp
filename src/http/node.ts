@@ -3,6 +3,7 @@
  * (Avoids a web-framework dependency: the app is a plain Request -> Response function.)
  */
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+import { once } from "node:events";
 import { Readable } from "node:stream";
 import type { Logger } from "../logger.js";
 
@@ -45,7 +46,10 @@ export async function writeResponse(response: Response, res: ServerResponse): Pr
     res.end();
     return;
   }
-  for await (const chunk of response.body as AsyncIterable<Uint8Array>) res.write(chunk);
+  for await (const chunk of response.body as AsyncIterable<Uint8Array>) {
+    // Respect backpressure: wait for the socket to drain before writing more.
+    if (!res.write(chunk)) await once(res, "drain");
+  }
   res.end();
 }
 

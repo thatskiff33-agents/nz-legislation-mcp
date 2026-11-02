@@ -53,6 +53,26 @@ describe("listen", () => {
     });
   });
 
+  it("streams a large response (respecting backpressure)", async () => {
+    const size = 16 * 1024 * 1024;
+    server = await listen(
+      () =>
+        Promise.resolve(
+          new Response(
+            new ReadableStream({
+              start(c) {
+                for (let i = 0; i < 16; i += 1) c.enqueue(new Uint8Array(size / 16).fill(0x61));
+                c.close();
+              },
+            }),
+          ),
+        ),
+      { host: "127.0.0.1", port: 0, logger: silentLogger },
+    );
+    const body = await (await fetch(`${base()}/big`)).arrayBuffer();
+    expect(body.byteLength).toBe(size);
+  });
+
   it("handles GET with no body and empty responses", async () => {
     server = await listen(() => Promise.resolve(new Response(null, { status: 204 })), {
       host: "127.0.0.1",

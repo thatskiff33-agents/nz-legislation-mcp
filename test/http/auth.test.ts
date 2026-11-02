@@ -172,6 +172,24 @@ describe("discoverAuthorizationServer", () => {
     );
   });
 
+  it("stops reading an endless discovery response at the size cap", async () => {
+    const endless = () =>
+      new Response(
+        new ReadableStream({
+          pull(c) {
+            c.enqueue(new Uint8Array(16 * 1024).fill(0x20));
+          },
+        }),
+        { status: 200 },
+      );
+    const empty = () => new Response(null, { status: 200 });
+    await expect(
+      discoverAuthorizationServer(new URL(ISSUER), fakeFetch(endless, empty).fn),
+    ).rejects.toThrow(
+      "metadata too large; https://auth.example.com/.well-known/openid-configuration: not valid authorization server metadata",
+    );
+  });
+
   it("explains when nothing usable is found", async () => {
     const fake = fakeFetch(ok({ issuer: ISSUER }), new TypeError("down"));
     await expect(discoverAuthorizationServer(new URL(ISSUER), fake.fn)).rejects.toThrow(

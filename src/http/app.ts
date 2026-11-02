@@ -139,7 +139,7 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
   });
   /** Per-user limit (by token subject) protects the operator's API quota. */
   const limiter = new RateLimiter(config.rateLimitPerMinute, options.now);
-  /** Per-IP limit before authentication protects token verification and key fetching. */
+  /** Per-IP limit for public routes and failed authentication (not for valid tokens). */
   const ipLimiter = new RateLimiter(config.rateLimitPerMinute * PRE_AUTH_MULTIPLIER, options.now);
   const allowedSubjects = new Set(config.oauth?.allowedSubjects ?? []);
   const metadataUrl = getOAuthProtectedResourceMetadataUrl(config.resourceUrl);
@@ -165,13 +165,16 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
         };
 
   async function route(request: Request, remoteAddress: string): Promise<Response> {
-    if (!ipLimiter.take(remoteAddress)) return rateLimited();
+    const path = new URL(request.url).pathname;
+    // Per-IP limiting covers public routes and failed authentication, but never a valid
+    // key-holder token: behind a proxy every client shares one IP, and unauthenticated junk
+    // must not be able to lock the owner out.
+    if (path !== MCP_PATH && !ipLimiter.take(remoteAddress)) return rateLimited();
     const hostRejected = hostHeaderValidationResponse(request, allowedHosts);
     if (hostRejected !== undefined) return hostRejected;
     const originRejected = originValidationResponse(request, allowedOrigins);
     if (originRejected !== undefined) return originRejected;
 
-    const path = new URL(request.url).pathname;
     if (path === "/healthz" && request.method === "GET") return json(200, { status: "ok" });
 
     if (metadataOptions !== undefined) {
@@ -184,7 +187,7 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
     let authInfo: AuthInfo | undefined;
     if (gate !== undefined) {
       const result = await gate(request);
-      if (result instanceof Response) return result;
+      if (result instanceof Response) return ipLimiter.take(remoteAddress) ? result : rateLimited();
       authInfo = result;
       // Valid token, but only the API key holder may use this server (PCO terms clause 6).
       if (!allowedSubjects.has(subjectOf(authInfo))) {

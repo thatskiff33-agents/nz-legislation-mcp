@@ -281,6 +281,22 @@ describe("HTTP app abuse controls", () => {
     );
   });
 
+  it("limits failed authentication per IP, but never locks out the key holder", async () => {
+    const { app, k } = await oauthApp("1"); // per-IP allowance 5 per minute
+    const junk = () =>
+      app.fetch(
+        request("/mcp", { method: "POST", body: "{}", headers: { authorization: "Bearer junk" } }),
+        {
+          remoteAddress: "192.0.2.9",
+        },
+      );
+    const statuses = [];
+    for (let i = 0; i < 7; i += 1) statuses.push((await junk()).status);
+    expect(statuses).toEqual([401, 401, 401, 401, 401, 429, 429]);
+    // Same IP (e.g. a shared reverse proxy), valid owner token: still served.
+    expect((await post(app, await k.mint(), undefined, "192.0.2.9")).status).not.toBe(429);
+  });
+
   it("forbids a verified token that carries no subject", async () => {
     const config = loadHttpConfig({
       LEGISLATION_NZ_HTTP_HOST: "0.0.0.0",

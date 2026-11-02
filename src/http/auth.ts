@@ -52,6 +52,25 @@ export type AuthorizationServerMetadata = z.output<typeof AuthorizationServerMet
   response_types_supported: string[];
 };
 
+/** Reads a response body as text, stopping (and returning null) once it exceeds `max` bytes. */
+async function readCapped(response: Response, max: number): Promise<string | null> {
+  if (response.body === null) return "";
+  const reader = (response.body as ReadableStream<Uint8Array>).getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > max) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  return new TextDecoder().decode(Buffer.concat(chunks));
+}
+
 /**
  * Fetches the authorization server's metadata: RFC 8414 first, then OpenID Connect discovery.
  * The returned `issuer` must equal the configured issuer exactly (mix-up defence).
@@ -77,8 +96,8 @@ export async function discoverAuthorizationServer(
         problems.push(`${url.href}: HTTP ${String(response.status)}`);
         continue;
       }
-      const body = await response.text();
-      if (body.length > MAX_METADATA_BYTES) {
+      const body = await readCapped(response, MAX_METADATA_BYTES);
+      if (body === null) {
         problems.push(`${url.href}: metadata too large`);
         continue;
       }
