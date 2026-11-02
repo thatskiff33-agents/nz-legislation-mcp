@@ -25,3 +25,21 @@ updates:
         patterns: ["*"]
     commit-message:
       prefix: "ci(deps)"
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+      timezone: Pacific/Auckland
+    cooldown:
+      default-days: 14
+    commit-message:
+      prefix: "build(docker)"
+  - package-ecosystem: docker-compose
+    directory: /deploy
+    schedule:
+      interval: weekly
+      timezone: Pacific/Auckland
+    cooldown:
+      default-days: 14
+    commit-message:
+      prefix: "build(docker)"

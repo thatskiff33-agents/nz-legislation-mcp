@@ -1,0 +1,10 @@
+# Only what the build needs; never secrets or local state.
+*
+!package.json
+!pnpm-lock.yaml
+!pnpm-workspace.yaml
+!tsconfig.json
+!tsconfig.build.json
+!src/**
+!LICENSE
+!NOTICE
