@@ -16,6 +16,8 @@ export interface ToolDeps {
   readonly logger: Logger;
   /** Today's date in New Zealand (YYYY-MM-DD); injectable for tests. */
   readonly today: () => string;
+  /** Streams the official XML of a version (see src/text/xml-source.ts). */
+  readonly xml: (versionId: string, signal: AbortSignal) => AsyncIterable<string>;
 }
 
 /** Read-only, safe-to-repeat tools that call the external Legislation API. */

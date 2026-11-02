@@ -384,6 +384,29 @@ describe("get_api_quota", () => {
   });
 });
 
+describe("text helpers", () => {
+  it("describes targets for messages", async () => {
+    const { describeTarget, suggestLabels } = await import("../../src/tools/text-common.js");
+    expect(describeTarget("1", "2")).toBe("clause 1 of schedule 2");
+    expect(describeTarget("1", "")).toBe("clause 1 of schedule (unnumbered)");
+    expect(describeTarget("CA 1", undefined)).toBe("section CA 1");
+    expect(describeTarget(undefined, "")).toBe("schedule (unnumbered)");
+    expect(describeTarget(undefined, undefined)).toBe("schedule (unnumbered)");
+    expect(describeTarget(undefined, "3")).toBe("schedule 3");
+    const outline = ["1", "2", "6", "6A"].map((label) => ({
+      kind: "section" as const,
+      label,
+      heading: "",
+      id: null,
+      depth: 0,
+      schedule: null,
+      within: [],
+    }));
+    expect(suggestLabels(outline, "zz")).toEqual(["1", "2", "6", "6A"]);
+    expect(suggestLabels(outline, "  ")).toEqual(["1", "2", "6", "6A"]);
+  });
+});
+
 describe("shared helpers", () => {
   it("keeps the first link per known format and ignores unknown types", () => {
     expect(

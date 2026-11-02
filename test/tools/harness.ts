@@ -8,7 +8,23 @@ import { fakeFetch, type FakeFetch, type Step } from "../api/fake-fetch.js";
 
 export const TEST_KEY = DUMMY_KEY;
 
-export function deps(steps: Step[], today = "2026-11-02"): { deps: ToolDeps; fake: FakeFetch } {
+/** XML source for tests: maps version_id to fixture text (streamed in small chunks). */
+function xmlFrom(documents: Record<string, string>): ToolDeps["xml"] {
+  return async function* (versionId: string) {
+    const doc = documents[versionId];
+    if (doc === undefined) throw new Error(`no XML fixture for ${versionId}`);
+    for (let i = 0; i < doc.length; i += 4096) {
+      await Promise.resolve();
+      yield doc.slice(i, i + 4096);
+    }
+  };
+}
+
+export function deps(
+  steps: Step[],
+  today = "2026-11-02",
+  documents: Record<string, string> = {},
+): { deps: ToolDeps; fake: FakeFetch } {
   const fake = fakeFetch(...steps);
   const client = new LegislationClient({
     apiKey: new Secret(TEST_KEY),
@@ -16,7 +32,10 @@ export function deps(steps: Step[], today = "2026-11-02"): { deps: ToolDeps; fak
     fetch: fake.fn,
     sleep: () => Promise.resolve(),
   });
-  return { deps: { client, logger: silentLogger, today: () => today }, fake };
+  return {
+    deps: { client, logger: silentLogger, today: () => today, xml: xmlFrom(documents) },
+    fake,
+  };
 }
 
 export const signal = new AbortController().signal;

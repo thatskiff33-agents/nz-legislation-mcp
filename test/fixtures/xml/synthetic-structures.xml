@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Hand-written test document using PCO element names, covering structures the real
+     fixtures do not: nested paragraphs, definitions, tables, history notes, schedules
+     with numbered clauses, cross-headings in the body, line breaks and graphics. -->
+<act id="X1" year="2099" act.no="1">
+  <cover><title>Synthetic Structures Act 2099</title></cover>
+  <body>
+    <crosshead>Preliminary <emphasis>provisions</emphasis></crosshead>
+    <prov id="P1">
+      <label>1</label><heading>Interpretation</heading>
+      <prov.body>
+        <subprov><label>1</label>
+          <para><text>In this Act, unless the context otherwise requires,—</text>
+            <def-para><para><text><def-term>employer</def-term> means a person who—</text>
+              <label-para><label>a</label><para><text>employs another person; or</text>
+                <label-para><label>i</label><para><text>engages a contractor</text></para></label-para>
+              </para></label-para>
+              <label-para><label>b</label><para><text>is treated as an employer.</text></para></label-para>
+            </para></def-para>
+          </para>
+        </subprov>
+      </prov.body>
+      <notes><history><history-note><amending-operation>amended</amending-operation> on 1 April 2100 by section 3 of the Example Amendment Act 2100</history-note></history></notes>
+      <ird.aids><text>Compare: old section 1</text></ird.aids>
+    </prov>
+    <part id="PT1"><label>1</label><heading>Rates</heading>
+      <prov id="P2">
+        <label>2</label><heading>Rates table</heading>
+        <prov.body><subprov><label/>
+          <para><text>The rates are:</text>
+            <table><tgroup><tbody>
+              <row><entry>Band</entry><entry>Rate</entry></row>
+              <row><entry>0 to 14,000</entry><entry>10.5%</entry></row>
+            </tbody></tgroup></table>
+            <text>First line<brk/>second line <graphic/></text>
+          </para>
+        </subprov></prov.body>
+      </prov>
+    </part>
+  </body>
+  <schedule.group>
+    <schedule id="S1"><label>1</label><heading>Transitional provisions</heading>
+      <schedule.provisions>
+        <prov id="S1C1"><label>1</label><heading>Application</heading>
+          <prov.body><subprov><label/><para><text>This clause applies from 2099.</text></para></subprov></prov.body>
+        </prov>
+      </schedule.provisions>
+    </schedule>
+  </schedule.group>
+</act>

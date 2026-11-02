@@ -8,6 +8,7 @@ import { LegislationClient } from "./api/client.js";
 import { ConfigError, loadConfig } from "./config.js";
 import { createLogger } from "./logger.js";
 import { createServer } from "./server.js";
+import { streamVersionXml } from "./text/xml-source.js";
 import { todayInNewZealand, type ToolDeps } from "./tools/shared.js";
 import { SERVER_NAME, VERSION } from "./version.js";
 
@@ -46,7 +47,12 @@ function buildDeps(env: MainIo["env"], stderr: MainIo["stderr"]): ToolDeps {
     logger,
   });
   logger.info("starting", { server: SERVER_NAME, version: VERSION, cache: config.cache });
-  return { client, logger, today: todayInNewZealand };
+  return {
+    client,
+    logger,
+    today: todayInNewZealand,
+    xml: streamVersionXml,
+  };
 }
 
 /** Starts the stdio server. Returns the process exit code for start-up failures, else undefined. */
