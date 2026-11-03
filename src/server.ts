@@ -16,6 +16,8 @@ import { getTableOfContents } from "./tools/get-table-of-contents.js";
 import { listVersions } from "./tools/list-versions.js";
 import { searchLegislation } from "./tools/search-legislation.js";
 import { toErrorResult, toResult, type ToolDefinition, type ToolDeps } from "./tools/shared.js";
+import { registerPrompts } from "./prompts.js";
+import { registerResources } from "./resources.js";
 import { SERVER_NAME, SERVER_TITLE, VERSION } from "./version.js";
 
 /** Every tool, in the order clients see them (spec: deterministic tools/list order). */
@@ -69,8 +71,16 @@ function register<
 export function createServer(deps: ToolDeps): McpServer {
   const server = new McpServer(
     { name: SERVER_NAME, title: SERVER_TITLE, version: VERSION },
-    // The tool list never changes at runtime, so do not advertise list-changed notifications.
-    { instructions: SERVER_INSTRUCTIONS, capabilities: { tools: { listChanged: false } } },
+    // The tool, resource and prompt lists never change at runtime, so do not advertise
+    // list-changed notifications.
+    {
+      instructions: SERVER_INSTRUCTIONS,
+      capabilities: {
+        tools: { listChanged: false },
+        resources: { listChanged: false },
+        prompts: { listChanged: false },
+      },
+    },
   );
   register(server, searchLegislation, deps);
   register(server, getLegislation, deps);
@@ -79,5 +89,7 @@ export function createServer(deps: ToolDeps): McpServer {
   register(server, getProvisionText, deps);
   register(server, compareVersions, deps);
   register(server, getApiQuota, deps);
+  registerResources(server, deps);
+  registerPrompts(server);
   return server;
 }
