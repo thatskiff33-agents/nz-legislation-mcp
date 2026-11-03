@@ -142,6 +142,11 @@ export interface JwtVerifierOptions {
   readonly resource: URL;
   /** Key source: a remote JWKS in production, a local key set in tests. */
   readonly keys: JWTVerifyGetKey;
+  /**
+   * Told why a token was refused (the error class and code, never the token), so an operator
+   * can tell an attack or expired token from a key-set fetch failure after key rotation.
+   */
+  readonly onReject?: (reason: { readonly error: string; readonly code: string }) => void;
 }
 
 /** True if a URL is safe to fetch keys from: https, or http on a loopback host. */
@@ -182,6 +187,15 @@ export function createJwtVerifier(options: JwtVerifierOptions): OAuthTokenVerifi
           ...(options.requireAtJwt === true ? { typ: "at+jwt" } : {}),
         }));
       } catch (error) {
+        options.onReject?.({
+          error: error instanceof Error ? error.name : "unknown",
+          code:
+            error instanceof joseErrors.JOSEError
+              ? error.code
+              : error instanceof Error
+                ? "error"
+                : "unknown",
+        });
         if (error instanceof joseErrors.JWTExpired) throw invalid("The access token has expired.");
         throw invalid("The access token is not valid for this server.");
       }

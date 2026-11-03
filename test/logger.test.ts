@@ -87,6 +87,20 @@ describe("logger", () => {
     expect(last()).toMatchObject({ at: "2026-01-02T03:04:05.000Z" });
   });
 
+  it("redacts inside toJSON output and object keys, and summarises bytes", () => {
+    const { log, last } = capture((t) => t.replaceAll("SECRET", "[redacted]"));
+    log.info("odd values", {
+      url: new URL("https://example.com/?k=SECRET"),
+      nested: { SECRET: 1 },
+      bytes: Buffer.from("SECRET"),
+    });
+    expect(last()).toMatchObject({
+      url: "https://example.com/?k=[redacted]",
+      nested: { "[redacted]": 1 },
+      bytes: "[6 bytes]",
+    });
+  });
+
   it("falls back safely when serialisation still fails", () => {
     const { log, last } = capture();
     const hostile = {

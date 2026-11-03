@@ -27,8 +27,9 @@ export interface LoggerOptions {
 }
 
 /**
- * Converts a value into plain JSON data: strings redacted, BigInt as text, Errors as
- * {name, message}, and only true cycles (an object containing its own ancestor) marked.
+ * Converts a value into plain JSON data: strings and keys redacted, BigInt as text, Errors as
+ * {name, message}, bytes as a length, toJSON results sanitised, and only true cycles (an object
+ * containing its own ancestor) marked.
  */
 function sanitise(value: unknown, redact: (text: string) => string, ancestors: object[]): unknown {
   if (typeof value === "string") return redact(value);
@@ -38,9 +39,14 @@ function sanitise(value: unknown, redact: (text: string) => string, ancestors: o
   if (ancestors.includes(value)) return "[Circular]";
   const path = [...ancestors, value];
   if (Array.isArray(value)) return value.map((item) => sanitise(item, redact, path));
-  if (typeof (value as { toJSON?: unknown }).toJSON === "function") return value; // e.g. Date
+  if (value instanceof Uint8Array) return `[${String(value.byteLength)} bytes]`;
+  const toJSON = (value as { toJSON?: unknown }).toJSON;
+  if (typeof toJSON === "function") {
+    // e.g. Date or URL: sanitise what it serialises to (a URL's text is redacted too).
+    return sanitise((toJSON as () => unknown).call(value), redact, path);
+  }
   return Object.fromEntries(
-    Object.entries(value).map(([key, item]) => [key, sanitise(item, redact, path)]),
+    Object.entries(value).map(([key, item]) => [redact(key), sanitise(item, redact, path)]),
   );
 }
 
