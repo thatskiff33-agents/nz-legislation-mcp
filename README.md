@@ -21,6 +21,14 @@ version on [legislation.govt.nz](https://www.legislation.govt.nz) before relying
 | `compare_versions`      | What changed in a provision between two versions or dates.                                   |
 | `get_api_quota`         | How much of your daily API quota is left (makes no API call).                                |
 
+For clients that support them, there are also:
+
+- Resources you can attach as context: `legislation://version/{version_id}/contents`,
+  `.../section/{section}` and `.../schedule/{schedule}` (for example
+  `legislation://version/act_public_1976_33_en_2014-01-01/section/6A`).
+- Two prompts: `find_provision` (find and quote the provision on a topic) and `what_changed`
+  (how legislation, or one provision, has changed since a date).
+
 ## Quick start
 
 You need Node.js 22 or later and your own Legislation API key. Request one from the
