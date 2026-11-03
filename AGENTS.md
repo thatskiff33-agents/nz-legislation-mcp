@@ -13,7 +13,12 @@ Unofficial MCP server for the New Zealand Legislation API (PCO, `api.legislation
 3. Decisions: when a real choice exists, add a Decisions section to the issue with checkbox options and a Recommended default, labelled `needs-decision`. Ask the owner in-session, record the answer on the issue, remove the label.
 4. Before marking a PR ready: independent review (security, correctness, and any lens fitting the risk), fix findings, verify fixes, CI green. Post a plain-English ready comment: what was built, reviews and findings, fixes, carry-forwards.
 5. Carry-forwards only for things needing an owner decision or a fresh plan, filed as a linked `needs-decision` issue.
-6. Merge only after the owner comments exactly `Approved and ok to merge` on the PR. Squash merge.
+6. Merging (owner decision in an agent session, 4 November 2026: "I approve you to merge. I don't comment on github. You get it sorted."): the agent squash-merges a PR, and deletes its branch, once all of these hold:
+   * it is out of draft and CI is green on the final commit;
+   * an independent review has signed off on the final changes, with every finding fixed or answered;
+   * no owner decision on it is open.
+
+   The agent records the merge decision on the PR. Releases and publishing (npm, MCP Registry, container images), repository settings, and anything legal stay with the owner.
 
 ## Hard rules
 
