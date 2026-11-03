@@ -96,6 +96,18 @@ function subjectOf(authInfo: AuthInfo | undefined): string {
   return typeof subject === "string" ? subject : "";
 }
 
+/**
+ * The client address for per-IP limits. Behind a trusted proxy (which appends the address it
+ * saw to X-Forwarded-For), that last entry is used; earlier entries can be set by the client
+ * and are ignored. Without a trusted proxy, the socket address is used.
+ */
+function clientAddress(request: Request, socketAddress: string, trustProxy: boolean): string {
+  if (!trustProxy) return socketAddress;
+  const forwarded = request.headers.get("x-forwarded-for");
+  const last = forwarded?.split(",").at(-1)?.trim();
+  return last === undefined || last === "" ? socketAddress : last;
+}
+
 /** Reads a request body as text, or returns null if it exceeds MAX_BODY_BYTES. */
 async function readBody(request: Request): Promise<string | null> {
   if (Number(request.headers.get("content-length")) > MAX_BODY_BYTES) return null;
@@ -223,7 +235,10 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
     async fetch(request: Request, meta = { remoteAddress: "unknown" }): Promise<Response> {
       let response: Response;
       try {
-        response = await route(request, meta.remoteAddress);
+        response = await route(
+          request,
+          clientAddress(request, meta.remoteAddress, config.trustProxy),
+        );
       } catch (error) {
         logger.error("unhandled http error", { error });
         response = json(500, { error: "internal_error" });

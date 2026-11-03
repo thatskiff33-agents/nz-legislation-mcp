@@ -9,3 +9,6 @@ coverage/
 *.mcpb
 .cache/
 .e2e-dist/
+deploy/.env
+deploy/secrets/*
+!deploy/secrets/README.md

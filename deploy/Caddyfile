@@ -1,0 +1,6 @@
+# Caddy obtains and renews the TLS certificate for your domain automatically.
+{$NZLM_DOMAIN} {
+	encode zstd gzip
+	# Pass the original Host header through (Caddy does by default); the server checks it.
+	reverse_proxy mcp:8080
+}
