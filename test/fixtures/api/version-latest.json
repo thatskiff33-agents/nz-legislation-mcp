@@ -1,0 +1,24 @@
+{
+  "act_status": "in_force",
+  "act_type": "public",
+  "administering_agencies": ["Inland Revenue Department"],
+  "formats": [
+    {
+      "type": "html",
+      "url": "https://www.legislation.govt.nz/act/public/2007/97/en/latest/"
+    },
+    {
+      "type": "pdf",
+      "url": "https://www.legislation.govt.nz/act/public/2007/97/en/latest.pdf"
+    },
+    {
+      "type": "xml",
+      "url": "https://www.legislation.govt.nz/act/public/2007/97/en/latest.xml"
+    }
+  ],
+  "legislation_status": "in_force",
+  "legislation_type": "act",
+  "title": "Income Tax Act 2007",
+  "version_id": "act_public_2007_97_en_2026-09-04",
+  "work_id": "act_public_2007_97"
+}
