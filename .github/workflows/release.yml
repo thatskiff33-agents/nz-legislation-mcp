@@ -19,6 +19,10 @@ concurrency:
 
 jobs:
   release-please:
+    # Off until the owner has created the protected "release" environment (PUBLISHING.md) and set
+    # the repository variable RELEASE_ENABLED to true. GitHub would otherwise create a missing
+    # environment on first use with no protection, and publishing would need no approval.
+    if: vars.RELEASE_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
