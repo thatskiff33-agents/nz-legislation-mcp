@@ -404,6 +404,13 @@ describe("review follow-ups", () => {
     );
   });
 
+  it("removes bidirectional override and isolate controls", async () => {
+    const xml = one("<text>pay \u202E01$\u202C and \u2066x\u2069</text>");
+    expect((await readLegislation(chunked(xml), { target: { section: "1" } })).text).toBe(
+      "1 H\n(1) pay 01$ and x",
+    );
+  });
+
   it("lets part pick a clause inside a schedule part marked up as head1", async () => {
     const clause = (word: string) =>
       `<prov><label>1</label><heading>${word}</heading><prov.body><subprov><label/><para><text>${word}</text></para></subprov></prov.body></prov>`;

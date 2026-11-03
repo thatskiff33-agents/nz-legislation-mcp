@@ -179,8 +179,12 @@ const LABELLED = new Set([
 // eslint-disable-next-line no-control-regex -- removing control characters is the purpose
 const CONTROL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/gu;
 
-/** Zero-width and byte-order-mark characters (U+FEFF appears inside some citations). */
-const INVISIBLE = /[\u200B-\u200D\u2060\uFEFF]/gu;
+/**
+ * Zero-width and byte-order-mark characters (U+FEFF appears inside some citations), and
+ * bidirectional embedding, override and isolate controls, which could make displayed text read
+ * differently from its characters.
+ */
+const INVISIBLE = /[\u200B-\u200D\u2060\uFEFF\u202A-\u202E\u2066-\u2069]/gu;
 
 /** Upper bound on rendered characters for a single provision or schedule. */
 const MAX_RENDERED_CHARS = 2_000_000;
