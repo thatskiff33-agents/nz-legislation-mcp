@@ -109,7 +109,7 @@ export const apiErrors = {
   invalidResponse: (): ApiError =>
     new ApiError(
       "invalid_response",
-      "The Legislation API returned a response in an unexpected format. The API (v0) may have changed; please report this at https://github.com/thatskiff33-agents/nz-legislation-mcp/issues.",
+      "The Legislation API returned a response in an unexpected format. The API (v0) may have changed; please report this at https://github.com/thatskiff33/nz-legislation-mcp/issues.",
       false,
     ),
 
@@ -123,7 +123,7 @@ export const apiErrors = {
   unexpectedRedirect: (status: number): ApiError =>
     new ApiError(
       "unexpected_redirect",
-      `The Legislation API answered with a redirect (${String(status)}), which this server does not follow for security. The API may have moved; please report this at https://github.com/thatskiff33-agents/nz-legislation-mcp/issues.`,
+      `The Legislation API answered with a redirect (${String(status)}), which this server does not follow for security. The API may have moved; please report this at https://github.com/thatskiff33/nz-legislation-mcp/issues.`,
       false,
       status,
     ),
@@ -131,7 +131,7 @@ export const apiErrors = {
   internal: (): ApiError =>
     new ApiError(
       "internal_error",
-      "An internal error occurred in this MCP server while handling the API response. Please report it at https://github.com/thatskiff33-agents/nz-legislation-mcp/issues.",
+      "An internal error occurred in this MCP server while handling the API response. Please report it at https://github.com/thatskiff33/nz-legislation-mcp/issues.",
       false,
     ),
 

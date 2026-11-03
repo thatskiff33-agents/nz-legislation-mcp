@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
   "name": "nz-legislation-mcp",
   "owner": {
-    "name": "thatskiff33-agents"
+    "name": "thatskiff33"
   },
   "description": "Claude Code plugin for nz-legislation-mcp.",
   "plugins": [

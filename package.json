@@ -1,16 +1,16 @@
 {
   "name": "nz-legislation-mcp",
-  "mcpName": "io.github.thatskiff33-agents/nz-legislation-mcp",
+  "mcpName": "io.github.thatskiff33/nz-legislation-mcp",
   "version": "0.0.0",
   "description": "Unofficial, security-hardened MCP server for the New Zealand Legislation API. Bring your own API key.",
   "license": "Apache-2.0",
   "author": "nz-legislation-mcp contributors",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/thatskiff33-agents/nz-legislation-mcp.git"
+    "url": "git+https://github.com/thatskiff33/nz-legislation-mcp.git"
   },
-  "bugs": "https://github.com/thatskiff33-agents/nz-legislation-mcp/issues",
-  "homepage": "https://github.com/thatskiff33-agents/nz-legislation-mcp#readme",
+  "bugs": "https://github.com/thatskiff33/nz-legislation-mcp/issues",
+  "homepage": "https://github.com/thatskiff33/nz-legislation-mcp#readme",
   "keywords": [
     "mcp",
     "model-context-protocol",
