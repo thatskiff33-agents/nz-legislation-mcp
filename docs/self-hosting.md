@@ -59,12 +59,12 @@ The key is passed as a Docker secret file, so it does not appear in environment 
 
 ### Using a published image
 
-From the first release onwards, images will be published to `ghcr.io/thatskiff33-agents/nz-legislation-mcp`, signed with Sigstore cosign (keyless), with an SBOM and build provenance. To use one, set `NZLM_IMAGE` in `deploy/.env` to a specific version (never an unpinned `latest`), and verify the signature first:
+From the first release onwards, images will be published to `ghcr.io/thatskiff33/nz-legislation-mcp`, signed with Sigstore cosign (keyless), with an SBOM and build provenance. To use one, set `NZLM_IMAGE` in `deploy/.env` to a specific version (never an unpinned `latest`), and verify the signature first:
 
 ```sh
-cosign verify ghcr.io/thatskiff33-agents/nz-legislation-mcp:1.0.0 \
+cosign verify ghcr.io/thatskiff33/nz-legislation-mcp:1.0.0 \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  --certificate-identity-regexp '^https://github.com/thatskiff33-agents/nz-legislation-mcp/\.github/workflows/container\.yml@refs/tags/v'
+  --certificate-identity-regexp '^https://github.com/thatskiff33/nz-legislation-mcp/\.github/workflows/container\.yml@refs/tags/v'
 ```
 
 ### Running the container without Compose

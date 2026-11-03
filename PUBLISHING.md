@@ -19,7 +19,7 @@ Nothing leaves GitHub until someone approves the `release` environment.
      token is stored).
    - Claude Desktop bundle: attached to the GitHub release with SHA-256 checksums.
    - Container: built from the release tag (inside Docker, without access to the publishing
-     credentials), scanned, then pushed to `ghcr.io/thatskiff33-agents/nz-legislation-mcp`
+     credentials), scanned, then pushed to `ghcr.io/thatskiff33/nz-legislation-mcp`
      with an SBOM and provenance, and signed with cosign (keyless).
 4. After npm has the new version, publish to the MCP Registry by hand (see below).
 
@@ -45,7 +45,7 @@ Do these in order. Each one is an outward-facing change, so a maintainer does th
 3. npm: sign in to the account that will own `nz-legislation-mcp` and turn on two-factor
    authentication.
 4. npm trusted publisher: on the package's settings page, add a GitHub Actions trusted
-   publisher with owner `thatskiff33-agents`, repository `nz-legislation-mcp`, workflow
+   publisher with owner `thatskiff33`, repository `nz-legislation-mcp`, workflow
    `release.yml` and environment `release`. Trusted publishing needs npm 11.5.1 or later
    (the workflow publishes with Node 24's npm). A new trusted publisher must complete a
    successful publish within 2 days or it expires, so add it shortly before releasing.

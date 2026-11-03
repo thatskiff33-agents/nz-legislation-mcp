@@ -27,4 +27,4 @@ export const SERVER_NAME = "nz-legislation-mcp";
 export const SERVER_TITLE = "NZ Legislation";
 
 /** User-Agent sent to the API so PCO can identify (and contact the maintainers about) this client. */
-export const USER_AGENT = `nz-legislation-mcp/${VERSION} (+https://github.com/thatskiff33-agents/nz-legislation-mcp)`;
+export const USER_AGENT = `nz-legislation-mcp/${VERSION} (+https://github.com/thatskiff33/nz-legislation-mcp)`;

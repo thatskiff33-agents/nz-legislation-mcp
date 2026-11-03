@@ -7,15 +7,15 @@
   "long_description": "Unofficial, security-hardened MCP server for the New Zealand Legislation API. Bring your own API key. Unofficial: not affiliated with the Parliamentary Counsel Office. Check the official version on legislation.govt.nz.",
   "author": {
     "name": "nz-legislation-mcp contributors",
-    "url": "https://github.com/thatskiff33-agents/nz-legislation-mcp"
+    "url": "https://github.com/thatskiff33/nz-legislation-mcp"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/thatskiff33-agents/nz-legislation-mcp"
+    "url": "https://github.com/thatskiff33/nz-legislation-mcp"
   },
-  "homepage": "https://github.com/thatskiff33-agents/nz-legislation-mcp",
-  "documentation": "https://github.com/thatskiff33-agents/nz-legislation-mcp#readme",
-  "support": "https://github.com/thatskiff33-agents/nz-legislation-mcp/issues",
+  "homepage": "https://github.com/thatskiff33/nz-legislation-mcp",
+  "documentation": "https://github.com/thatskiff33/nz-legislation-mcp#readme",
+  "support": "https://github.com/thatskiff33/nz-legislation-mcp/issues",
   "license": "Apache-2.0",
   "keywords": [
     "mcp",

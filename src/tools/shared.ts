@@ -75,7 +75,7 @@ export function toErrorResult(error: unknown, logger: Logger, tool: string): Cal
     content: [
       {
         type: "text",
-        text: "An unexpected error occurred in this MCP server. Please report it at https://github.com/thatskiff33-agents/nz-legislation-mcp/issues.",
+        text: "An unexpected error occurred in this MCP server. Please report it at https://github.com/thatskiff33/nz-legislation-mcp/issues.",
       },
     ],
   };

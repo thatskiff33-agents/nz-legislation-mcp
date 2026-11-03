@@ -6,10 +6,10 @@
   "description": "Search and read New Zealand legislation via the official PCO Legislation API.",
   "author": {
     "name": "nz-legislation-mcp contributors",
-    "url": "https://github.com/thatskiff33-agents/nz-legislation-mcp"
+    "url": "https://github.com/thatskiff33/nz-legislation-mcp"
   },
-  "homepage": "https://github.com/thatskiff33-agents/nz-legislation-mcp",
-  "repository": "https://github.com/thatskiff33-agents/nz-legislation-mcp",
+  "homepage": "https://github.com/thatskiff33/nz-legislation-mcp",
+  "repository": "https://github.com/thatskiff33/nz-legislation-mcp",
   "license": "Apache-2.0",
   "keywords": [
     "mcp",

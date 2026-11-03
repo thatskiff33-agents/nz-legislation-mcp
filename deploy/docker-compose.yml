@@ -4,7 +4,7 @@ name: nz-legislation-mcp
 services:
   mcp:
     # Builds from this repository by default. To use a published release instead, set NZLM_IMAGE
-    # to a pinned version or digest, e.g. ghcr.io/thatskiff33-agents/nz-legislation-mcp:1.0.0
+    # to a pinned version or digest, e.g. ghcr.io/thatskiff33/nz-legislation-mcp:1.0.0
     # (verify its signature first: see docs/self-hosting.md).
     image: ${NZLM_IMAGE:-nz-legislation-mcp:local}
     build:
