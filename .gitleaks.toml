@@ -7,7 +7,6 @@ useDefault = true
 
 [allowlist]
 description = "Historical dummy API keys in test files"
-paths = ['''^test/''']
 regexes = [
   '''test-key-0123456789abcdef''',
   '''e2e-test-key-0123456789''',
