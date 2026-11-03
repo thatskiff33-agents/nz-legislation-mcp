@@ -51,10 +51,10 @@
     "@vitest/coverage-v8": "^5.0.5",
     "eslint": "^10.13.0",
     "fast-check": "^4.10.2",
-    "knip": "^6.42.0",
+    "knip": "^6.42.1",
     "prettier": "^3.9.10",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.71.2",
+    "typescript-eslint": "^8.72.0",
     "vitest": "^5.0.5"
   },
   "dependencies": {
