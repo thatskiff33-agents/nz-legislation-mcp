@@ -105,10 +105,14 @@ function clientAddress(request: Request, socketAddress: string, trustProxy: bool
   if (!trustProxy) return socketAddress;
   const forwarded = request.headers.get("x-forwarded-for");
   const last = forwarded?.split(",").at(-1)?.trim();
-  return last === undefined || last === "" ? socketAddress : last;
+  return last === undefined || last === "" ? socketAddress : withoutPort(last);
 }
 
-/** Headers a reverse proxy, tunnel or CDN adds; a no-auth server must never be behind one. */
+/**
+ * Headers a reverse proxy, tunnel or CDN adds; a no-auth server must never be behind one. A plain
+ * TCP forwarder, or a proxy configured to add none of these, is not detected (see the threat
+ * model): the real protection is OAuth.
+ */
 const PROXY_HEADERS = [
   "forwarded",
   "x-forwarded-for",
@@ -118,6 +122,14 @@ const PROXY_HEADERS = [
   "cf-connecting-ip",
   "true-client-ip",
   "via",
+  "x-forwarded-server",
+  "x-forwarded-port",
+  "x-original-forwarded-for",
+  "x-client-ip",
+  "fastly-client-ip",
+  "x-envoy-external-address",
+  "cdn-loop",
+  "cf-ray",
 ];
 
 /** True for IPv4 127.0.0.0/8, IPv6 ::1 and IPv4-mapped loopback addresses. */
@@ -162,6 +174,13 @@ function ipKey(address: string): string {
     .slice(0, 4)
     .map((g) => g.toLowerCase().replace(/^0+(?=.)/u, ""))
     .join(":")}::/64`;
+}
+
+/** "1.2.3.4:5678" and "[2001:db8::1]:443" to the bare address, so a port cannot vary the key. */
+function withoutPort(address: string): string {
+  const bracketed = /^\[([^\]]+)\](?::\d+)?$/u.exec(address);
+  if (bracketed?.[1] !== undefined) return bracketed[1];
+  return /^[\d.]+:\d+$/u.test(address) ? address.slice(0, address.lastIndexOf(":")) : address;
 }
 
 /** Reads a request body as text, or returns null if it exceeds MAX_BODY_BYTES. */

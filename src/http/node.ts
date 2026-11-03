@@ -35,6 +35,9 @@ export function toRequest(req: IncomingMessage, res: ServerResponse): Request {
   });
 }
 
+/** For cancellations whose failure does not matter (the stream is already gone). */
+const ignore = (): void => undefined;
+
 /** Writes a web Response to a Node response, streaming the body. */
 export async function writeResponse(response: Response, res: ServerResponse): Promise<void> {
   const headers: Record<string, string | string[]> = {};
@@ -47,6 +50,11 @@ export async function writeResponse(response: Response, res: ServerResponse): Pr
     return;
   }
   const reader = (response.body as ReadableStream<Uint8Array>).getReader();
+  // If the client goes while the body producer is itself waiting, cancel the read too.
+  const cancelOnClose = (): void => {
+    reader.cancel().catch(ignore);
+  };
+  res.once("close", cancelOnClose);
   try {
     for (;;) {
       const { done, value } = await reader.read();
@@ -58,7 +66,8 @@ export async function writeResponse(response: Response, res: ServerResponse): Pr
     res.end();
   } finally {
     // Releases the body (and the per-request server behind it) if we stopped early.
-    await reader.cancel().catch(() => undefined);
+    await reader.cancel().catch(ignore);
+    res.off("close", cancelOnClose);
   }
 }
 

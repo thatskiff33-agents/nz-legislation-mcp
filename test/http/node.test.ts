@@ -105,6 +105,34 @@ describe("listen", () => {
     await released; // would hang (test timeout) if the writer waited for "drain" for ever
   });
 
+  it("cancels the body when the client goes while the producer is waiting", async () => {
+    let cancelled!: () => void;
+    const released = new Promise<void>((resolve) => {
+      cancelled = resolve;
+    });
+    server = await listen(
+      () =>
+        Promise.resolve(
+          new Response(
+            new ReadableStream({
+              start(c) {
+                c.enqueue(new Uint8Array([0x61])); // then never another chunk
+              },
+              cancel() {
+                cancelled();
+              },
+            }),
+          ),
+        ),
+      { host: "127.0.0.1", port: 0, logger: silentLogger },
+    );
+    const controller = new AbortController();
+    const response = await fetch(`${base()}/idle`, { signal: controller.signal });
+    expect(response.status).toBe(200);
+    controller.abort();
+    await released;
+  });
+
   it("does not wait for drain on a response that is already closed", async () => {
     const closed = { destroyed: true } as unknown as Parameters<typeof drainedOrClosed>[0];
     expect(await drainedOrClosed(closed)).toBe(false);

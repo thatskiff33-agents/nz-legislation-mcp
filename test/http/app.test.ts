@@ -383,6 +383,12 @@ describe("trusted proxy", () => {
     expect((await health(trusted, "spoofed-x, 203.0.113.5")).status).toBe(429);
     expect((await health(trusted, "203.0.113.6")).status).toBe(200);
     expect((await health(trusted, " ")).status).toBe(200); // blank header: falls back to the socket
+    // A port on the forwarded address does not create a new bucket.
+    const ported = await make("true");
+    for (let i = 0; i < 5; i += 1) await health(ported, `203.0.113.7:${String(1000 + i)}`);
+    expect((await health(ported, "203.0.113.7")).status).toBe(429);
+    for (let i = 0; i < 5; i += 1) await health(ported, `[2001:db8::7]:${String(1000 + i)}`);
+    expect((await health(ported, "[2001:db8::8]")).status).toBe(429);
     // Not trusted: the header is ignored and the socket address is used.
     const untrusted = await make("false");
     for (let i = 0; i < 5; i += 1) await health(untrusted, `203.0.113.${String(i)}`);
