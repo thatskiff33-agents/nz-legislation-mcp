@@ -51,7 +51,7 @@ jobs:
           load: true
           tags: nz-legislation-mcp:scan
       # Install Trivy from its GitHub release, checked against a pinned SHA-256, instead of the
-      # action's installer (which downloads from get.trivy.dev and fails when that host is down).
+      # action's installer (which downloads from get.trivy.dev; that host stopped resolving on 4 Nov 2026).
       - name: Install Trivy (pinned, checksum verified)
         env:
           TRIVY_VERSION: "0.70.0"
@@ -121,7 +121,7 @@ jobs:
           load: true
           tags: nz-legislation-mcp:release-scan
       # Install Trivy from its GitHub release, checked against a pinned SHA-256, instead of the
-      # action's installer (which downloads from get.trivy.dev and fails when that host is down).
+      # action's installer (which downloads from get.trivy.dev; that host stopped resolving on 4 Nov 2026).
       - name: Install Trivy (pinned, checksum verified)
         env:
           TRIVY_VERSION: "0.70.0"
