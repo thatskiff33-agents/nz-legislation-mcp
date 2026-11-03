@@ -1,0 +1,30 @@
+name: Bug report
+description: Something is not working as documented
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: "Do not paste your API key. Report security issues privately via the Security tab."
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `nz-legislation-mcp --version`
+  - type: input
+    id: client
+    attributes:
+      label: MCP client
+      description: For example Claude Desktop 1.x, Cursor, Codex CLI.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: Relevant stderr output with any keys removed.
+      render: text
