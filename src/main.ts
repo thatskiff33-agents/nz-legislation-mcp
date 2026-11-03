@@ -3,6 +3,7 @@
  * down cleanly. Kept separate from cli.ts so it can be tested without spawning a process.
  */
 import { serveStdio } from "@modelcontextprotocol/server/stdio";
+import type { Input } from "./cli/terminal.js";
 import { MemoryCache } from "./api/cache.js";
 import { LegislationClient } from "./api/client.js";
 import { ConfigError, loadConfig } from "./config.js";
@@ -20,8 +21,10 @@ const TEXT_CACHE_MAX_ENTRIES = 50;
 export interface MainIo {
   readonly env: Readonly<Record<string, string | undefined>>;
   readonly stderr: (text: string) => void;
-  /** Only for --version/--help output, never while serving stdio (stdout is the protocol). */
+  /** Only for --version/--help/setup/doctor output, never while serving stdio (stdout is the protocol). */
   readonly stdout: (text: string) => void;
+  /** Standard input, used only by `setup` (stdio serving reads it through the SDK). */
+  readonly stdin: Input;
   readonly serve: typeof serveStdio;
   readonly onSignal: (signal: "SIGINT" | "SIGTERM", handler: () => void) => void;
   readonly onUnhandledRejection: (handler: (reason: unknown) => void) => void;
@@ -32,6 +35,7 @@ export const defaultIo: MainIo = {
   env: process.env,
   stderr: (text) => process.stderr.write(text),
   stdout: (text) => process.stdout.write(text),
+  stdin: process.stdin,
   serve: serveStdio,
   onSignal: (signal, handler) => process.once(signal, handler),
   onUnhandledRejection: (handler) => process.on("unhandledRejection", handler),
@@ -64,13 +68,42 @@ export function buildDeps(env: MainIo["env"], stderr: MainIo["stderr"]): ToolDep
   };
 }
 
-const USAGE = `Usage: ${SERVER_NAME} [stdio|http] [--version] [--help]
+const USAGE = `Usage: ${SERVER_NAME} [stdio|http|setup|doctor] [--version] [--help]
 
   stdio    Serve MCP over standard input/output (default; for desktop and CLI clients).
   http     Serve MCP over HTTP (Streamable HTTP). Binds 127.0.0.1 unless OAuth is configured.
+  setup    Save your API key in a private file and show how to add the server to your client.
+  doctor   Check the key, the Legislation API and the website are reachable.
 
 Configuration is by environment variables; see README.md and docs/self-hosting.md.
 `;
+
+/** `setup`, wired to the real terminal and API (modules loaded only when used). */
+async function runSetupCommand(argv: readonly string[], io: MainIo): Promise<number> {
+  const [{ runSetup, verifyWithApi }, terminal] = await Promise.all([
+    import("./cli/setup.js"),
+    import("./cli/terminal.js"),
+  ]);
+  return runSetup(argv, {
+    env: io.env,
+    stdout: io.stdout,
+    stderr: io.stderr,
+    readSecret: (prompt) => terminal.readSecret(prompt, io.stdin, io.stderr),
+    readStdin: () => terminal.readAll(io.stdin),
+    verify: verifyWithApi,
+  });
+}
+
+/** `doctor`, wired to the real environment. */
+async function runDoctorCommand(io: MainIo): Promise<number> {
+  const { runDoctor } = await import("./cli/doctor.js");
+  return runDoctor({
+    env: io.env,
+    stdout: io.stdout,
+    nodeVersion: process.version,
+    fetch: globalThis.fetch,
+  });
+}
 
 /**
  * Runs the command line. Returns the process exit code, or undefined while a server runs.
@@ -95,6 +128,8 @@ export async function runCli(
     io.stdout(USAGE);
     return 0;
   }
+  if (command === "setup") return runSetupCommand(rest, io);
+  if (command === "doctor" && rest.length === 0) return runDoctorCommand(io);
   if (rest.length > 0 || (command !== undefined && command !== "stdio" && command !== "http")) {
     io.stderr(USAGE);
     return 2;

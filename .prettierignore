@@ -3,3 +3,10 @@ coverage/
 pnpm-lock.yaml
 CODE_OF_CONDUCT.md
 LICENSE
+# Generated JSON (scripts/distribution.ts) is written as JSON.stringify output so that
+# release-please's version bumps leave it byte-identical to a fresh generation.
+server.json
+.claude-plugin/
+plugins/
+packaging/
+.release-please-manifest.json
