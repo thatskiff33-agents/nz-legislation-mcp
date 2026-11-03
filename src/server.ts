@@ -8,19 +8,30 @@ import {
   type ToolCallback,
 } from "@modelcontextprotocol/server";
 import type { z } from "zod";
+import { compareVersions } from "./tools/compare-versions.js";
 import { getApiQuota } from "./tools/get-api-quota.js";
 import { getLegislation } from "./tools/get-legislation.js";
+import { getProvisionText } from "./tools/get-provision-text.js";
+import { getTableOfContents } from "./tools/get-table-of-contents.js";
 import { listVersions } from "./tools/list-versions.js";
 import { searchLegislation } from "./tools/search-legislation.js";
 import { toErrorResult, toResult, type ToolDefinition, type ToolDeps } from "./tools/shared.js";
 import { SERVER_NAME, SERVER_TITLE, VERSION } from "./version.js";
 
 /** Every tool, in the order clients see them (spec: deterministic tools/list order). */
-export const TOOLS = [searchLegislation, getLegislation, listVersions, getApiQuota] as const;
+export const TOOLS = [
+  searchLegislation,
+  getLegislation,
+  listVersions,
+  getTableOfContents,
+  getProvisionText,
+  compareVersions,
+  getApiQuota,
+] as const;
 
 export const SERVER_INSTRUCTIONS = [
   "Tools for New Zealand legislation from the official legislation.govt.nz API (Parliamentary Counsel Office).",
-  "Typical flow: search_legislation to find a work_id, then get_legislation (with as_at for a past date) for the version and official links; list_versions for the amendment history.",
+  "Typical flow: search_legislation to find a work_id; get_legislation (with as_at for a past date) for the version and links; get_table_of_contents for section labels; get_provision_text to read a section; compare_versions to see what changed; list_versions for the amendment history.",
   "Cite the title, version date and the dated permalink (it does not change when the law is amended). Results are not legal advice; tell the user to check the official version on legislation.govt.nz.",
   "Each user's API key has a daily quota (get_api_quota), so prefer specific searches over many broad ones.",
 ].join("\n");
@@ -64,6 +75,9 @@ export function createServer(deps: ToolDeps): McpServer {
   register(server, searchLegislation, deps);
   register(server, getLegislation, deps);
   register(server, listVersions, deps);
+  register(server, getTableOfContents, deps);
+  register(server, getProvisionText, deps);
+  register(server, compareVersions, deps);
   register(server, getApiQuota, deps);
   return server;
 }

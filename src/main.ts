@@ -8,11 +8,14 @@ import { LegislationClient } from "./api/client.js";
 import { ConfigError, loadConfig } from "./config.js";
 import { createLogger } from "./logger.js";
 import { createServer } from "./server.js";
+import { streamVersionXml } from "./text/xml-source.js";
 import { todayInNewZealand, type ToolDeps } from "./tools/shared.js";
 import { SERVER_NAME, VERSION } from "./version.js";
 
 /** Bounded size of the optional response cache. */
 const CACHE_MAX_ENTRIES = 500;
+/** Bounded size of the optional rendered-text cache (entries can be large). */
+const TEXT_CACHE_MAX_ENTRIES = 50;
 
 export interface MainIo {
   readonly env: Readonly<Record<string, string | undefined>>;
@@ -39,14 +42,21 @@ function buildDeps(env: MainIo["env"], stderr: MainIo["stderr"]): ToolDeps {
     redact: (text) => config.apiKey.redact(text),
     write: stderr,
   });
+  const memory = config.cache === "memory";
   const client = new LegislationClient({
     apiKey: config.apiKey,
     timeoutMs: config.timeoutMs,
-    cache: config.cache === "memory" ? new MemoryCache(CACHE_MAX_ENTRIES) : undefined,
+    cache: memory ? new MemoryCache(CACHE_MAX_ENTRIES) : undefined,
     logger,
   });
   logger.info("starting", { server: SERVER_NAME, version: VERSION, cache: config.cache });
-  return { client, logger, today: todayInNewZealand };
+  return {
+    client,
+    logger,
+    today: todayInNewZealand,
+    textCache: memory ? new MemoryCache(TEXT_CACHE_MAX_ENTRIES) : undefined,
+    xml: streamVersionXml,
+  };
 }
 
 /** Starts the stdio server. Returns the process exit code for start-up failures, else undefined. */

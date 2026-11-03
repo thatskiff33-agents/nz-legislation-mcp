@@ -39,6 +39,9 @@ describe("stdio binary", () => {
       "search_legislation",
       "get_legislation",
       "list_versions",
+      "get_table_of_contents",
+      "get_provision_text",
+      "compare_versions",
       "get_api_quota",
     ]);
     const quota = await client.callTool({ name: "get_api_quota", arguments: {} });
@@ -60,7 +63,7 @@ describe("stdio binary", () => {
     await client.connect(transport);
     expect(client.getNegotiatedProtocolVersion()).toBe("2026-07-28");
     const { tools } = await client.listTools();
-    expect(tools).toHaveLength(4);
+    expect(tools).toHaveLength(7);
     await client.close();
   }, 30_000);
 
