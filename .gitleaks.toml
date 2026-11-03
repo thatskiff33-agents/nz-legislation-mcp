@@ -1,0 +1,15 @@
+# gitleaks configuration: the default rules, plus an allowlist for the exact dummy keys that
+# early test files used (they remain in branch history). They were never real keys. Listing the
+# literal values, not commit fingerprints, keeps the allowlist valid when commits are rebased.
+# New tests must use test/dummy-key.ts instead of inventing key-like strings.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Historical dummy API keys in test files"
+paths = ['''^test/''']
+regexes = [
+  '''test-key-0123456789abcdef''',
+  '''e2e-test-key-0123456789''',
+  '''main-test-key-0123456789''',
+]
