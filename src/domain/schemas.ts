@@ -37,9 +37,10 @@ import {
 /**
  * Rejects control characters (C0, DEL and C1: NUL, newlines, etc.) in free text. Written with
  * explicit ranges, not \p{Cc}, so the emitted JSON Schema pattern works in every regex engine.
+ * U+2028 and U+2029 (line and paragraph separators) are refused too: they act as line breaks.
  */
 // eslint-disable-next-line no-control-regex -- matching control characters is the purpose
-const NO_CONTROL_CHARS = /^[^\u0000-\u001F\u007F-\u009F]*$/;
+const NO_CONTROL_CHARS = /^[^\u0000-\u001F\u007F-\u009F\u2028\u2029]*$/;
 
 /** Trimmed, non-empty, length-limited text with no control characters. */
 export function freeText(max: number): z.ZodString {

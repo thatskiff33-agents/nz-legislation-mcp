@@ -100,6 +100,7 @@ describe("resource templates", () => {
       .readResource({ uri: `legislation://version/${V2014}/section/CA%201` })
       .catch((e: unknown) => e);
     expect(err).toBeInstanceOf(ProtocolError);
+    expect((err as ProtocolError).code).toBe(-32602);
     expect((err as ProtocolError).message).toContain('"CA 1"');
   });
 
@@ -121,6 +122,10 @@ describe("resource templates", () => {
       `legislation://version/${V2014}/section/%E0%A4%A`,
       "legislation://version/not-a-version/contents",
       `legislation://version/${V2014}/section/%3Cscript%3E`,
+      `legislation://version/${V2014}/section/a%2Fb`,
+      `legislation://version/${V2014}/schedule/%20`,
+      `legislation://version/${V2014}/schedule/%201`,
+      `legislation://version/%20${V2014}/contents`,
     ]) {
       const err = await c.readResource({ uri }).catch((e: unknown) => e);
       expect(err).toBeInstanceOf(ProtocolError);
@@ -135,7 +140,17 @@ describe("resource templates", () => {
       .readResource({ uri: `legislation://version/${V2014}/contents` })
       .catch((e: unknown) => e);
     expect(err).toBeInstanceOf(ProtocolError);
+    // A missing version is "resource not found" (-32602 with the URI), not an internal error.
+    expect((err as ProtocolError).code).toBe(-32602);
+    expect((err as ProtocolError).data).toEqual({ uri: `legislation://version/${V2014}/contents` });
     expect((err as ProtocolError).message).not.toContain("dummy-key");
+
+    const denied = await connect([status(401)]);
+    const unauthorised = await denied.client
+      .readResource({ uri: `legislation://version/${V2014}/contents` })
+      .catch((e: unknown) => e);
+    expect((unauthorised as ProtocolError).code).toBe(-32603);
+    expect((unauthorised as ProtocolError).message).toContain("401");
 
     const logged: string[] = [];
     const broken = await connect(
@@ -146,6 +161,7 @@ describe("resource templates", () => {
     const hidden = await broken.client
       .readResource({ uri: `legislation://version/${V2014}/contents` })
       .catch((e: unknown) => e);
+    expect((hidden as ProtocolError).code).toBe(-32603);
     expect((hidden as ProtocolError).message).toContain("An unexpected error occurred");
     expect((hidden as ProtocolError).message).not.toContain("no XML fixture");
     expect(logged).toEqual(["unexpected resource failure"]);
@@ -153,6 +169,19 @@ describe("resource templates", () => {
 });
 
 describe("resource formatting", () => {
+  it("rewords tool-only advice when a label appears more than once", async () => {
+    const id = "act_public_2099_3_en_2099-01-01";
+    // The reader keeps scanning past a repealed match, so a repealed then a current section 1.
+    const prov = (part: string) =>
+      `<part><label>${part}</label><heading>Part ${part}</heading><prov${part === "1" ? ' deletion-status="repealed"' : ""}><label>1</label><heading>Rule ${part}</heading><prov.body><subprov><label/><para><text>Text ${part}.</text></para></subprov></prov.body></prov></part>`;
+    const xml = `<act><cover><title>Twice Act 2099</title></cover><body>${prov("1")}${prov("2")}</body></act>`;
+    const { client: c } = await connect([record(id, "act_public_2099_3")], { [id]: xml });
+    const text = textOf(await c.readResource({ uri: `legislation://version/${id}/section/1` }));
+    expect(text).toContain("This label appears 2 times");
+    expect(text).toContain("use the get_provision_text tool with part");
+    expect(text).not.toContain("Pass part to choose another.");
+  });
+
   it("omits the permalink for agency-published records", async () => {
     const id = "secondary-legislation_agency-drafted_2026_~346217_en_2026-10-20";
     const work = "secondary-legislation_agency-drafted_2026_~346217";
@@ -230,9 +259,41 @@ describe("prompts", () => {
     expect(one).toContain("compare_versions for that provision, from_as_at 2024-04-01");
   });
 
+  it("names only tools and arguments that exist", async () => {
+    const { client: c } = await connect();
+    const { tools } = await c.listTools();
+    const names = new Set(tools.map((t) => t.name));
+    const args = new Set(tools.flatMap((t) => Object.keys(t.inputSchema.properties ?? {})));
+    const texts = [
+      promptText(
+        await c.getPrompt({
+          name: "find_provision",
+          arguments: { topic: "tax", legislation: "Income Tax Act 2007", as_at: "2020-04-01" },
+        }),
+      ),
+      promptText(
+        await c.getPrompt({
+          name: "what_changed",
+          arguments: { legislation: "GST Act", since: "2024-04-01", provision: "section 8" },
+        }),
+      ),
+      promptText(
+        await c.getPrompt({
+          name: "what_changed",
+          arguments: { legislation: "GST Act", since: "2024-04-01" },
+        }),
+      ),
+    ].join("\n");
+    // Every snake_case word is a tool name or a tool argument.
+    const words = [...texts.matchAll(/\b[a-z]+(?:_[a-z]+)+\b/gu)].map((m) => m[0]);
+    expect(words.length).toBeGreaterThan(5);
+    expect(words.filter((w) => !names.has(w) && !args.has(w))).toEqual([]);
+  });
+
   it("rejects bad arguments", async () => {
     const { client: c } = await connect();
     for (const args of [
+      { topic: "a\u2028b" },
       { topic: "" },
       { topic: "a\u0007b" },
       { topic: "x".repeat(201) },

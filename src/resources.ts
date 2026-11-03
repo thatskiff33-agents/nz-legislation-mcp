@@ -34,14 +34,24 @@ const MIME = "text/markdown";
  * unambiguous; a malformed encoding is rejected.)
  */
 function single(variables: Variables, name: string): string {
+  let value: string;
   try {
-    return decodeURIComponent(String(variables[name]));
+    value = decodeURIComponent(String(variables[name]));
   } catch {
     throw new ProtocolError(
       ProtocolErrorCode.InvalidParams,
       `Invalid resource URI: bad encoding in ${name}.`,
     );
   }
+  // One spelling per resource: no leading/trailing spaces (they would be trimmed to the same
+  // label, so "schedule/%201" and "schedule/1" would name the same text).
+  if (value !== value.trim()) {
+    throw new ProtocolError(
+      ProtocolErrorCode.InvalidParams,
+      `Invalid resource URI: ${name} must not start or end with a space.`,
+    );
+  }
+  return value;
 }
 
 /**
@@ -64,6 +74,9 @@ async function runTool<I extends z.ZodType, O extends z.ZodType>(
     return await tool.run(parsed.data, deps, signal);
   } catch (error) {
     if (error instanceof ToolInputError) throw new ResourceNotFoundError(uri.href, error.message);
+    if (error instanceof ApiError && error.kind === "not_found") {
+      throw new ResourceNotFoundError(uri.href, error.message);
+    }
     if (error instanceof ApiError)
       throw new ProtocolError(ProtocolErrorCode.InternalError, error.message);
     deps.logger.error("unexpected resource failure", { tool: tool.name, error });
@@ -72,6 +85,14 @@ async function runTool<I extends z.ZodType, O extends z.ZodType>(
       "An unexpected error occurred in this MCP server.",
     );
   }
+}
+
+/** Tool notes that mention tool-only parameters, reworded for a resource reader. */
+function forResource(note: string): string {
+  return note.replace(
+    "Pass part to choose another.",
+    "To read another, use the get_provision_text tool with part (resource URIs cannot choose).",
+  );
 }
 
 /** "Version <id> (<permalink>)." Agency-published records have no permalink. */
@@ -139,7 +160,7 @@ async function readProvision(
           `[Text continues: ${String(out.total_chars - out.next_offset)} more characters. Use the get_provision_text tool with offset ${String(out.next_offset)}.]`,
         ]),
     "",
-    ...out.notes.filter((note) => note !== TEXT_SOURCE_NOTE),
+    ...out.notes.filter((note) => note !== TEXT_SOURCE_NOTE).map(forResource),
     TEXT_SOURCE_NOTE,
   ]);
 }

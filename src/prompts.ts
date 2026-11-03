@@ -56,7 +56,7 @@ function findProvisionPrompt(args: z.output<typeof FindArgs>): GetPromptResult {
     "Use the nz-legislation tools:",
     `1. search_legislation to find the work_id${args.legislation === undefined ? " (search content if a title search finds nothing)" : ""}.`,
     `2. get_table_of_contents with that work_id${args.as_at === undefined ? "" : ` and as_at ${args.as_at}`} to find likely sections.`,
-    "3. get_provision_text to read the most relevant sections (read more than one if the first does not settle it, including definitions).",
+    `3. get_provision_text with the same work_id${args.as_at === undefined ? "" : ` and as_at ${args.as_at}`} (or the version_id from step 2) to read the most relevant sections. Read more than one if the first does not settle it, including definitions.`,
     "",
     ...CITATION_RULES,
   ]);
@@ -68,10 +68,12 @@ function whatChangedPrompt(args: z.output<typeof ChangedArgs>): GetPromptResult 
     "",
     "Use the nz-legislation tools:",
     "1. search_legislation to find the work_id.",
-    `2. list_versions to see the versions dated after ${args.since}, and the amending legislation where the results show it.`,
+    `2. list_versions to see the versions dated after ${args.since}.`,
     args.provision === undefined
       ? "3. Pick the provisions that matter (get_table_of_contents helps) and compare_versions each one, from_as_at the earlier date to today."
       : `3. compare_versions for that provision, from_as_at ${args.since} to today (get_table_of_contents gives the exact label).`,
+    "",
+    "4. To name the amending legislation, read get_provision_text with include_history true (the history notes list it). Do not name an amending Act the tool results do not show.",
     "",
     "Summarise each change in plain language with its version date. Versions show the law as at each date: check the amending legislation for when changes commence and what they apply to.",
     ...CITATION_RULES,
