@@ -64,7 +64,11 @@ async function readCached(
     includeHistory: args.include_history === true,
   });
   // Keep only what later pages need (not the outline of a successful read).
-  const rendered: Rendered = doc.found === null ? doc : { ...doc, outline: [] };
+  // Duplicate matches keep their entry (for the note) but not their text, which can be large.
+  const rendered: Rendered =
+    doc.found === null
+      ? doc
+      : { ...doc, outline: [], matches: doc.matches.map((m) => ({ entry: m.entry, text: "" })) };
   if (doc.found !== null) deps.textCache?.set(key, rendered, TEXT_CACHE_TTL_MS);
   return rendered;
 }

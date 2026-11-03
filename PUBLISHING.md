@@ -54,7 +54,13 @@ Do these in order. Each one is an outward-facing change, so a maintainer does th
      first version by hand from a clean checkout of the release tag
      (`pnpm install --frozen-lockfile && pnpm check && npm publish --access public`), then add
      the trusted publisher, and from then on disallow token publishing in the package settings.
-5. GitHub Container Registry: after the first image is pushed, set the package's visibility to
+5. Repository settings, Rules: add a tag ruleset for `v*` that only maintainers can bypass,
+   so release tags cannot be created or moved by anyone else.
+6. Only when steps 1 to 5 are done: Repository settings, Secrets and variables, Actions,
+   Variables: set `RELEASE_ENABLED` to `true`. Until then the release workflow does nothing.
+   This matters because GitHub creates a missing environment automatically, with no
+   protection, the first time a job uses it.
+7. GitHub Container Registry: after the first image is pushed, set the package's visibility to
    public and link it to this repository.
 
 ## MCP Registry (manual, after npm)

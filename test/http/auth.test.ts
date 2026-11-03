@@ -99,6 +99,38 @@ describe("createJwtVerifier", () => {
     expect(await rejection(v.verify.verifyAccessToken(token))).toContain("expired");
   });
 
+  it("reports the reason for a refusal (class and code only)", async () => {
+    const reasons: { error: string; code: string }[] = [];
+    const make = (keys: Parameters<typeof createJwtVerifier>[0]["keys"]) =>
+      createJwtVerifier({
+        issuer: ISSUER,
+        audience: RESOURCE,
+        resource,
+        keys,
+        onReject: (r) => reasons.push(r),
+      });
+    const k = await testKeys();
+    const token = await k.mint();
+    await rejection(make(k.keys).verifyAccessToken("not.a.jwt"));
+    await rejection(
+      make(() => {
+        throw new TypeError("network down");
+      }).verifyAccessToken(token),
+    );
+    await rejection(
+      make(() => {
+        // eslint-disable-next-line @typescript-eslint/only-throw-error -- a hostile key source
+        throw "odd";
+      }).verifyAccessToken(token),
+    );
+    expect(reasons).toEqual([
+      { error: "JWSInvalid", code: "ERR_JWS_INVALID" },
+      { error: "TypeError", code: "error" },
+      { error: "unknown", code: "unknown" },
+    ]);
+    expect(JSON.stringify(reasons)).not.toContain(token);
+  });
+
   it("rejects garbage and tokens signed with another key", async () => {
     const v = await verifier();
     const other = await testKeys();

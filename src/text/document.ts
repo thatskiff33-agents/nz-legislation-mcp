@@ -179,8 +179,12 @@ const LABELLED = new Set([
 // eslint-disable-next-line no-control-regex -- removing control characters is the purpose
 const CONTROL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/gu;
 
-/** Zero-width and byte-order-mark characters (U+FEFF appears inside some citations). */
-const INVISIBLE = /[\u200B-\u200D\u2060\uFEFF]/gu;
+/**
+ * Zero-width and byte-order-mark characters (U+FEFF appears inside some citations), and
+ * bidirectional embedding, override and isolate controls, which could make displayed text read
+ * differently from its characters.
+ */
+const INVISIBLE = /[\u200B-\u200D\u2060\uFEFF\u202A-\u202E\u2066-\u2069]/gu;
 
 /** Upper bound on rendered characters for a single provision or schedule. */
 const MAX_RENDERED_CHARS = 2_000_000;
@@ -197,7 +201,7 @@ class TextWriter {
   #onlyLabel = false;
 
   get truncated(): boolean {
-    return this.#chars > MAX_RENDERED_CHARS;
+    return this.#chars + this.#current.length > MAX_RENDERED_CHARS;
   }
 
   get onlyLabel(): boolean {
@@ -216,6 +220,9 @@ class TextWriter {
     if (this.#current === "") this.#current = clean.trimStart();
     else if (this.#current.endsWith(" ") && clean.startsWith(" ")) this.#current += clean.slice(1);
     else this.#current += clean;
+    // Enforce the cap inside a line too: one huge text node must not grow without bound.
+    const room = MAX_RENDERED_CHARS + 1 - this.#chars;
+    if (this.#current.length > room) this.#current = this.#current.slice(0, Math.max(0, room));
   }
 
   /** Writes a label prefix such as "(1) "; the next paragraph continues on this line. */

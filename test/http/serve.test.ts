@@ -99,6 +99,29 @@ describe("serveHttp", () => {
     expect(t.stderr.join("")).toContain("unhandled promise rejection");
   });
 
+  it("logs why a token was refused, without the token", async () => {
+    let handler: Parameters<HttpIo["listen"]>[0] | undefined;
+    const listen: HttpIo["listen"] = (h) => {
+      handler = h;
+      return Promise.resolve({ close: vi.fn() } as unknown as Server);
+    };
+    const t = io(remote, fakeFetch(metadata()).fn, listen);
+    expect(await serveHttp(t.value)).toBeUndefined();
+    const res = await handler?.(
+      new Request("https://mcp.example.com/mcp", {
+        method: "POST",
+        headers: { host: "mcp.example.com", authorization: "Bearer not.a.jwt" },
+        body: "{}",
+      }),
+      { remoteAddress: "192.0.2.1" },
+    );
+    expect(res?.status).toBe(401);
+    const logged = t.stderr.join("");
+    expect(logged).toContain('"message":"access token refused"');
+    expect(logged).toContain('"code":"ERR_JWS_INVALID"');
+    expect(logged).not.toContain("not.a.jwt");
+  });
+
   it("uses a configured JWKS URL instead of the discovered one", async () => {
     const t = io(
       { ...remote, LEGISLATION_NZ_OAUTH_JWKS_URL: "https://keys.example.com/jwks" },

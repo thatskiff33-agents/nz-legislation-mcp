@@ -181,6 +181,7 @@ describe("loadConfig", () => {
     [{ [ENV.apiKey]: "short" }, "8 to 512 characters"],
     [{ [ENV.apiKey]: "has space in key value" }, "spaces, quotes"],
     [{ [ENV.apiKey]: '"quotedkeyvalue"' }, "spaces, quotes"],
+    [{ [ENV.apiKey]: "back\\slashkeyvalue" }, "backslashes"],
     [{ [ENV.apiKey]: KEY, [ENV.apiKeyFile]: "/x" }, "Set only one"],
     [{ [ENV.apiKey]: KEY, [ENV.timeoutMs]: "10" }, `${ENV.timeoutMs} is invalid`],
     [{ [ENV.apiKey]: KEY, [ENV.cache]: "disk" }, `${ENV.cache} is invalid`],

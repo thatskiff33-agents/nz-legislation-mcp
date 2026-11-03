@@ -130,7 +130,8 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 24
-      - run: npm publish release/nz-legislation-mcp-*.tgz --access public --provenance
+      # --ignore-scripts: no lifecycle script runs while this job can mint an OIDC token.
+      - run: npm publish release/nz-legislation-mcp-*.tgz --access public --provenance --ignore-scripts
 
   # Claude Desktop bundle and checksums, attached to the GitHub release.
   bundle:
