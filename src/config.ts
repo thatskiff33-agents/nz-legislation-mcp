@@ -16,7 +16,7 @@ export const ENV = {
 } as const;
 
 const LOG_LEVELS = ["debug", "info", "warn", "error"] as const;
-type LogLevel = (typeof LOG_LEVELS)[number];
+export type LogLevel = (typeof LOG_LEVELS)[number];
 
 /** Response caching modes. `off` until PCO confirms caching is allowed (issue #3). */
 const CACHE_MODES = ["off", "memory"] as const;

@@ -222,6 +222,8 @@ export const VersionListParamsSchema = strictParams({
   per_page: perPageParam,
 });
 
+export type VersionListParams = z.infer<typeof VersionListParamsSchema>;
+
 // ---------------------------------------------------------------------------
 // API response schemas (tolerant reader)
 // ---------------------------------------------------------------------------

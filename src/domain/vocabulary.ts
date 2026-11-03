@@ -114,5 +114,8 @@ export const ID_LANGUAGE = "en";
 // Hosts
 // ---------------------------------------------------------------------------
 
+/** The API host. The only host that ever receives the API key. */
+export const API_ORIGIN = "https://api.legislation.govt.nz";
+
 /** Public website host serving HTML, PDF and XML formats. Never receives the API key. */
 export const WEBSITE_ORIGIN = "https://www.legislation.govt.nz";
