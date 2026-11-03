@@ -2,5 +2,5 @@
 # fingerprint (commit:file:rule:line) kept because the value remains in branch history.
 # New tests must use test/dummy-key.ts instead of inventing key-like strings.
 2ead990e061cd063aab6c0d6239035e3b7ad6de0:test/api/client.test.ts:generic-api-key:17
-e46dc44541737f82f55151f55134e4cebb583a2d:test/e2e/stdio.test.ts:generic-api-key:31
-e46dc44541737f82f55151f55134e4cebb583a2d:test/main.test.ts:generic-api-key:4
+2fcb3071a7a4fb6b749f6f967ed9fca6fa0f1471:test/e2e/stdio.test.ts:generic-api-key:31
+2fcb3071a7a4fb6b749f6f967ed9fca6fa0f1471:test/main.test.ts:generic-api-key:4
