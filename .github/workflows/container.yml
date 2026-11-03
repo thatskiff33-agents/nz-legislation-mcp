@@ -13,9 +13,8 @@ on:
         "tsconfig*.json",
         ".github/workflows/container.yml",
       ]
-  push:
-    tags: ["v*"]
-  # Called by release.yml (a tag created by release-please does not trigger "push" workflows).
+  # Publishing happens only when release.yml calls this workflow (after its gates). There is no
+  # tag-push trigger: anyone able to push a tag could otherwise publish a signed image.
   workflow_call:
     inputs:
       tag:

@@ -46,11 +46,45 @@ export async function writeResponse(response: Response, res: ServerResponse): Pr
     res.end();
     return;
   }
-  for await (const chunk of response.body as AsyncIterable<Uint8Array>) {
-    // Respect backpressure: wait for the socket to drain before writing more.
-    if (!res.write(chunk)) await once(res, "drain");
+  const reader = (response.body as ReadableStream<Uint8Array>).getReader();
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      // Respect backpressure: wait for the socket to drain before writing more. If the client
+      // goes away instead, stop: "drain" would never come and the response would hang for good.
+      if (!res.write(value) && !(await drainedOrClosed(res))) return;
+    }
+    res.end();
+  } finally {
+    // Releases the body (and the per-request server behind it) if we stopped early.
+    await reader.cancel().catch(() => undefined);
   }
-  res.end();
+}
+
+/**
+ * Waits for "drain"; resolves false if the response closes (client gone) first.
+ *
+ * @internal Exported for tests.
+ */
+export async function drainedOrClosed(res: ServerResponse): Promise<boolean> {
+  if (res.destroyed) return false;
+  const controller = new AbortController();
+  try {
+    return await Promise.race([
+      // The loser is aborted below; its rejection is expected and ignored.
+      once(res, "drain", { signal: controller.signal }).then(
+        () => true,
+        () => false,
+      ),
+      once(res, "close", { signal: controller.signal }).then(
+        () => false,
+        () => false,
+      ),
+    ]);
+  } finally {
+    controller.abort();
+  }
 }
 
 /** Methods the MCP endpoint and health/metadata routes can use; anything else gets 405. */

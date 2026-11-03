@@ -78,8 +78,10 @@ export function validateKey(raw: string, source: string): string | Error {
       `${source} must be ${String(MIN_KEY_LENGTH)} to ${String(MAX_KEY_LENGTH)} characters.`,
     );
   }
-  if (!KEY_CHARSET.test(key) || key.includes('"') || key.includes("'")) {
-    return new Error(`${source} contains spaces, quotes or non-printable characters.`);
+  // Quotes and backslashes are refused: they are never in real keys, and JSON escaping of a
+  // backslash would stop the log redactor from recognising the key.
+  if (!KEY_CHARSET.test(key) || /["'\\]/u.test(key)) {
+    return new Error(`${source} contains spaces, quotes, backslashes or non-printable characters.`);
   }
   return key;
 }

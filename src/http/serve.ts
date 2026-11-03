@@ -73,6 +73,9 @@ export async function serveHttp(io: HttpIo): Promise<number | undefined> {
         requireAtJwt: config.oauth.requireAtJwt,
         resource: config.resourceUrl,
         keys: remoteKeys(jwks),
+        onReject: (reason) => {
+          logger.warn("access token refused", reason);
+        },
       }),
       authorizationServer: metadata as unknown as OAuthMetadata,
     };

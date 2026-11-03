@@ -2,7 +2,7 @@ import type { Server } from "node:http";
 import { connect } from "node:net";
 import type { AddressInfo } from "node:net";
 import { afterEach, describe, expect, it } from "vitest";
-import { listen } from "../../src/http/node.js";
+import { drainedOrClosed, listen } from "../../src/http/node.js";
 import { silentLogger } from "../../src/logger.js";
 
 let server: Server | undefined;
@@ -71,6 +71,43 @@ describe("listen", () => {
     );
     const body = await (await fetch(`${base()}/big`)).arrayBuffer();
     expect(body.byteLength).toBe(size);
+  });
+
+  it("stops and releases the body when a stalled client disconnects", async () => {
+    let cancelled!: () => void;
+    const released = new Promise<void>((resolve) => {
+      cancelled = resolve;
+    });
+    server = await listen(
+      () =>
+        Promise.resolve(
+          new Response(
+            new ReadableStream({
+              // An endless body: only a cancel ends it.
+              pull(c) {
+                c.enqueue(new Uint8Array(1024 * 1024).fill(0x61));
+              },
+              cancel() {
+                cancelled();
+              },
+            }),
+          ),
+        ),
+      { host: "127.0.0.1", port: 0, logger: silentLogger },
+    );
+    // A raw client that sends a request, never reads, then goes away.
+    const { port } = server.address() as AddressInfo;
+    const socket = connect(port, "127.0.0.1");
+    socket.pause();
+    socket.write("GET /stall HTTP/1.1\r\nHost: 127.0.0.1\r\n\r\n");
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    socket.destroy();
+    await released; // would hang (test timeout) if the writer waited for "drain" for ever
+  });
+
+  it("does not wait for drain on a response that is already closed", async () => {
+    const closed = { destroyed: true } as unknown as Parameters<typeof drainedOrClosed>[0];
+    expect(await drainedOrClosed(closed)).toBe(false);
   });
 
   it("handles GET with no body and empty responses", async () => {

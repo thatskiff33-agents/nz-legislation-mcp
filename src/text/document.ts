@@ -201,7 +201,7 @@ class TextWriter {
   #onlyLabel = false;
 
   get truncated(): boolean {
-    return this.#chars > MAX_RENDERED_CHARS;
+    return this.#chars + this.#current.length > MAX_RENDERED_CHARS;
   }
 
   get onlyLabel(): boolean {
@@ -220,6 +220,9 @@ class TextWriter {
     if (this.#current === "") this.#current = clean.trimStart();
     else if (this.#current.endsWith(" ") && clean.startsWith(" ")) this.#current += clean.slice(1);
     else this.#current += clean;
+    // Enforce the cap inside a line too: one huge text node must not grow without bound.
+    const room = MAX_RENDERED_CHARS + 1 - this.#chars;
+    if (this.#current.length > room) this.#current = this.#current.slice(0, Math.max(0, room));
   }
 
   /** Writes a label prefix such as "(1) "; the next paragraph continues on this line. */

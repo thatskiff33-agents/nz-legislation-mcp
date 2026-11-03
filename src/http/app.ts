@@ -108,6 +108,62 @@ function clientAddress(request: Request, socketAddress: string, trustProxy: bool
   return last === undefined || last === "" ? socketAddress : last;
 }
 
+/** Headers a reverse proxy, tunnel or CDN adds; a no-auth server must never be behind one. */
+const PROXY_HEADERS = [
+  "forwarded",
+  "x-forwarded-for",
+  "x-forwarded-host",
+  "x-forwarded-proto",
+  "x-real-ip",
+  "cf-connecting-ip",
+  "true-client-ip",
+  "via",
+];
+
+/** True for IPv4 127.0.0.0/8, IPv6 ::1 and IPv4-mapped loopback addresses. */
+function isLoopbackAddress(address: string): boolean {
+  const v4 = address.startsWith("::ffff:") ? address.slice("::ffff:".length) : address;
+  return address === "::1" || /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/u.test(v4);
+}
+
+/**
+ * Without OAuth, only direct connections from this machine are served. A proxy or tunnel that
+ * rewrites Host to a loopback name would otherwise pass the Host check and expose the key holder's
+ * quota to anyone, so proxy headers and non-loopback peers are refused.
+ */
+function unauthenticatedRejection(request: Request, socketAddress: string): Response | undefined {
+  if (!isLoopbackAddress(socketAddress) || PROXY_HEADERS.some((h) => request.headers.has(h))) {
+    return json(403, {
+      error: "forbidden",
+      message:
+        "This server has no authentication, so it only accepts direct connections from this computer. To serve it through a proxy or tunnel, configure OAuth (see docs/self-hosting.md).",
+    });
+  }
+  return undefined;
+}
+
+/**
+ * The key for per-IP limits: IPv4 as is, IPv6 by its /64 prefix (one host usually controls a
+ * whole /64, so per-address buckets would be trivial to spread across).
+ */
+function ipKey(address: string): string {
+  if (!address.includes(":") || address.startsWith("::ffff:")) return address;
+  const [head = "", tail = ""] = address.split("::");
+  const left = head === "" ? [] : head.split(":");
+  const right = address.includes("::") ? (tail === "" ? [] : tail.split(":")) : [];
+  const groups = address.includes("::")
+    ? [
+        ...left,
+        ...Array.from({ length: Math.max(0, 8 - left.length - right.length) }, () => "0"),
+        ...right,
+      ]
+    : left;
+  return `${groups
+    .slice(0, 4)
+    .map((g) => g.toLowerCase().replace(/^0+(?=.)/u, ""))
+    .join(":")}::/64`;
+}
+
 /** Reads a request body as text, or returns null if it exceeds MAX_BODY_BYTES. */
 async function readBody(request: Request): Promise<string | null> {
   if (Number(request.headers.get("content-length")) > MAX_BODY_BYTES) return null;
@@ -151,8 +207,16 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
   });
   /** Per-user limit (by token subject) protects the operator's API quota. */
   const limiter = new RateLimiter(config.rateLimitPerMinute, options.now);
-  /** Per-IP limit for public routes and failed authentication (not for valid tokens). */
+  /** Per-IP limit for public routes and failed or refused authentication (not valid tokens). */
   const ipLimiter = new RateLimiter(config.rateLimitPerMinute * PRE_AUTH_MULTIPLIER, options.now);
+  /**
+   * OAuth discovery has its own per-IP bucket, so junk sent from a shared client IP (for example
+   * a hosted AI service) cannot stop the owner's client from discovering how to sign in again.
+   */
+  const metadataLimiter = new RateLimiter(
+    config.rateLimitPerMinute * PRE_AUTH_MULTIPLIER,
+    options.now,
+  );
   const allowedSubjects = new Set(config.oauth?.allowedSubjects ?? []);
   const metadataUrl = getOAuthProtectedResourceMetadataUrl(config.resourceUrl);
   const auth = options.auth;
@@ -181,7 +245,11 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
     // Per-IP limiting covers public routes and failed authentication, but never a valid
     // key-holder token: behind a proxy every client shares one IP, and unauthenticated junk
     // must not be able to lock the owner out.
-    if (path !== MCP_PATH && !ipLimiter.take(remoteAddress)) return rateLimited();
+    const ip = ipKey(remoteAddress);
+    const isMetadata = path.startsWith("/.well-known/");
+    if (path !== MCP_PATH && !(isMetadata ? metadataLimiter : ipLimiter).take(ip)) {
+      return rateLimited();
+    }
     const hostRejected = hostHeaderValidationResponse(request, allowedHosts);
     if (hostRejected !== undefined) return hostRejected;
     const originRejected = originValidationResponse(request, allowedOrigins);
@@ -199,10 +267,11 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
     let authInfo: AuthInfo | undefined;
     if (gate !== undefined) {
       const result = await gate(request);
-      if (result instanceof Response) return ipLimiter.take(remoteAddress) ? result : rateLimited();
+      if (result instanceof Response) return ipLimiter.take(ip) ? result : rateLimited();
       authInfo = result;
       // Valid token, but only the API key holder may use this server (PCO terms clause 6).
       if (!allowedSubjects.has(subjectOf(authInfo))) {
+        if (!ipLimiter.take(ip)) return rateLimited();
         return json(403, {
           error: "forbidden",
           message: "This account is not allowed to use this server.",
@@ -235,10 +304,13 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
     async fetch(request: Request, meta = { remoteAddress: "unknown" }): Promise<Response> {
       let response: Response;
       try {
-        response = await route(
-          request,
-          clientAddress(request, meta.remoteAddress, config.trustProxy),
-        );
+        const refused =
+          config.oauth === undefined
+            ? unauthenticatedRejection(request, meta.remoteAddress)
+            : undefined;
+        response =
+          refused ??
+          (await route(request, clientAddress(request, meta.remoteAddress, config.trustProxy)));
       } catch (error) {
         logger.error("unhandled http error", { error });
         response = json(500, { error: "internal_error" });

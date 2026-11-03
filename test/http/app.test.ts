@@ -22,9 +22,10 @@ afterEach(async () => {
   apps = [];
 });
 
-async function oauthApp(rateLimit = "60") {
+async function oauthApp(rateLimit = "60", extra: Record<string, string> = {}) {
   const k = await testKeys();
   const config = loadHttpConfig({
+    ...extra,
     LEGISLATION_NZ_HTTP_HOST: "0.0.0.0",
     LEGISLATION_NZ_PUBLIC_URL: RESOURCE,
     LEGISLATION_NZ_OAUTH_ISSUER: ISSUER,
@@ -49,6 +50,9 @@ async function oauthApp(rateLimit = "60") {
   return { app, k };
 }
 
+/** Direct connection from this machine. */
+const LOCAL = { remoteAddress: "127.0.0.1" };
+
 const request = (
   path: string,
   init: Omit<RequestInit, "headers"> & { headers?: Record<string, string> } = {},
@@ -69,7 +73,7 @@ function viaApp(
     const original = new Request(input, init);
     const headers = new Headers(original.headers);
     headers.set("host", host);
-    return app.fetch(new Request(original, { headers }));
+    return app.fetch(new Request(original, { headers }), LOCAL);
   };
 }
 
@@ -142,6 +146,44 @@ describe("HTTP app with OAuth", () => {
     expect(res2.status).toBe(403);
   });
 
+  it("counts refused subjects against the per-IP limit", async () => {
+    const { app, k } = await oauthApp("1"); // per-IP: 5 a minute
+    const other = await k.mint({ sub: "intruder" });
+    const post = () =>
+      app.fetch(
+        request("/mcp", {
+          method: "POST",
+          body: "{}",
+          headers: { authorization: `Bearer ${other}`, "content-type": "application/json" },
+        }),
+        { remoteAddress: "192.0.2.50" },
+      );
+    for (let i = 0; i < 5; i += 1) expect((await post()).status).toBe(403);
+    expect((await post()).status).toBe(429);
+  });
+
+  it("keeps OAuth discovery on its own per-IP bucket", async () => {
+    const { app } = await oauthApp("1");
+    const from = { remoteAddress: "192.0.2.60" };
+    for (let i = 0; i < 5; i += 1) await app.fetch(request("/healthz"), from);
+    expect((await app.fetch(request("/healthz"), from)).status).toBe(429);
+    const discovery = await app.fetch(request("/.well-known/oauth-protected-resource/mcp"), from);
+    expect(discovery.status).toBe(200);
+  });
+
+  it("groups IPv6 clients by /64 for per-IP limits", async () => {
+    const { app } = await oauthApp("1");
+    const health = (remoteAddress: string) => app.fetch(request("/healthz"), { remoteAddress });
+    for (let i = 0; i < 5; i += 1) await health(`2001:db8::${String(i + 1)}`);
+    // Same /64, written in full or compressed differently: limited.
+    expect((await health("2001:0db8:0000:0000:1:2:3:4")).status).toBe(429);
+    expect((await health("2001:db8:0:0::ffff")).status).toBe(429);
+    // Another /64, and an address starting with "::": separate buckets.
+    expect((await health("2001:db8:0:1::1")).status).toBe(200);
+    expect((await health("::2")).status).toBe(200);
+    expect((await health("2001:db8:0:2::")).status).toBe(200);
+  });
+
   it("serves MCP to the key holder through the official client", async () => {
     const { app, k } = await oauthApp();
     const client = await connect(app, await k.mint());
@@ -192,6 +234,7 @@ describe("HTTP app with OAuth", () => {
           headers: { host: "localhost:8080", "content-type": "application/json" },
           body: "{}",
         }),
+        LOCAL,
       );
     expect((await post()).status).not.toBe(429);
     expect((await post()).status).not.toBe(429);
@@ -327,36 +370,21 @@ describe("HTTP app abuse controls", () => {
 
 describe("trusted proxy", () => {
   it("uses the last X-Forwarded-For entry only when the proxy is trusted", async () => {
-    const make = (trust: string) => {
-      const app = createHttpApp({
-        config: loadHttpConfig({
-          LEGISLATION_NZ_RATE_LIMIT_PER_MINUTE: "1",
-          LEGISLATION_NZ_TRUST_PROXY: trust,
-        }),
-        deps: deps([]).deps,
-        logger: silentLogger,
-      });
-      apps.push(app);
-      return app;
-    };
+    const make = async (trust: string) =>
+      (await oauthApp("1", { LEGISLATION_NZ_TRUST_PROXY: trust })).app;
     const health = (app: HttpApp, xff?: string) =>
       app.fetch(
-        new Request("http://localhost:8080/healthz", {
-          headers: {
-            host: "localhost:8080",
-            ...(xff === undefined ? {} : { "x-forwarded-for": xff }),
-          },
-        }),
+        request("/healthz", { headers: xff === undefined ? {} : { "x-forwarded-for": xff } }),
         { remoteAddress: "10.0.0.2" }, // the proxy
       );
     // Trusted: each real client (last entry) gets its own allowance; spoofed earlier entries are ignored.
-    const trusted = make("true");
+    const trusted = await make("true");
     for (let i = 0; i < 5; i += 1) await health(trusted, `spoofed-${String(i)}, 203.0.113.5`);
     expect((await health(trusted, "spoofed-x, 203.0.113.5")).status).toBe(429);
     expect((await health(trusted, "203.0.113.6")).status).toBe(200);
     expect((await health(trusted, " ")).status).toBe(200); // blank header: falls back to the socket
     // Not trusted: the header is ignored and the socket address is used.
-    const untrusted = make("false");
+    const untrusted = await make("false");
     for (let i = 0; i < 5; i += 1) await health(untrusted, `203.0.113.${String(i)}`);
     expect((await health(untrusted, "198.51.100.1")).status).toBe(429);
   });
@@ -382,6 +410,7 @@ describe("HTTP app on loopback without OAuth", () => {
     apps.push(app);
     const res = await app.fetch(
       new Request("http://localhost:8080/healthz", { headers: { host: "localhost:8080" } }),
+      LOCAL,
     );
     expect(res.headers.get("strict-transport-security")).toBeNull();
     const transport = new StreamableHTTPClientTransport(new URL("http://localhost:8080/mcp"), {
@@ -397,9 +426,38 @@ describe("HTTP app on loopback without OAuth", () => {
           new Request("http://localhost:8080/.well-known/oauth-protected-resource/mcp", {
             headers: { host: "localhost:8080" },
           }),
+          LOCAL,
         )
       ).status,
     ).toBe(404);
+  });
+
+  it("refuses proxied, tunnelled or remote connections", async () => {
+    const app = createHttpApp({
+      config: loadHttpConfig({}),
+      deps: deps([]).deps,
+      logger: silentLogger,
+    });
+    apps.push(app);
+    const health = (headers: Record<string, string>, remoteAddress: string) =>
+      app.fetch(
+        new Request("http://localhost:8080/healthz", {
+          headers: { host: "127.0.0.1:8080", ...headers },
+        }),
+        { remoteAddress },
+      );
+    // A proxy or tunnel that rewrites Host to a loopback name still adds its own headers.
+    for (const header of ["x-forwarded-for", "forwarded", "via", "cf-connecting-ip", "x-real-ip"]) {
+      const res = await health({ [header]: "203.0.113.9" }, "127.0.0.1");
+      expect(res.status).toBe(403);
+      expect(((await res.json()) as { message: string }).message).toContain("configure OAuth");
+    }
+    // Another machine (or an unknown peer) is refused; loopback forms are accepted.
+    expect((await health({}, "192.0.2.10")).status).toBe(403);
+    expect((await health({}, "unknown")).status).toBe(403);
+    for (const peer of ["127.0.0.1", "127.8.9.10", "::1", "::ffff:127.0.0.1"]) {
+      expect((await health({}, peer)).status).toBe(200);
+    }
   });
 
   it("refuses to build with OAuth configured but no verifier", () => {
@@ -431,7 +489,7 @@ describe("HTTP app on loopback without OAuth", () => {
         throw new Error("boom");
       },
     });
-    const res = await app.fetch(broken);
+    const res = await app.fetch(broken, LOCAL);
     expect(res.status).toBe(500);
     expect(await res.json()).toEqual({ error: "internal_error" });
     expect(lines).toContain("unhandled http error");
