@@ -1,0 +1,235 @@
+/**
+ * The HTTP application as a web-standard fetch handler (Request -> Response).
+ *
+ * Request pipeline:
+ *   security headers (all responses)
+ *   -> Host header check (DNS-rebinding defence)
+ *   -> Origin check (browser requests only from allowed origins)
+ *   -> routes: GET /healthz, RFC 9728 protected-resource metadata, /mcp
+ *   -> /mcp: bearer token (OAuth) -> per-subject rate limit -> SDK stateless MCP handler.
+ *
+ * The MCP endpoint is stateless (protocol 2026-07-28, with legacy fallback handled by the SDK),
+ * so no session state is kept between requests.
+ */
+import {
+  createMcpHandler,
+  getOAuthProtectedResourceMetadataUrl,
+  hostHeaderValidationResponse,
+  localhostAllowedHostnames,
+  localhostAllowedOrigins,
+  oauthMetadataResponse,
+  originValidationResponse,
+  requireBearerAuth,
+  type AuthInfo,
+  type McpHttpHandler,
+  type OAuthMetadata,
+  type OAuthTokenVerifier,
+} from "@modelcontextprotocol/server";
+import type { Logger } from "../logger.js";
+import { createServer } from "../server.js";
+import type { ToolDeps } from "../tools/shared.js";
+import { MCP_PATH, type HttpConfig } from "./config.js";
+import { RateLimiter } from "./rate-limit.js";
+
+export interface HttpAppOptions {
+  readonly config: HttpConfig;
+  readonly deps: ToolDeps;
+  readonly logger: Logger;
+  /** Required when config.oauth is set. */
+  readonly auth?: {
+    readonly verifier: OAuthTokenVerifier;
+    readonly authorizationServer: OAuthMetadata;
+  };
+  readonly now?: () => number;
+}
+
+export interface HttpApp {
+  readonly fetch: (
+    request: Request,
+    meta?: { readonly remoteAddress: string },
+  ) => Promise<Response>;
+  readonly close: () => Promise<void>;
+}
+
+const SECURITY_HEADERS: Readonly<Record<string, string>> = {
+  "X-Content-Type-Options": "nosniff",
+  "Cache-Control": "no-store",
+  "Referrer-Policy": "no-referrer",
+  "X-Frame-Options": "DENY",
+  "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",
+  "Cross-Origin-Resource-Policy": "same-origin",
+};
+
+function withSecurityHeaders(response: Response, https: boolean): Response {
+  const headers = new Headers(response.headers);
+  for (const [name, value] of Object.entries(SECURITY_HEADERS)) headers.set(name, value);
+  if (https) headers.set("Strict-Transport-Security", "max-age=63072000; includeSubDomains");
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers,
+  });
+}
+
+const json = (status: number, body: unknown, headers: Record<string, string> = {}): Response =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json", ...headers },
+  });
+
+/** The pre-authentication per-IP limit is this multiple of the per-user limit. */
+const PRE_AUTH_MULTIPLIER = 5;
+/** Largest accepted request body (matches the SDK's own default). */
+const MAX_BODY_BYTES = 4 * 1024 * 1024;
+
+const rateLimited = (): Response =>
+  json(
+    429,
+    { error: "rate_limited", message: "Too many requests. Wait a minute and try again." },
+    { "Retry-After": "60" },
+  );
+
+/** The verified token subject ("local" without OAuth, "" if a verifier supplied none). */
+function subjectOf(authInfo: AuthInfo | undefined): string {
+  if (authInfo === undefined) return "local";
+  const subject = authInfo.extra?.["subject"];
+  return typeof subject === "string" ? subject : "";
+}
+
+/** Reads a request body as text, or returns null if it exceeds MAX_BODY_BYTES. */
+async function readBody(request: Request): Promise<string | null> {
+  if (Number(request.headers.get("content-length")) > MAX_BODY_BYTES) return null;
+  if (request.body === null) return "";
+  const reader = (request.body as ReadableStream<Uint8Array>).getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > MAX_BODY_BYTES) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+  return new TextDecoder().decode(Buffer.concat(chunks));
+}
+
+export function createHttpApp(options: HttpAppOptions): HttpApp {
+  const { config, deps, logger } = options;
+  if (config.oauth !== undefined && options.auth === undefined) {
+    throw new TypeError("OAuth is configured but no token verifier was supplied.");
+  }
+  const https = config.resourceUrl.protocol === "https:";
+  // The public host is trusted only with OAuth; a no-auth server answers loopback names only,
+  // so a tunnel or proxy forwarding a public Host header cannot reach it.
+  const allowedHosts = [
+    ...(config.oauth === undefined ? [] : [config.resourceUrl.hostname]),
+    ...(config.loopback ? localhostAllowedHostnames() : []),
+  ];
+  const allowedOrigins = [
+    ...config.allowedOrigins,
+    ...(config.loopback ? localhostAllowedOrigins() : []),
+  ];
+  const mcp: McpHttpHandler = createMcpHandler(() => createServer(deps), {
+    onerror: (error) => {
+      logger.warn("mcp http handler error", { error });
+    },
+  });
+  /** Per-user limit (by token subject) protects the operator's API quota. */
+  const limiter = new RateLimiter(config.rateLimitPerMinute, options.now);
+  /** Per-IP limit for public routes and failed authentication (not for valid tokens). */
+  const ipLimiter = new RateLimiter(config.rateLimitPerMinute * PRE_AUTH_MULTIPLIER, options.now);
+  const allowedSubjects = new Set(config.oauth?.allowedSubjects ?? []);
+  const metadataUrl = getOAuthProtectedResourceMetadataUrl(config.resourceUrl);
+  const auth = options.auth;
+  const gate =
+    auth === undefined || config.oauth === undefined
+      ? undefined
+      : requireBearerAuth({
+          verifier: auth.verifier,
+          requiredScopes: [...config.oauth.requiredScopes],
+          resourceMetadataUrl: metadataUrl,
+          expectedResource: config.resourceUrl,
+        });
+  const metadataOptions =
+    auth === undefined || config.oauth === undefined
+      ? undefined
+      : {
+          oauthMetadata: auth.authorizationServer,
+          resourceServerUrl: config.resourceUrl,
+          ...(config.oauth.requiredScopes.length > 0
+            ? { scopesSupported: [...config.oauth.requiredScopes] }
+            : {}),
+        };
+
+  async function route(request: Request, remoteAddress: string): Promise<Response> {
+    const path = new URL(request.url).pathname;
+    // Per-IP limiting covers public routes and failed authentication, but never a valid
+    // key-holder token: behind a proxy every client shares one IP, and unauthenticated junk
+    // must not be able to lock the owner out.
+    if (path !== MCP_PATH && !ipLimiter.take(remoteAddress)) return rateLimited();
+    const hostRejected = hostHeaderValidationResponse(request, allowedHosts);
+    if (hostRejected !== undefined) return hostRejected;
+    const originRejected = originValidationResponse(request, allowedOrigins);
+    if (originRejected !== undefined) return originRejected;
+
+    if (path === "/healthz" && request.method === "GET") return json(200, { status: "ok" });
+
+    if (metadataOptions !== undefined) {
+      const metadata = oauthMetadataResponse(request, metadataOptions);
+      if (metadata !== undefined) return metadata;
+    }
+
+    if (path !== MCP_PATH) return json(404, { error: "not_found" });
+
+    let authInfo: AuthInfo | undefined;
+    if (gate !== undefined) {
+      const result = await gate(request);
+      if (result instanceof Response) return ipLimiter.take(remoteAddress) ? result : rateLimited();
+      authInfo = result;
+      // Valid token, but only the API key holder may use this server (PCO terms clause 6).
+      if (!allowedSubjects.has(subjectOf(authInfo))) {
+        return json(403, {
+          error: "forbidden",
+          message: "This account is not allowed to use this server.",
+        });
+      }
+    }
+
+    // Rate-limit per user (token subject), not per OAuth client, so new client
+    // registrations cannot reset the limit.
+    if (!limiter.take(subjectOf(authInfo))) return rateLimited();
+
+    let forwarded = request;
+    if (request.method === "POST") {
+      const body = await readBody(request);
+      if (body === null) return json(413, { error: "payload_too_large" });
+      // JSON-RPC batches (allowed by older protocol revisions) would let one request carry
+      // many tool calls past the rate limit; MCP no longer uses them, so refuse them.
+      if (body.trimStart().startsWith("[")) {
+        return json(400, {
+          error: "batch_not_supported",
+          message: "Send one JSON-RPC message per request.",
+        });
+      }
+      forwarded = new Request(request, { body });
+    }
+    return mcp.fetch(forwarded, authInfo === undefined ? {} : { authInfo });
+  }
+
+  return {
+    async fetch(request: Request, meta = { remoteAddress: "unknown" }): Promise<Response> {
+      let response: Response;
+      try {
+        response = await route(request, meta.remoteAddress);
+      } catch (error) {
+        logger.error("unhandled http error", { error });
+        response = json(500, { error: "internal_error" });
+      }
+      return withSecurityHeaders(response, https);
+    },
+    close: () => mcp.close(),
+  };
+}

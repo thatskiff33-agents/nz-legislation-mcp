@@ -1,6 +1,6 @@
 import { DUMMY_KEY } from "./dummy-key.js";
 import { describe, expect, it, vi } from "vitest";
-import { defaultIo, main, type MainIo } from "../src/main.js";
+import { defaultIo, main, runCli, type MainIo } from "../src/main.js";
 
 const KEY = DUMMY_KEY;
 
@@ -14,6 +14,7 @@ function io(env: Record<string, string>) {
   const value: MainIo = {
     env,
     stderr: (t) => stderr.push(t),
+    stdout: (t) => stderr.push(t),
     serve: ((factory: () => unknown, options: { onerror?: (e: Error) => void }) => {
       factories.push(factory);
       serveOptions.push(options);
@@ -93,5 +94,40 @@ describe("main", () => {
       },
     };
     expect(() => main(boom)).toThrow("stderr closed");
+  });
+});
+
+describe("runCli", () => {
+  it("prints the version and help", async () => {
+    const t = io({});
+    expect(await runCli(["--version"], t.value)).toBe(0);
+    expect(await runCli(["-h"], t.value)).toBe(0);
+    expect(t.stderr.join("")).toContain("Usage: nz-legislation-mcp [stdio|http]");
+  });
+
+  it("rejects unknown commands and extra arguments with usage on stderr", async () => {
+    const t = io({});
+    expect(await runCli(["serve"], t.value)).toBe(2);
+    expect(await runCli(["http", "extra"], t.value)).toBe(2);
+  });
+
+  it("runs stdio by default and http on request", async () => {
+    const t = io({ LEGISLATION_NZ_API_KEY: KEY });
+    expect(await runCli([], t.value)).toBeUndefined();
+    expect(await runCli(["stdio"], t.value)).toBeUndefined();
+    const http = vi.fn(() => Promise.resolve(7));
+    expect(await runCli(["http"], t.value, http)).toBe(7);
+  });
+
+  it("loads the HTTP stack lazily by default", async () => {
+    const t = io({ LEGISLATION_NZ_API_KEY: KEY, LEGISLATION_NZ_HTTP_HOST: "0.0.0.0" });
+    expect(await runCli(["http"], t.value)).toBe(1); // config error: remote needs OAuth
+    expect(t.stderr.join("")).toContain("Remote HTTP mode requires OAuth");
+  });
+
+  it("writes version output to stdout by default", async () => {
+    const spy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    expect(await runCli(["--version"])).toBe(0);
+    expect(spy).toHaveBeenCalled();
   });
 });

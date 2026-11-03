@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Command-line entry (the `nz-legislation-mcp` binary). All logic lives in main.ts.
-import { main } from "./main.js";
+import { runCli } from "./main.js";
 
-const code = main();
+const code = await runCli(process.argv.slice(2));
 if (code !== undefined) process.exitCode = code;
