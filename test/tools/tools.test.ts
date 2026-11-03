@@ -384,6 +384,55 @@ describe("get_api_quota", () => {
   });
 });
 
+describe("text helpers", () => {
+  it("describes targets for messages", async () => {
+    const { describeTarget, suggestLabels } = await import("../../src/tools/text-common.js");
+    expect(describeTarget("1", "2")).toBe("clause 1 of schedule 2");
+    expect(describeTarget("1", "")).toBe("clause 1 of schedule (unnumbered)");
+    expect(describeTarget("CA 1", undefined)).toBe("section CA 1");
+    expect(describeTarget(undefined, "")).toBe("schedule (unnumbered)");
+    expect(describeTarget(undefined, undefined)).toBe("schedule (unnumbered)");
+    expect(describeTarget(undefined, "3")).toBe("schedule 3");
+    const outline = ["1", "2", "6", "6A"].map((label) => ({
+      kind: "section" as const,
+      label,
+      heading: "",
+      id: null,
+      repealed: false,
+      depth: 0,
+      schedule: null,
+      within: [],
+    }));
+    expect(suggestLabels(outline, "zz")).toEqual(["1", "2", "6", "6A"]);
+    const { duplicatesNote } = await import("../../src/tools/text-common.js");
+    const [a, b] = outline;
+    if (a === undefined || b === undefined) throw new Error("fixture");
+    expect(duplicatesNote([{ entry: a, text: "" }], a)).toBeNull();
+    expect(
+      duplicatesNote(
+        [
+          { entry: a, text: "" },
+          { entry: b, text: "" },
+        ],
+        a,
+      ),
+    ).toBe(
+      "This label appears 2 times (at the top level; at the top level). Used the one at the top level. Pass part to choose another.",
+    );
+    const schedule = { ...a, kind: "schedule" as const };
+    expect(
+      duplicatesNote(
+        [
+          { entry: schedule, text: "" },
+          { entry: b, text: "" },
+        ],
+        schedule,
+      ),
+    ).toContain("Duplicated schedules are usually a repealed and a current version.");
+    expect(suggestLabels(outline, "  ")).toEqual(["1", "2", "6", "6A"]);
+  });
+});
+
 describe("shared helpers", () => {
   it("keeps the first link per known format and ignores unknown types", () => {
     expect(

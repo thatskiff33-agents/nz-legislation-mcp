@@ -51,6 +51,9 @@ describe("server", () => {
       "search_legislation",
       "get_legislation",
       "list_versions",
+      "get_table_of_contents",
+      "get_provision_text",
+      "compare_versions",
       "get_api_quota",
     ]);
     for (const tool of tools) {
