@@ -7,6 +7,7 @@ import { closeSync, constants, fstatSync, openSync, readSync } from "node:fs";
 import { z } from "zod";
 import { Secret } from "./secret.js";
 
+/** @internal Exported for tests. */
 export const ENV = {
   apiKey: "LEGISLATION_NZ_API_KEY",
   apiKeyFile: "LEGISLATION_NZ_API_KEY_FILE",

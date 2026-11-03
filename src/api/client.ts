@@ -74,7 +74,11 @@ export interface ClientOptions {
   readonly random?: () => number;
 }
 
-/** Cache lifetimes (only used when the optional cache is enabled). */
+/**
+ * Cache lifetimes (only used when the optional cache is enabled).
+ *
+ * @internal Exported for tests.
+ */
 export const CACHE_TTL_MS = {
   search: 10 * 60 * 1000,
   versions: 60 * 60 * 1000,
@@ -436,6 +440,8 @@ export class LegislationClient {
  * Builds an API URL and refuses anything that would leave API_ORIGIN/v0/ (for example a
  * protocol-relative "//host" path or a "/v0/../x" traversal). Defence in depth: callers
  * already pass validated, encoded paths.
+ *
+ * @internal Exported for tests.
  */
 export function buildApiUrl(path: string, query: URLSearchParams): URL {
   if (/\.\.|%2e|\\/i.test(path)) {
