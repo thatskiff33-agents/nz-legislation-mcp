@@ -11,6 +11,13 @@ updates:
     groups:
       dev-dependencies:
         dependency-type: development
+    ignore:
+      # typescript-eslint does not support TypeScript 7 yet; move with it deliberately.
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
+      # Types must match the oldest supported Node (package.json engines: Node 22).
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
     commit-message:
       prefix: "build(deps)"
   - package-ecosystem: github-actions
@@ -32,6 +39,11 @@ updates:
       timezone: Pacific/Auckland
     cooldown:
       default-days: 14
+    ignore:
+      # Node majors (including odd, non-LTS releases) are moved deliberately with the distroless
+      # runtime image; Dependabot keeps patch and minor updates and digests current.
+      - dependency-name: node
+        update-types: ["version-update:semver-major"]
     commit-message:
       prefix: "build(docker)"
   - package-ecosystem: docker-compose
