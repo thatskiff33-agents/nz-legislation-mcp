@@ -1,0 +1,976 @@
+{
+  "components": {},
+  "info": {
+    "description": "## Introduction\n\nThis API provides progammatic access to New Zealand legislation. It is currently \"Version Zero\" of an API, which has been developed to provide an opportunity for developers to test and provide feedback which will inform future enhancement and refinement.\n\nThe functionality of the API is intended to match that of the site search on the Legislation Website, and is strongly influenced by the [FRBR model](https://en.wikipedia.org/wiki/Functional_Requirements_for_Bibliographic_Records).\n\n## Conceptual model\n\nThis API is based on a three-tier conceptual model of **works**, **versions**, and **formats**.\n\nA **work** is the highest level, and represents the concept of an enduring standalone piece of legislation, that may have multiple versions. Each work has a `work_id`. Examples of works are:\n\n- New Zealand Bill of Rights Act 1990, `act_public_1990_109`\n- Natural and Built Environment Bill, `bill_government_2022_186`\n- Microwave Ovens Regulations 1982, `secondary-legislation_pco-drafted_1982_221`\n\nOne level below a work is a **version**. Each work can have one or more versions. Each consolidation of an Act is a new version, as is each stage of a Bill. A version is equivilant to an expression in the FRBR model. Each version has a `version_id`. Examples of versions are:\n\n- The version of the New Zealand Bill of Rights Act 1990 as at 30 August 2022, `act_public_1990_109_en_2022-08-30`\n- The second reading version of the Natural and Built Environment Bill as reported from the Environment Committee on 27 June 2023, `bill_government_2022_186_en_2023-06-27`\n- The version of the Microwave Ovens Regulations 1982 as at 1 July 2023, `secondary-legislation_pco-drafted_1982_221_en_2013-07-01`\n\nOne level below a version is a **format**. Each version of each work will have multiple formats, such as the source XML file, a PDF file, or an HTML page. Some versions will have formats that other versions don't have, such as the as enacted versions of some Acts which have also have a format providing a scan of the original printed Act. A format is equivilant to a manifestation in the FRBR model.\n\nThis API does not include an equivilant of the fourth level in the FRBR model, 'Item', which would generally be the concrete example of a specific format of a version, i.e. an XML file saved on a particular drive, or a PDF file printed on sheets of paper.\n\n## Identifiers\n\nThe structure of `work_id` and `version_id` identifiers used by this API is shared with the URLs of the Legislation website. They are constructed from six segments:\n\n1. **type** — Kind of legislation. Must be one of: `act`, `bill`, `secondary-legislation`, `amendment-paper`.\n\n2. **subtype** — Sub-classification of that type. Allowed values depend on type:\n   - Acts: `public`, `imperial`, `local`, `private`, `provincial`\n   - Bills: `government`, `local`, `members`, `private`\n   - Secondary legislation: `agency-drafted`, `pco-drafted`\n   - Amendment papers: `government`, `members`\n\n3. **date** — Year. Must be four digits (YYYY). May be prefixed with `~` when the value is ephemeral.\n\n4. **number** — Legislation number or identifier. Must match: digits. May have followed by a single letter (deduplication), optionally followed by a hyphen and letter (e.g. bill split: `96-B`). May be prefixed with `~` when ephemeral.\n\n5. **language** — Language. Currently only `en` is used.\n\n6. **version_date** — Date identifying the version in time. Must be YYYY-MM-DD. May be prefixed with `~` when ephemeral. May have a suffix of one or more deduplication letters (e.g. `A`, `B`, `AB`, `BA`, `2023-12-31B`) when multiple versions share the same base date.\n\nA `version_id` is all six segments, and a `work_id` is the first four segments, each joined together with underscore characters.\n\n### Ephemeral segments\n\nFor some agency-published secondary legislation harvested from agency websites through the pilot secondary legislation service, we do not have sufficient data to construct a permanent identifier. In these cases, we use fallback values to calculate 'ephemeral' identifiers.\n\nFor example, if we do not know the commencement date of a piece of secondary legislation, we cannot determine the correct value for the `version_date` segment, and will fall back to using the date the record was harvested from the agency website.\n\nTo indicate that these values are not final, and may change if we get better data for the record in the future, they are prefixed with a `~` character. Any identifiers which contain `~` characters may change in the future.\n\n## URLs\n\nWebsite URLs for legislation follow the same pattern as the identifiers described above:\n\nhttps://www.legislation.govt.nz/{type}/{subtype}/{date}/{number}/{language}/{version_date}/\n\nThe website uses `latest` as an alias value in the `version_date` segment, which always resolves to the most recent version of a work.\n\n### Formats\n\nResponses to API queries include links to versions in their available formats. These can also be constructed directly by manipulating URLs, for example:\n\n- https://www.legislation.govt.nz/act/public/1990/109/en/2022-08-30/: HTML page of the New Zealand Bill of Rights Act 1990 as at 30 August 2022\n- https://www.legislation.govt.nz/act/public/1990/109/en/2022-08-30.pdf/: PDF of the New Zealand Bill of Rights Act 1990 as at 30 August 2022\n- https://www.legislation.govt.nz/act/public/1990/109/en/2022-08-30.xml/: XML source of the New Zealand Bill of Rights Act 1990 as at 30 August 2022\n\nFor legislation and secondary legislation drafted by the PCO; `html`, `pdf`, and `xml` formats are available.\n\nFor as enacted versions of pre-2008 Acts that have been converted from scans of the original printed volumes, an additional format of `pdf_original_scan` is available which contains the scanned PDF.\n\nFor agency drafted secondary legislation harvested through the pilot secondary legislation service, HTML or PDF formats may be available, but this will vary from record to record, and links may point to agency websites which do not follow the URL patterns described above.\n\n\n## Rate limiting\n\nEach API key has a default rate limit of 10,000 requests per day, with the quota resetting at midnight NZ local time.\n\nRequests sent after this rate limit has been reached will receive a response with HTTP status code 429, Too Many Requests.\n\nThe rate limit is communicated using the `X-RateLimit` response headers, which have values of:\n\n- `X-RateLimit-Limit`: number of requests permitted per period.\n- `X-RateLimit-Remaining`: number of requests remaining in the current period.\n- `X-RateLimit-Reset`: Unix timestamp of the UTC time at which the period ends and the quota resets.\n\nIn addition to these per-key rate limits, there is a burst limit of no more than 2,000 requests permitted from any single IP address in any five minute period. Requests sent after this limit is reached will receive a response with HTTP status code 403 Forbidden. Once a further five minutes have elapsed, further requests from that IP address will be permitted.",
+    "title": "New Zealand Legislation API",
+    "version": "v0"
+  },
+  "openapi": "3.0.1",
+  "paths": {
+    "/api/rss/search/": {
+      "get": {
+        "parameters": [
+          {
+            "description": "API Key for authentication (can also be passed via X-Api-Key header)",
+            "in": "query",
+            "name": "api_key",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "API Key for authentication (can also be passed via api_key query parameter)",
+            "in": "header",
+            "name": "X-Api-Key",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Search term to filter results",
+            "in": "query",
+            "name": "search_term",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Field to search in (title or fulltext)",
+            "in": "query",
+            "name": "search_field",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Filter by legislation status",
+            "in": "query",
+            "name": "legislation_status",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Filter by legislation type",
+            "in": "query",
+            "name": "legislation_type",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "successful operation with results",
+            "headers": {
+              "X-RateLimit-Limit": {
+                "description": "Number of permitted requests per day",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Remaining": {
+                "description": "Number of requests remaining in current period",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Reset": {
+                "description": "Unix timestamp when the rate limit resets",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "search",
+        "tags": ["search"]
+      }
+    },
+    "/api/rss/works/{work_id}/versions/": {
+      "get": {
+        "parameters": [
+          {
+            "in": "path",
+            "name": "work_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "API Key for authentication (can also be passed via X-Api-Key header)",
+            "in": "query",
+            "name": "api_key",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "API Key for authentication (can also be passed via api_key query parameter)",
+            "in": "header",
+            "name": "X-Api-Key",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/xml": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "successful operation with results",
+            "headers": {
+              "X-RateLimit-Limit": {
+                "description": "Number of permitted requests per day",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Remaining": {
+                "description": "Number of requests remaining in current period",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Reset": {
+                "description": "Unix timestamp when the rate limit resets",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "works/{work_id}/versions/",
+        "tags": ["works"]
+      }
+    },
+    "/v0/versions/{version_id}/": {
+      "get": {
+        "description": "Get details of a specific version of a work.",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "version_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "API key for authentication. Can also be passed via `X-Api-Key` header.",
+            "in": "query",
+            "name": "api_key",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "API key for authentication. Can also be passed via `api_key` query parameter.",
+            "in": "header",
+            "name": "X-Api-Key",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "act_status": {
+                      "type": "string"
+                    },
+                    "act_type": {
+                      "type": "string"
+                    },
+                    "administering_agencies": {
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "bill_status": {
+                      "type": "string"
+                    },
+                    "bill_type": {
+                      "type": "string"
+                    },
+                    "formats": {
+                      "items": {
+                        "properties": {
+                          "type": {
+                            "type": "string"
+                          },
+                          "url": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "instrument_classification": {
+                      "type": "string"
+                    },
+                    "instrument_status": {
+                      "type": "string"
+                    },
+                    "instrument_type_group": {
+                      "type": "string"
+                    },
+                    "legislation_status": {
+                      "type": "string"
+                    },
+                    "legislation_type": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "version_id": {
+                      "type": "string"
+                    },
+                    "work_id": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "version_id",
+                    "work_id",
+                    "title",
+                    "legislation_status",
+                    "legislation_type",
+                    "administering_agencies",
+                    "formats"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "successful operation with a version",
+            "headers": {
+              "X-RateLimit-Limit": {
+                "description": "Number of permitted requests per day",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Remaining": {
+                "description": "Number of requests remaining in current period",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Reset": {
+                "description": "Unix timestamp when the rate limit resets",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "unauthorized - missing or invalid API key"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            },
+            "description": "successful operation with no version"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "too many requests - rate limit exceeded",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the rate limit resets and quota renews",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Limit": {
+                "description": "Number of permitted requests per day",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Remaining": {
+                "description": "Number of requests remaining in current period",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Reset": {
+                "description": "Unix timestamp when the rate limit resets",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "versions/{version_id}/versions/",
+        "tags": ["versions"]
+      }
+    },
+    "/v0/works/": {
+      "get": {
+        "description": "Search for works.\n\nThis endpoint is the main entry to the API, and mirrors the functionality of the website site search. Searches can be either title or content searches, and results are a series of works that match the search query.\n\nEach work has a `latest_matching_version` key with details of the newest version of the work that the search term was found within. This may not be the same version as the newest version of the work, for example if you perform a content search for a phrase that appears in an older version of an Act in a section which has since been repealed and does not appear in newer versions. Inside the `latest_matching_version` object is a key `is_latest_version` which gives a boolean value for whether the version described in `latest_matching_version` is the *actually* newest version of that work.\n\nThe `work_id` of each work returned can be passed to the `/works/{work_id}/versions` endpoint to get all versions of that work, and any `version_id` can be passed to the `/versions/{version_id}` endpoint to get details of that *specific* version.",
+        "parameters": [
+          {
+            "description": "API key for authentication. Can also be passed via `X-Api-Key` header.",
+            "in": "query",
+            "name": "api_key",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "API key for authentication. Can also be passed via `api_key` query parameter.",
+            "in": "header",
+            "name": "X-Api-Key",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "What to search for.\n\nThe supplied phrase will be searched in either work titles or work content depending on the value of the `search_field` parameter.\n\nStemming is enabled by default, i.e. 'levy' will return matches for both 'levy' and 'levies'. To disable stemming for a word or phrase, wrap it in \" charcters.\n\nThe search term is processed by ElasticSearch as a 'Simple query string query'. For full details on this syntax, [see the ElasticSearch docs](https://www.elastic.co/docs/reference/query-languages/query-dsl/query-dsl-simple-query-string-query).",
+            "in": "query",
+            "name": "search_term",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Whether to perform a title search of content search.",
+            "in": "query",
+            "name": "search_field",
+            "required": false,
+            "schema": {
+              "enum": ["title", "content"],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Which page of results to receive, for responses where there are more results returned than the `per_page` value, and the response does not contain all results.",
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "How many results to receive in a single response. Default is `20`, maximum is `100`.",
+            "in": "query",
+            "name": "per_page",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Filter to specific legislation status.",
+            "in": "query",
+            "name": "legislation_status",
+            "required": false,
+            "schema": {
+              "enum": ["in_force", "not_in_force", "no_value"],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Filter to a specific legislation type.",
+            "in": "query",
+            "name": "legislation_type",
+            "required": false,
+            "schema": {
+              "enum": ["act", "amendment_paper", "bill", "secondary_legislation"],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Filter to a specific type of Act. Should only be supplied if `legislation_type` = `act` is also supplied.",
+            "in": "query",
+            "name": "act_type",
+            "required": false,
+            "schema": {
+              "enum": ["public", "private", "imperial", "local", "provincial"],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Filter to a specific classification of Act. Should only be supplied if `legislation_type` = `act` is also supplied.",
+            "in": "query",
+            "name": "act_classification",
+            "required": false,
+            "schema": {
+              "enum": ["principal", "amendment"],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Filter to a specific status of an Act. Should only be supplied if `legislation_type` = `act` is also supplied.",
+            "in": "query",
+            "name": "act_status",
+            "required": false,
+            "schema": {
+              "enum": ["in_force", "not_in_force", "repealed"],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Filter to a specific type of secondary legislation. Should only be supplied if `legislation_type` = `secondary_legislation` is also supplied.",
+            "in": "query",
+            "name": "instrument_type_group",
+            "required": false,
+            "schema": {
+              "enum": [
+                "regulations",
+                "order",
+                "rules",
+                "code",
+                "bylaws",
+                "determination",
+                "exemption",
+                "notice",
+                "instrument",
+                "other_type"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Filter to a specific status of secondary legislation. Should only be supplied if `legislation_type` = `secondary_legislation` is also supplied.",
+            "in": "query",
+            "name": "instrument_status",
+            "required": false,
+            "schema": {
+              "enum": ["expired", "in_force", "not_yet_in_force", "revoked", "superseded"],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Filter to a specific classification of secondary legislation. Should only be supplied if `legislation_type` = `secondary_legislation` is also supplied.",
+            "in": "query",
+            "name": "instrument_classification",
+            "required": false,
+            "schema": {
+              "enum": ["principal", "amendment"],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Filter to a specific type of Bill. Should only be supplied if `legislation_type` = `bill` is also supplied.",
+            "in": "query",
+            "name": "bill_type",
+            "required": false,
+            "schema": {
+              "enum": ["government", "local", "member", "private"],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Filter to a specific status of Bill. Should only be supplied if `legislation_type` = `bill` is also supplied.",
+            "in": "query",
+            "name": "bill_status",
+            "required": false,
+            "schema": {
+              "enum": ["current", "enacted", "terminated"],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Filter to a specific administering agency. The value must be the full text name, exactly as listed on the [browse agencies page](https://www.legislation.govt.nz/browse/agencies).",
+            "in": "query",
+            "name": "administering_agencies",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "How to sort the results. Options are:\n\n- **title_asc**: Sort alphabetically by title, A-Z.\n- **title_desc**: Sort alphabetically by title, Z-A.\n- **year_asc**: Sort by legislative year and number, oldest to newest. Agency secondary legislation which does not have legislative year and number may not be meaningfully sorted.\n- **year_desc**: Sort by legislative year and number, newest to oldest. Agency secondary legislation which does not have legislative year and number may not be meaningfully sorted.\n- **most_recently_updated**: Sort by the most recent version date of each work, newest to oldest.",
+            "in": "query",
+            "name": "sort_by",
+            "required": false,
+            "schema": {
+              "enum": ["title_asc", "title_desc", "year_asc", "year_desc", "most_recently_updated"],
+              "type": "string"
+            }
+          },
+          {
+            "description": "Filter to works published by PCO (all Acts, Bills, Amendment papers, and PCO-drafted secondary legislation) with a value of `Parliamentary Counsel Office`, or Agency-published secondary legislation harvested through the pilot secondary legislation service with a value of `Agency`.",
+            "in": "query",
+            "name": "publisher",
+            "required": false,
+            "schema": {
+              "enum": ["Agency", "Parliamentary Counsel Office"],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "page": {
+                      "type": "integer"
+                    },
+                    "per_page": {
+                      "type": "integer"
+                    },
+                    "results": {
+                      "items": {
+                        "properties": {
+                          "act_classification": {
+                            "type": "string"
+                          },
+                          "act_status": {
+                            "type": "string"
+                          },
+                          "act_type": {
+                            "type": "string"
+                          },
+                          "administering_agencies": {
+                            "items": {
+                              "type": "string"
+                            },
+                            "type": "array"
+                          },
+                          "bill_status": {
+                            "type": "string"
+                          },
+                          "bill_type": {
+                            "type": "string"
+                          },
+                          "instrument_classification": {
+                            "type": "string"
+                          },
+                          "instrument_status": {
+                            "type": "string"
+                          },
+                          "instrument_type_group": {
+                            "type": "string"
+                          },
+                          "latest_matching_version": {
+                            "properties": {
+                              "formats": {
+                                "items": {
+                                  "properties": {
+                                    "type": {
+                                      "type": "string"
+                                    },
+                                    "url": {
+                                      "type": "string"
+                                    }
+                                  },
+                                  "type": "object"
+                                },
+                                "type": "array"
+                              },
+                              "is_latest_version": {
+                                "type": "boolean"
+                              },
+                              "title": {
+                                "type": "string"
+                              },
+                              "version_id": {
+                                "type": "string"
+                              }
+                            },
+                            "type": "object"
+                          },
+                          "legislation_status": {
+                            "type": "string"
+                          },
+                          "legislation_type": {
+                            "type": "string"
+                          },
+                          "work_id": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "total": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": ["results", "total", "page"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "successful operation with results",
+            "headers": {
+              "X-RateLimit-Limit": {
+                "description": "Number of permitted requests per day",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Remaining": {
+                "description": "Number of requests remaining in current period",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Reset": {
+                "description": "Unix timestamp when the rate limit resets",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "unauthorized - missing or invalid API key"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "too many requests - rate limit exceeded",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the rate limit resets and quota renews",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Limit": {
+                "description": "Number of permitted requests per day",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Remaining": {
+                "description": "Number of requests remaining in current period",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Reset": {
+                "description": "Unix timestamp when the rate limit resets",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "works/",
+        "tags": ["works"]
+      }
+    },
+    "/v0/works/{work_id}/versions/": {
+      "get": {
+        "description": "Get all versions of a specified work.",
+        "parameters": [
+          {
+            "description": "The ID of the work to return versions of.",
+            "in": "path",
+            "name": "work_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "API key for authentication. Can also be passed via `X-Api-Key` header.",
+            "in": "query",
+            "name": "api_key",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "API key for authentication. Can also be passed via `api_key` query parameter.",
+            "in": "header",
+            "name": "X-Api-Key",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "How to sort the results.",
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "default": "desc",
+              "enum": ["asc", "desc"],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "page": {
+                      "type": "integer"
+                    },
+                    "per_page": {
+                      "type": "integer"
+                    },
+                    "results": {
+                      "items": {
+                        "properties": {
+                          "act_classification": {
+                            "type": "string"
+                          },
+                          "act_status": {
+                            "type": "string"
+                          },
+                          "act_type": {
+                            "type": "string"
+                          },
+                          "administering_agencies": {
+                            "items": {
+                              "type": "string"
+                            },
+                            "type": "array"
+                          },
+                          "bill_status": {
+                            "type": "string"
+                          },
+                          "bill_type": {
+                            "type": "string"
+                          },
+                          "formats": {
+                            "items": {
+                              "properties": {
+                                "type": {
+                                  "type": "string"
+                                },
+                                "url": {
+                                  "type": "string"
+                                }
+                              },
+                              "type": "object"
+                            },
+                            "type": "array"
+                          },
+                          "instrument_classification": {
+                            "type": "string"
+                          },
+                          "instrument_status": {
+                            "type": "string"
+                          },
+                          "instrument_type_group": {
+                            "type": "string"
+                          },
+                          "legislation_status": {
+                            "type": "string"
+                          },
+                          "legislation_type": {
+                            "type": "string"
+                          },
+                          "title": {
+                            "type": "string"
+                          },
+                          "version_id": {
+                            "type": "string"
+                          },
+                          "work_id": {
+                            "type": "string"
+                          }
+                        },
+                        "type": "object"
+                      },
+                      "type": "array"
+                    },
+                    "total": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": ["results", "total", "page"],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "successful operation with results",
+            "headers": {
+              "X-RateLimit-Limit": {
+                "description": "Number of permitted requests per day",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Remaining": {
+                "description": "Number of requests remaining in current period",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Reset": {
+                "description": "Unix timestamp when the rate limit resets",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "unauthorized - missing or invalid API key"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "description": "too many requests - rate limit exceeded",
+            "headers": {
+              "Retry-After": {
+                "description": "Seconds until the rate limit resets and quota renews",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Limit": {
+                "description": "Number of permitted requests per day",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Remaining": {
+                "description": "Number of requests remaining in current period",
+                "schema": {
+                  "type": "integer"
+                }
+              },
+              "X-RateLimit-Reset": {
+                "description": "Unix timestamp when the rate limit resets",
+                "schema": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        },
+        "summary": "works/{work_id}/versions/",
+        "tags": ["works"]
+      }
+    }
+  },
+  "servers": [
+    {
+      "url": "https://api.legislation.govt.nz",
+      "variables": {
+        "defaultHost": {
+          "default": "api.legislation.govt.nz"
+        }
+      }
+    }
+  ]
+}

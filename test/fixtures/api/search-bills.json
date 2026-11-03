@@ -1,0 +1,427 @@
+{
+  "results": [
+    {
+      "administering_agencies": [],
+      "bill_status": "current",
+      "bill_type": "government",
+      "latest_matching_version": {
+        "formats": [
+          {
+            "type": "html",
+            "url": "https://www.legislation.govt.nz/bill/government/2026/299/en/latest/"
+          },
+          {
+            "type": "pdf",
+            "url": "https://www.legislation.govt.nz/bill/government/2026/299/en/latest.pdf"
+          },
+          {
+            "type": "xml",
+            "url": "https://www.legislation.govt.nz/bill/government/2026/299/en/latest.xml"
+          }
+        ],
+        "is_latest_version": true,
+        "title": "Fair Trading Amendment Bill",
+        "version_id": "bill_government_2026_299_en_2026-09-25"
+      },
+      "legislation_status": null,
+      "legislation_type": "bill",
+      "publisher": "Parliamentary Counsel Office",
+      "work_id": "bill_government_2026_299"
+    },
+    {
+      "administering_agencies": [],
+      "bill_status": "current",
+      "bill_type": "government",
+      "latest_matching_version": {
+        "formats": [
+          {
+            "type": "html",
+            "url": "https://www.legislation.govt.nz/bill/government/2026/353/en/latest/"
+          },
+          {
+            "type": "pdf",
+            "url": "https://www.legislation.govt.nz/bill/government/2026/353/en/latest.pdf"
+          },
+          {
+            "type": "xml",
+            "url": "https://www.legislation.govt.nz/bill/government/2026/353/en/latest.xml"
+          }
+        ],
+        "is_latest_version": true,
+        "title": "Customs and Excise (Border Security) Amendment Bill",
+        "version_id": "bill_government_2026_353_en_2026-09-23"
+      },
+      "legislation_status": null,
+      "legislation_type": "bill",
+      "publisher": "Parliamentary Counsel Office",
+      "work_id": "bill_government_2026_353"
+    },
+    {
+      "administering_agencies": [],
+      "bill_status": "current",
+      "bill_type": "member",
+      "latest_matching_version": {
+        "formats": [
+          {
+            "type": "html",
+            "url": "https://www.legislation.govt.nz/bill/members/2025/168/en/latest/"
+          },
+          {
+            "type": "pdf",
+            "url": "https://www.legislation.govt.nz/bill/members/2025/168/en/latest.pdf"
+          },
+          {
+            "type": "xml",
+            "url": "https://www.legislation.govt.nz/bill/members/2025/168/en/latest.xml"
+          }
+        ],
+        "is_latest_version": true,
+        "title": "Military Decorations and Distinctive Badges (Modernisation) Amendment Bill",
+        "version_id": "bill_members_2025_168_en_2026-09-23"
+      },
+      "legislation_status": null,
+      "legislation_type": "bill",
+      "publisher": "Parliamentary Counsel Office",
+      "work_id": "bill_members_2025_168"
+    },
+    {
+      "administering_agencies": [],
+      "bill_status": "current",
+      "bill_type": "government",
+      "latest_matching_version": {
+        "formats": [
+          {
+            "type": "html",
+            "url": "https://www.legislation.govt.nz/bill/government/2026/345/en/latest/"
+          },
+          {
+            "type": "pdf",
+            "url": "https://www.legislation.govt.nz/bill/government/2026/345/en/latest.pdf"
+          },
+          {
+            "type": "xml",
+            "url": "https://www.legislation.govt.nz/bill/government/2026/345/en/latest.xml"
+          }
+        ],
+        "is_latest_version": true,
+        "title": "Inspector-General of Police Legislation Amendment Bill",
+        "version_id": "bill_government_2026_345_en_2026-09-22"
+      },
+      "legislation_status": null,
+      "legislation_type": "bill",
+      "publisher": "Parliamentary Counsel Office",
+      "work_id": "bill_government_2026_345"
+    },
+    {
+      "administering_agencies": [],
+      "bill_status": "current",
+      "bill_type": "government",
+      "latest_matching_version": {
+        "formats": [
+          {
+            "type": "html",
+            "url": "https://www.legislation.govt.nz/bill/government/2026/352/en/latest/"
+          },
+          {
+            "type": "pdf",
+            "url": "https://www.legislation.govt.nz/bill/government/2026/352/en/latest.pdf"
+          },
+          {
+            "type": "xml",
+            "url": "https://www.legislation.govt.nz/bill/government/2026/352/en/latest.xml"
+          }
+        ],
+        "is_latest_version": true,
+        "title": "Broadcasting (Disestablishment of Broadcasting Standards Authority) Amendment Bill",
+        "version_id": "bill_government_2026_352_en_2026-09-22"
+      },
+      "legislation_status": null,
+      "legislation_type": "bill",
+      "publisher": "Parliamentary Counsel Office",
+      "work_id": "bill_government_2026_352"
+    },
+    {
+      "administering_agencies": [],
+      "bill_status": "current",
+      "bill_type": "government",
+      "latest_matching_version": {
+        "formats": [
+          {
+            "type": "html",
+            "url": "https://www.legislation.govt.nz/bill/government/2024/117/en/latest/"
+          },
+          {
+            "type": "pdf",
+            "url": "https://www.legislation.govt.nz/bill/government/2024/117/en/latest.pdf"
+          },
+          {
+            "type": "xml",
+            "url": "https://www.legislation.govt.nz/bill/government/2024/117/en/latest.xml"
+          }
+        ],
+        "is_latest_version": true,
+        "title": "Regulatory Systems (Courts) Amendment Bill",
+        "version_id": "bill_government_2024_117_en_2026-09-21"
+      },
+      "legislation_status": null,
+      "legislation_type": "bill",
+      "publisher": "Parliamentary Counsel Office",
+      "work_id": "bill_government_2024_117"
+    },
+    {
+      "administering_agencies": [],
+      "bill_status": "current",
+      "bill_type": "government",
+      "latest_matching_version": {
+        "formats": [
+          {
+            "type": "html",
+            "url": "https://www.legislation.govt.nz/bill/government/2026/307/en/latest/"
+          },
+          {
+            "type": "pdf",
+            "url": "https://www.legislation.govt.nz/bill/government/2026/307/en/latest.pdf"
+          },
+          {
+            "type": "xml",
+            "url": "https://www.legislation.govt.nz/bill/government/2026/307/en/latest.xml"
+          }
+        ],
+        "is_latest_version": true,
+        "title": "Overseas Adoptions Legislation Bill",
+        "version_id": "bill_government_2026_307_en_2026-09-21"
+      },
+      "legislation_status": null,
+      "legislation_type": "bill",
+      "publisher": "Parliamentary Counsel Office",
+      "work_id": "bill_government_2026_307"
+    },
+    {
+      "administering_agencies": [],
+      "bill_status": "current",
+      "bill_type": "government",
+      "latest_matching_version": {
+        "formats": [
+          {
+            "type": "html",
+            "url": "https://www.legislation.govt.nz/bill/government/2026/351/en/latest/"
+          },
+          {
+            "type": "pdf",
+            "url": "https://www.legislation.govt.nz/bill/government/2026/351/en/latest.pdf"
+          },
+          {
+            "type": "xml",
+            "url": "https://www.legislation.govt.nz/bill/government/2026/351/en/latest.xml"
+          }
+        ],
+        "is_latest_version": true,
+        "title": "Research, Science, Innovation, and Technology Bill",
+        "version_id": "bill_government_2026_351_en_2026-09-21"
+      },
+      "legislation_status": null,
+      "legislation_type": "bill",
+      "publisher": "Parliamentary Counsel Office",
+      "work_id": "bill_government_2026_351"
+    },
+    {
+      "administering_agencies": [],
+      "bill_status": "current",
+      "bill_type": "government",
+      "latest_matching_version": {
+        "formats": [
+          {
+            "type": "html",
+            "url": "https://www.legislation.govt.nz/bill/government/2026/346/en/latest/"
+          },
+          {
+            "type": "pdf",
+            "url": "https://www.legislation.govt.nz/bill/government/2026/346/en/latest.pdf"
+          },
+          {
+            "type": "xml",
+            "url": "https://www.legislation.govt.nz/bill/government/2026/346/en/latest.xml"
+          }
+        ],
+        "is_latest_version": true,
+        "title": "References to Tiriti o Waitangi/Treaty of Waitangi (Standardisation) Amendment Bill",
+        "version_id": "bill_government_2026_346_en_2026-09-15"
+      },
+      "legislation_status": null,
+      "legislation_type": "bill",
+      "publisher": "Parliamentary Counsel Office",
+      "work_id": "bill_government_2026_346"
+    },
+    {
+      "administering_agencies": [],
+      "bill_status": "current",
+      "bill_type": "government",
+      "latest_matching_version": {
+        "formats": [
+          {
+            "type": "html",
+            "url": "https://www.legislation.govt.nz/bill/government/2026/348/en/latest/"
+          },
+          {
+            "type": "pdf",
+            "url": "https://www.legislation.govt.nz/bill/government/2026/348/en/latest.pdf"
+          },
+          {
+            "type": "xml",
+            "url": "https://www.legislation.govt.nz/bill/government/2026/348/en/latest.xml"
+          }
+        ],
+        "is_latest_version": true,
+        "title": "References to Tiriti o Waitangi/Treaty of Waitangi (Repeals) Amendment Bill",
+        "version_id": "bill_government_2026_348_en_2026-09-15"
+      },
+      "legislation_status": null,
+      "legislation_type": "bill",
+      "publisher": "Parliamentary Counsel Office",
+      "work_id": "bill_government_2026_348"
+    },
+    {
+      "administering_agencies": [],
+      "bill_status": "current",
+      "bill_type": "government",
+      "latest_matching_version": {
+        "formats": [
+          {
+            "type": "html",
+            "url": "https://www.legislation.govt.nz/bill/government/2026/347/en/latest/"
+          },
+          {
+            "type": "pdf",
+            "url": "https://www.legislation.govt.nz/bill/government/2026/347/en/latest.pdf"
+          },
+          {
+            "type": "xml",
+            "url": "https://www.legislation.govt.nz/bill/government/2026/347/en/latest.xml"
+          }
+        ],
+        "is_latest_version": true,
+        "title": "References to Tiriti o Waitangi/Treaty of Waitangi (Strength of Legislative Obligations) Amendment Bill",
+        "version_id": "bill_government_2026_347_en_2026-09-15"
+      },
+      "legislation_status": null,
+      "legislation_type": "bill",
+      "publisher": "Parliamentary Counsel Office",
+      "work_id": "bill_government_2026_347"
+    },
+    {
+      "administering_agencies": [],
+      "bill_status": "current",
+      "bill_type": "government",
+      "latest_matching_version": {
+        "formats": [
+          {
+            "type": "html",
+            "url": "https://www.legislation.govt.nz/bill/government/2026/349/en/latest/"
+          },
+          {
+            "type": "pdf",
+            "url": "https://www.legislation.govt.nz/bill/government/2026/349/en/latest.pdf"
+          },
+          {
+            "type": "xml",
+            "url": "https://www.legislation.govt.nz/bill/government/2026/349/en/latest.xml"
+          }
+        ],
+        "is_latest_version": true,
+        "title": "Ngāti Mutunga o Wharekauri Claims Settlement Bill",
+        "version_id": "bill_government_2026_349_en_2026-09-15"
+      },
+      "legislation_status": null,
+      "legislation_type": "bill",
+      "publisher": "Parliamentary Counsel Office",
+      "work_id": "bill_government_2026_349"
+    },
+    {
+      "administering_agencies": [],
+      "bill_status": "current",
+      "bill_type": "government",
+      "latest_matching_version": {
+        "formats": [
+          {
+            "type": "html",
+            "url": "https://www.legislation.govt.nz/bill/government/2026/350/en/latest/"
+          },
+          {
+            "type": "pdf",
+            "url": "https://www.legislation.govt.nz/bill/government/2026/350/en/latest.pdf"
+          },
+          {
+            "type": "xml",
+            "url": "https://www.legislation.govt.nz/bill/government/2026/350/en/latest.xml"
+          }
+        ],
+        "is_latest_version": true,
+        "title": "Rēkohu Wharekauri Shared Redress Bill",
+        "version_id": "bill_government_2026_350_en_2026-09-15"
+      },
+      "legislation_status": null,
+      "legislation_type": "bill",
+      "publisher": "Parliamentary Counsel Office",
+      "work_id": "bill_government_2026_350"
+    },
+    {
+      "administering_agencies": [],
+      "bill_status": "enacted",
+      "bill_type": "government",
+      "latest_matching_version": {
+        "formats": [
+          {
+            "type": "html",
+            "url": "https://www.legislation.govt.nz/bill/government/2026/305/en/latest/"
+          },
+          {
+            "type": "pdf",
+            "url": "https://www.legislation.govt.nz/bill/government/2026/305/en/latest.pdf"
+          },
+          {
+            "type": "xml",
+            "url": "https://www.legislation.govt.nz/bill/government/2026/305/en/latest.xml"
+          }
+        ],
+        "is_latest_version": true,
+        "title": "Agricultural Compounds and Veterinary Medicines Amendment Bill",
+        "version_id": "bill_government_2026_305_en_2026-09-15"
+      },
+      "legislation_status": null,
+      "legislation_type": "bill",
+      "publisher": "Parliamentary Counsel Office",
+      "work_id": "bill_government_2026_305"
+    },
+    {
+      "administering_agencies": [],
+      "bill_status": "enacted",
+      "bill_type": "government",
+      "latest_matching_version": {
+        "formats": [
+          {
+            "type": "html",
+            "url": "https://www.legislation.govt.nz/bill/members/2024/37/en/latest/"
+          },
+          {
+            "type": "pdf",
+            "url": "https://www.legislation.govt.nz/bill/members/2024/37/en/latest.pdf"
+          },
+          {
+            "type": "xml",
+            "url": "https://www.legislation.govt.nz/bill/members/2024/37/en/latest.xml"
+          }
+        ],
+        "is_latest_version": true,
+        "title": "Healthy Futures (Pae Ora) (3-Day Postnatal Stay) Amendment Bill",
+        "version_id": "bill_members_2024_37_en_2026-09-15"
+      },
+      "legislation_status": null,
+      "legislation_type": "bill",
+      "publisher": "Parliamentary Counsel Office",
+      "work_id": "bill_members_2024_37"
+    }
+  ],
+  "page": 1,
+  "per_page": 15,
+  "total": 1908
+}

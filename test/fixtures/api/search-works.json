@@ -1,0 +1,106 @@
+{
+  "results": [
+    {
+      "act_classification": "principal",
+      "act_status": "repealed",
+      "act_type": "public",
+      "administering_agencies": [],
+      "latest_matching_version": {
+        "formats": [
+          {
+            "type": "html",
+            "url": "https://www.legislation.govt.nz/act/public/1914/3/en/latest/"
+          },
+          {
+            "type": "pdf",
+            "url": "https://www.legislation.govt.nz/act/public/1914/3/en/latest.pdf"
+          },
+          {
+            "type": "xml",
+            "url": "https://www.legislation.govt.nz/act/public/1914/3/en/latest.xml"
+          },
+          {
+            "type": "pdf_original_scan",
+            "url": "https://www.legislation.govt.nz/act/public/1914/3/en/1914-07-31/official_scan.pdf"
+          }
+        ],
+        "is_latest_version": true,
+        "title": "Land-tax and Income-tax Act 1914",
+        "version_id": "act_public_1914_3_en_1914-07-31"
+      },
+      "legislation_status": "not_in_force",
+      "legislation_type": "act",
+      "publisher": null,
+      "work_id": "act_public_1914_3"
+    },
+    {
+      "act_classification": "principal",
+      "act_status": "repealed",
+      "act_type": "public",
+      "administering_agencies": [],
+      "latest_matching_version": {
+        "formats": [
+          {
+            "type": "html",
+            "url": "https://www.legislation.govt.nz/act/public/1913/12/en/latest/"
+          },
+          {
+            "type": "pdf",
+            "url": "https://www.legislation.govt.nz/act/public/1913/12/en/latest.pdf"
+          },
+          {
+            "type": "xml",
+            "url": "https://www.legislation.govt.nz/act/public/1913/12/en/latest.xml"
+          },
+          {
+            "type": "pdf_original_scan",
+            "url": "https://www.legislation.govt.nz/act/public/1913/12/en/1913-10-10/official_scan.pdf"
+          }
+        ],
+        "is_latest_version": true,
+        "title": "Land-tax and Income-tax Act 1913",
+        "version_id": "act_public_1913_12_en_1913-10-10"
+      },
+      "legislation_status": "not_in_force",
+      "legislation_type": "act",
+      "publisher": null,
+      "work_id": "act_public_1913_12"
+    },
+    {
+      "act_classification": "principal",
+      "act_status": "repealed",
+      "act_type": "public",
+      "administering_agencies": [],
+      "latest_matching_version": {
+        "formats": [
+          {
+            "type": "html",
+            "url": "https://www.legislation.govt.nz/act/public/1912/11/en/latest/"
+          },
+          {
+            "type": "pdf",
+            "url": "https://www.legislation.govt.nz/act/public/1912/11/en/latest.pdf"
+          },
+          {
+            "type": "xml",
+            "url": "https://www.legislation.govt.nz/act/public/1912/11/en/latest.xml"
+          },
+          {
+            "type": "pdf_original_scan",
+            "url": "https://www.legislation.govt.nz/act/public/1912/11/en/1912-10-15/official_scan.pdf"
+          }
+        ],
+        "is_latest_version": true,
+        "title": "Land-tax and Income-tax Act 1912",
+        "version_id": "act_public_1912_11_en_1912-10-15"
+      },
+      "legislation_status": "not_in_force",
+      "legislation_type": "act",
+      "publisher": null,
+      "work_id": "act_public_1912_11"
+    }
+  ],
+  "page": 1,
+  "per_page": 3,
+  "total": 241
+}
