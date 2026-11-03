@@ -41,6 +41,7 @@ function io(
     env,
     stderr: (t) => stderr.push(t),
     stdout: (t) => stderr.push(t),
+    stdin: process.stdin,
     serve: () => ({ close: () => Promise.resolve() }),
     onSignal: (s, h) => handlers.set(s, h),
     onUnhandledRejection: (h) => rejections.push(h),
@@ -55,7 +56,11 @@ describe("serveHttp", () => {
     const t = io({ LEGISLATION_NZ_API_KEY: DUMMY_KEY, LEGISLATION_NZ_HTTP_HOST: "0.0.0.0" });
     expect(await serveHttp(t.value)).toBe(1);
     expect(t.stderr.join("")).toContain("Remote HTTP mode requires OAuth");
-    expect(await serveHttp(io({}).value)).toBe(1);
+    expect(
+      await serveHttp(
+        io({ XDG_CONFIG_HOME: "/nonexistent-nzlm-test", APPDATA: "/nonexistent-nzlm-test" }).value,
+      ),
+    ).toBe(1);
   });
 
   it("rethrows unexpected start-up errors", async () => {

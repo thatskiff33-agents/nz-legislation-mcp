@@ -5,14 +5,20 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { inspect } from "node:util";
 import { describe, expect, it } from "vitest";
-import { ConfigError, ENV, loadConfig } from "../src/config.js";
+import { chmodSync } from "node:fs";
+import { ConfigError, defaultKeyFilePath, ENV, loadConfig } from "../src/config.js";
 
 const KEY = DUMMY_KEY;
-const noFile = (): string => {
+/** A reader with no files at all: missing when allowed, otherwise unreadable. */
+const noFile = (_path: string, options?: { allowMissing: boolean }): string | undefined => {
+  if (options?.allowMissing === true) return undefined;
   throw new Error("no file");
 };
 
-function problems(env: Record<string, string>, reader: (p: string) => string = noFile): string[] {
+function problems(
+  env: Record<string, string>,
+  reader: Parameters<typeof loadConfig>[1] = noFile,
+): string[] {
   try {
     loadConfig(env, reader);
   } catch (e) {
@@ -40,6 +46,76 @@ describe("loadConfig", () => {
     expect(() => loadConfig({ [ENV.apiKeyFile]: "/definitely/not/a/real/path" })).toThrow(
       `${ENV.apiKeyFile} points to a file that cannot be read.`,
     );
+  });
+
+  describe("default key file (written by setup)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "nzlm-default-"));
+    const path = join(dir, "key");
+
+    it("is used when no key variable is set", () => {
+      writeFileSync(path, `${KEY}\n`, { mode: 0o600 });
+      chmodSync(path, 0o600);
+      expect(loadConfig({}, undefined, path).apiKey.reveal()).toBe(KEY);
+    });
+
+    it("is refused if other users can read it", () => {
+      writeFileSync(path, `${KEY}\n`);
+      chmodSync(path, 0o644);
+      expect(() => loadConfig({}, undefined, path)).toThrow(
+        `can be read by other users; run: chmod 600 ${path}`,
+      );
+    });
+
+    it("reports an invalid key in the file", () => {
+      writeFileSync(path, "YOUR_KEY\n");
+      chmodSync(path, 0o600);
+      expect(() => loadConfig({}, undefined, path)).toThrow(
+        `The key file ${path} contains placeholder text`,
+      );
+    });
+
+    it("suggests setup when the file does not exist", () => {
+      expect(() => loadConfig({}, undefined, join(dir, "missing"))).toThrow(
+        'Run "npx nz-legislation-mcp setup"',
+      );
+    });
+
+    it("reports other read problems", () => {
+      expect(() => loadConfig({}, undefined, dir)).toThrow(
+        `The key file ${dir} is not a regular file`,
+      );
+      expect(problems({})).toEqual([
+        'No API key found. Run "npx nz-legislation-mcp setup", or set LEGISLATION_NZ_API_KEY (request a key from contact@pco.govt.nz).',
+      ]);
+      const throwing = () => {
+        throw new Error("boom");
+      };
+      expect(() => loadConfig({}, throwing, path)).toThrow(`The key file ${path} cannot be read`);
+    });
+
+    it("lives in the user's config directory on each platform", () => {
+      expect(defaultKeyFilePath({}, "linux", "/home/u")).toBe(
+        "/home/u/.config/nz-legislation-mcp/key",
+      );
+      expect(defaultKeyFilePath({ XDG_CONFIG_HOME: "/x" }, "darwin", "/Users/u")).toBe(
+        "/x/nz-legislation-mcp/key",
+      );
+      expect(
+        defaultKeyFilePath({ APPDATA: "C:\\Users\\u\\AppData\\Roaming" }, "win32", "C:\\Users\\u"),
+      ).toContain("nz-legislation-mcp");
+      expect(defaultKeyFilePath({}, "win32", "/h")).toContain("AppData");
+      expect(typeof defaultKeyFilePath()).toBe("string");
+    });
+
+    it("ignores empty or relative config directories (never the current directory)", () => {
+      for (const XDG_CONFIG_HOME of ["", "relative/dir"]) {
+        expect(defaultKeyFilePath({ XDG_CONFIG_HOME }, "linux", "/home/u")).toBe(
+          "/home/u/.config/nz-legislation-mcp/key",
+        );
+      }
+      expect(defaultKeyFilePath({ APPDATA: "" }, "win32", "/h")).toContain("AppData");
+      expect(defaultKeyFilePath({ APPDATA: "rel" }, "win32", "/h")).toContain("AppData");
+    });
   });
 
   describe("key file safety (real file system)", () => {
@@ -92,7 +168,7 @@ describe("loadConfig", () => {
   });
 
   it.each([
-    [{}, "No API key found"],
+    [{}, 'No API key found. Run "npx nz-legislation-mcp setup"'],
     [{ [ENV.apiKey]: "" }, "No API key found"],
     [{ [ENV.apiKey]: "   " }, "is empty"],
     [{ [ENV.apiKey]: "YOUR_KEY" }, "placeholder"],

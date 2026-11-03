@@ -10,7 +10,7 @@ export default tseslint.config(
   {
     languageOptions: {
       parserOptions: {
-        projectService: { allowDefaultProject: ["eslint.config.js"] },
+        projectService: { allowDefaultProject: ["eslint.config.js", "scripts/*.mjs"] },
         tsconfigRootDir: import.meta.dirname,
       },
     },
@@ -28,7 +28,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ["eslint.config.js"],
+    files: ["eslint.config.js", "scripts/*.mjs"],
     ...tseslint.configs.disableTypeChecked,
   },
 );

@@ -1,0 +1,22 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "packages": {
+    ".": {
+      "release-type": "node",
+      "package-name": "nz-legislation-mcp",
+      "include-component-in-tag": false,
+      "bump-minor-pre-major": true,
+      "bump-patch-for-minor-pre-major": false,
+      "extra-files": [
+        { "type": "json", "path": "server.json", "jsonpath": "$.version" },
+        { "type": "json", "path": "server.json", "jsonpath": "$.packages[0].version" },
+        {
+          "type": "json",
+          "path": "plugins/nz-legislation-mcp/.claude-plugin/plugin.json",
+          "jsonpath": "$.version"
+        },
+        { "type": "json", "path": "packaging/mcpb/manifest.json", "jsonpath": "$.version" }
+      ]
+    }
+  }
+}

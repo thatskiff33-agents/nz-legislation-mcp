@@ -71,7 +71,7 @@ describe("stdio binary", () => {
 
   it("exits 1 with a readable message when no key is configured", () => {
     const run = spawnSync(process.execPath, [CLI], {
-      env: { PATH: process.env["PATH"] ?? "" },
+      env: { PATH: process.env["PATH"] ?? "", XDG_CONFIG_HOME: "/nonexistent-nzlm-test" },
       input: "",
       encoding: "utf8",
       timeout: 10_000,
