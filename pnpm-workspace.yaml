@@ -1,0 +1,14 @@
+# Supply-chain hardening (pnpm 11 settings).
+# Refuse any package version published less than 14 days ago (value in minutes).
+minimumReleaseAge: 20160
+# Fail the install if any dependency wants to run a build/install script that is not
+# explicitly allowed (pnpm 11 default, stated here for clarity). Allow per package with allowBuilds.
+strictDepBuilds: true
+# Time-boxed audit exception, tracked in issue #15.
+# GHSA-g3hv-75wg-m249: moderate DoS in minimatch <11.0.1, reached only via eslint and
+# typescript-eslint (dev only; glob patterns come from our own config). Those packages require
+# minimatch ^10 and no 10.x fix exists, so the exception stays until upstream moves to 11, or
+# until a tested override to minimatch 11 is in place (not before the fix is 14 days old).
+audit:
+  ignore:
+    - GHSA-g3hv-75wg-m249
