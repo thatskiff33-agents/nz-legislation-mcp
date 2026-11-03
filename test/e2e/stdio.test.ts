@@ -5,6 +5,8 @@ import { createRequire } from "node:module";
 import { join } from "node:path";
 import { Client } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
+import { StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
+import { spawn } from "node:child_process";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { DUMMY_KEY } from "../dummy-key.js";
 
@@ -77,5 +79,55 @@ describe("stdio binary", () => {
     expect(run.status).toBe(1);
     expect(run.stderr).toContain("No API key found");
     expect(run.stdout).toBe(""); // stdout is reserved for the protocol
+  });
+});
+
+describe("http binary", () => {
+  it("serves MCP over HTTP on loopback", async () => {
+    const port = 40_000 + Math.floor(Math.random() * 20_000);
+    const child = spawn(process.execPath, [CLI, "http"], {
+      env: {
+        LEGISLATION_NZ_API_KEY: DUMMY_KEY,
+        LEGISLATION_NZ_HTTP_PORT: String(port),
+        PATH: process.env["PATH"] ?? "",
+      },
+      stdio: ["ignore", "ignore", "pipe"],
+    });
+    try {
+      await new Promise<void>((resolve, reject) => {
+        let log = "";
+        child.stderr.on("data", (d: Buffer) => {
+          log += d.toString();
+          if (log.includes('"message":"listening"')) resolve();
+        });
+        child.on("exit", (code) => {
+          reject(new Error(`exited ${String(code)}: ${log}`));
+        });
+      });
+      const client = new Client({ name: "e2e-http", version: "0.0.0" });
+      await client.connect(
+        new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${String(port)}/mcp`)),
+      );
+      expect((await client.listTools()).tools).toHaveLength(7);
+      await client.close();
+      const health = await fetch(`http://127.0.0.1:${String(port)}/healthz`);
+      expect(health.headers.get("x-content-type-options")).toBe("nosniff");
+    } finally {
+      child.kill("SIGTERM");
+    }
+  }, 30_000);
+
+  it("refuses to start remotely without OAuth", () => {
+    const run = spawnSync(process.execPath, [CLI, "http"], {
+      env: {
+        LEGISLATION_NZ_API_KEY: DUMMY_KEY,
+        LEGISLATION_NZ_HTTP_HOST: "0.0.0.0",
+        PATH: process.env["PATH"] ?? "",
+      },
+      encoding: "utf8",
+      timeout: 10_000,
+    });
+    expect(run.status).toBe(1);
+    expect(run.stderr).toContain("Remote HTTP mode requires OAuth");
   });
 });

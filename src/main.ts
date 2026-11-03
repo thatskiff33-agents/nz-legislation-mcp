@@ -20,6 +20,8 @@ const TEXT_CACHE_MAX_ENTRIES = 50;
 export interface MainIo {
   readonly env: Readonly<Record<string, string | undefined>>;
   readonly stderr: (text: string) => void;
+  /** Only for --version/--help output, never while serving stdio (stdout is the protocol). */
+  readonly stdout: (text: string) => void;
   readonly serve: typeof serveStdio;
   readonly onSignal: (signal: "SIGINT" | "SIGTERM", handler: () => void) => void;
   readonly onUnhandledRejection: (handler: (reason: unknown) => void) => void;
@@ -29,13 +31,16 @@ export interface MainIo {
 export const defaultIo: MainIo = {
   env: process.env,
   stderr: (text) => process.stderr.write(text),
+  stdout: (text) => process.stdout.write(text),
   serve: serveStdio,
   onSignal: (signal, handler) => process.once(signal, handler),
   onUnhandledRejection: (handler) => process.on("unhandledRejection", handler),
 };
 
-/** Builds the dependencies shared by every tool call. */
-function buildDeps(env: MainIo["env"], stderr: MainIo["stderr"]): ToolDeps {
+/**
+ * Builds the dependencies shared by every tool call (stdio and HTTP mode).
+ */
+export function buildDeps(env: MainIo["env"], stderr: MainIo["stderr"]): ToolDeps {
   const config = loadConfig(env);
   const logger = createLogger({
     level: config.logLevel,
@@ -59,7 +64,49 @@ function buildDeps(env: MainIo["env"], stderr: MainIo["stderr"]): ToolDeps {
   };
 }
 
-/** Starts the stdio server. Returns the process exit code for start-up failures, else undefined. */
+const USAGE = `Usage: ${SERVER_NAME} [stdio|http] [--version] [--help]
+
+  stdio    Serve MCP over standard input/output (default; for desktop and CLI clients).
+  http     Serve MCP over HTTP (Streamable HTTP). Binds 127.0.0.1 unless OAuth is configured.
+
+Configuration is by environment variables; see README.md and docs/self-hosting.md.
+`;
+
+/**
+ * Runs the command line. Returns the process exit code, or undefined while a server runs.
+ * `http` is loaded lazily so stdio mode never loads the HTTP stack.
+ */
+export async function runCli(
+  argv: readonly string[],
+  io: MainIo = defaultIo,
+  http: () => Promise<number | undefined> = async () =>
+    (await import("./http/serve.js")).serveHttp({
+      ...io,
+      listen: (await import("./http/node.js")).listen,
+      fetch: globalThis.fetch,
+    }),
+): Promise<number | undefined> {
+  const [command, ...rest] = argv;
+  if (command === "--version" || command === "-v") {
+    io.stdout(`${VERSION}\n`);
+    return 0;
+  }
+  if (command === "--help" || command === "-h") {
+    io.stdout(USAGE);
+    return 0;
+  }
+  if (rest.length > 0 || (command !== undefined && command !== "stdio" && command !== "http")) {
+    io.stderr(USAGE);
+    return 2;
+  }
+  return command === "http" ? http() : main(io);
+}
+
+/**
+ * Starts the stdio server. Returns the process exit code for start-up failures, else undefined.
+ *
+ * @internal Exported for tests (use runCli).
+ */
 export function main(io: MainIo = defaultIo): number | undefined {
   let deps: ToolDeps;
   try {
