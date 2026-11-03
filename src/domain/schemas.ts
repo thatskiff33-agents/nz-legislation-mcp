@@ -41,7 +41,8 @@ import {
 // eslint-disable-next-line no-control-regex -- matching control characters is the purpose
 const NO_CONTROL_CHARS = /^[^\u0000-\u001F\u007F-\u009F]*$/;
 
-function freeText(max: number): z.ZodString {
+/** Trimmed, non-empty, length-limited text with no control characters. */
+export function freeText(max: number): z.ZodString {
   return z
     .string()
     .trim()
