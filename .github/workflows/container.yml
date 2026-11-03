@@ -50,9 +50,24 @@ jobs:
           context: .
           load: true
           tags: nz-legislation-mcp:scan
+      # Install Trivy from its GitHub release, checked against a pinned SHA-256, instead of the
+      # action's installer (which downloads from get.trivy.dev and fails when that host is down).
+      - name: Install Trivy (pinned, checksum verified)
+        env:
+          TRIVY_VERSION: "0.70.0"
+          TRIVY_SHA256: 8b4376d5d6befe5c24d503f10ff136d9e0c49f9127a4279fd110b727929a5aa9
+        run: |
+          tarball="trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/$tarball" \
+            "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/$tarball"
+          echo "$TRIVY_SHA256  $RUNNER_TEMP/$tarball" | sha256sum --check --strict
+          mkdir -p "$RUNNER_TEMP/trivy-bin"
+          tar -xzf "$RUNNER_TEMP/$tarball" -C "$RUNNER_TEMP/trivy-bin" trivy
+          echo "$RUNNER_TEMP/trivy-bin" >> "$GITHUB_PATH"
       - name: Scan image (fail on fixable high or critical vulnerabilities)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          skip-setup-trivy: true
           image-ref: nz-legislation-mcp:scan
           severity: HIGH,CRITICAL
           ignore-unfixed: true
@@ -105,9 +120,24 @@ jobs:
           context: .
           load: true
           tags: nz-legislation-mcp:release-scan
+      # Install Trivy from its GitHub release, checked against a pinned SHA-256, instead of the
+      # action's installer (which downloads from get.trivy.dev and fails when that host is down).
+      - name: Install Trivy (pinned, checksum verified)
+        env:
+          TRIVY_VERSION: "0.70.0"
+          TRIVY_SHA256: 8b4376d5d6befe5c24d503f10ff136d9e0c49f9127a4279fd110b727929a5aa9
+        run: |
+          tarball="trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
+          curl -fsSL --retry 3 -o "$RUNNER_TEMP/$tarball" \
+            "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/$tarball"
+          echo "$TRIVY_SHA256  $RUNNER_TEMP/$tarball" | sha256sum --check --strict
+          mkdir -p "$RUNNER_TEMP/trivy-bin"
+          tar -xzf "$RUNNER_TEMP/$tarball" -C "$RUNNER_TEMP/trivy-bin" trivy
+          echo "$RUNNER_TEMP/trivy-bin" >> "$GITHUB_PATH"
       - name: Scan before publishing (fail on fixable high or critical vulnerabilities)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
+          skip-setup-trivy: true
           image-ref: nz-legislation-mcp:release-scan
           severity: HIGH,CRITICAL
           ignore-unfixed: true
