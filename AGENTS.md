@@ -14,22 +14,22 @@ Unofficial MCP server for the New Zealand Legislation API (PCO, `api.legislation
 4. Before marking a PR ready: independent review (security, correctness, and any lens fitting the risk), fix findings, verify fixes, CI green. Post a plain-English ready comment: what was built, reviews and findings, fixes, carry-forwards.
 5. Carry-forwards only for things needing an owner decision or a fresh plan, filed as a linked `needs-decision` issue.
 6. Merging (owner decision in an agent session, 4 November 2026: "I approve you to merge. I don't comment on github. You get it sorted."): the agent squash-merges a PR, and deletes its branch, once all of these hold:
-   * it is out of draft and CI is green on the final commit;
-   * an independent review has signed off on the final changes, with every finding fixed or answered;
-   * no owner decision on it is open.
+   - it is out of draft and CI is green on the final commit;
+   - an independent review has signed off on the final changes, with every finding fixed or answered;
+   - no owner decision on it is open.
 
    The agent records the merge decision on the PR. Releases and publishing (npm, MCP Registry, container images), repository settings, and anything legal stay with the owner.
 
 ## Hard rules
 
-* Never commit, log, print or return an API key. Never put a key in a URL. The key is sent only as the `X-Api-Key` header to allowlisted PCO hosts.
-* Keep `pnpm check` green. Its components are listed in CONTRIBUTING.md and include a 100% line and branch coverage gate.
-* Enums, identifier formats and response shapes are defined once in `src/domain/` (from issue #4). Do not duplicate them.
-* Every external input is parsed with a schema at the boundary.
-* stdout is reserved for the MCP stdio protocol. Log to stderr only.
-* Pin GitHub Actions by full commit SHA. New runtime dependencies need a justification in the PR.
-* Response caching is disabled by default until the PCO confirms in writing that it is allowed (issue #3).
-* Remote (non-localhost) HTTP mode requires OAuth 2.1 (issue #8).
+- Never commit, log, print or return an API key. Never put a key in a URL. The key is sent only as the `X-Api-Key` header to allowlisted PCO hosts.
+- Keep `pnpm check` green. Its components are listed in CONTRIBUTING.md and include a 100% line and branch coverage gate.
+- Enums, identifier formats and response shapes are defined once in `src/domain/` (from issue #4). Do not duplicate them.
+- Every external input is parsed with a schema at the boundary.
+- stdout is reserved for the MCP stdio protocol. Log to stderr only.
+- Pin GitHub Actions by full commit SHA. New runtime dependencies need a justification in the PR.
+- Response caching is disabled by default until the PCO confirms in writing that it is allowed (issue #3).
+- Remote (non-localhost) HTTP mode requires OAuth 2.1 (issue #8).
 
 ## Style
 

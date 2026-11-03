@@ -16,15 +16,15 @@ Include what you found, how to reproduce it, and the impact you expect. We aim t
 
 In scope:
 
-* Leaks of a user's Legislation API key (logs, errors, tool output, URLs, outbound requests to hosts other than the PCO's).
-* Authentication or authorisation flaws in the HTTP transport (once implemented, issue #8).
-* Injection or parsing flaws (for example XML entity expansion, server-side request forgery).
-* Supply-chain issues in our build and release pipeline.
+- Leaks of a user's Legislation API key (logs, errors, tool output, URLs, outbound requests to hosts other than the PCO's).
+- Authentication or authorisation flaws in the HTTP transport (once implemented, issue #8).
+- Injection or parsing flaws (for example XML entity expansion, server-side request forgery).
+- Supply-chain issues in our build and release pipeline.
 
 Out of scope:
 
-* The PCO Legislation API itself. Report those to the Parliamentary Counsel Office.
-* Content of legislation returned by the API.
+- The PCO Legislation API itself. Report those to the Parliamentary Counsel Office.
+- Content of legislation returned by the API.
 
 ## Handling of API keys (design commitments)
 
