@@ -9,7 +9,7 @@ describe("version", () => {
     };
     expect(VERSION).toBe(pkg.version);
     expect(USER_AGENT).toBe(
-      `nz-legislation-mcp/${pkg.version} (+https://github.com/thatskiff33-agents/nz-legislation-mcp)`,
+      `nz-legislation-mcp/${pkg.version} (+https://github.com/thatskiff33/nz-legislation-mcp)`,
     );
   });
 

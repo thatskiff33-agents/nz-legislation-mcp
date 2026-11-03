@@ -60,7 +60,7 @@ const CLIENTS: readonly ClientGuide[] = [
       "Or install the plugin, which asks for your API key and keeps it in your system's secure credential store (no `setup` needed):",
       block(
         "sh",
-        "claude plugin marketplace add thatskiff33-agents/nz-legislation-mcp\nclaude plugin install nz-legislation-mcp@nz-legislation-mcp --scope user",
+        "claude plugin marketplace add thatskiff33/nz-legislation-mcp\nclaude plugin install nz-legislation-mcp@nz-legislation-mcp --scope user",
       ),
     ],
   },
@@ -126,7 +126,7 @@ export const CLIENT_SETUP_HINT = [
   `  Codex CLI:    codex mcp add ${SERVER_ID} -- ${CLIENT_LAUNCH.command} ${CLIENT_LAUNCH.args.join(" ")}`,
   "",
   "Other clients (Claude Desktop, Cursor, VS Code, Gemini CLI): see docs/clients.md",
-  "https://github.com/thatskiff33-agents/nz-legislation-mcp/blob/main/docs/clients.md",
+  "https://github.com/thatskiff33/nz-legislation-mcp/blob/main/docs/clients.md",
   "",
 ].join("\n");
 

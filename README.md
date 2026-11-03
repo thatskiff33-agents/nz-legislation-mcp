@@ -65,11 +65,11 @@ The plugin asks for your key and keeps it in your system's secure credential sto
 can skip `setup`:
 
 ```sh
-/plugin install nz-legislation-mcp --marketplace thatskiff33-agents/nz-legislation-mcp
+/plugin install nz-legislation-mcp --marketplace thatskiff33/nz-legislation-mcp
 ```
 
 On Claude Code versions before 2.1.275, run
-`/plugin marketplace add thatskiff33-agents/nz-legislation-mcp` and then
+`/plugin marketplace add thatskiff33/nz-legislation-mcp` and then
 `/plugin install nz-legislation-mcp@nz-legislation-mcp`.
 
 ## Remote endpoint (ChatGPT, Claude on the web, Grok)

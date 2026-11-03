@@ -27,7 +27,7 @@ claude mcp add --transport stdio --scope user nz-legislation -- npx -y nz-legisl
 Or install the plugin, which asks for your API key and keeps it in your system's secure credential store (no `setup` needed):
 
 ```sh
-claude plugin marketplace add thatskiff33-agents/nz-legislation-mcp
+claude plugin marketplace add thatskiff33/nz-legislation-mcp
 claude plugin install nz-legislation-mcp@nz-legislation-mcp --scope user
 ```
 

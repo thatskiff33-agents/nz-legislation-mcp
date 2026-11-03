@@ -7,7 +7,7 @@ No releases have been published yet. From the first release until v1.0.0, only t
 ## Reporting a vulnerability
 
 Please report vulnerabilities privately using GitHub's
-[private vulnerability reporting](https://github.com/thatskiff33-agents/nz-legislation-mcp/security/advisories/new).
+[private vulnerability reporting](https://github.com/thatskiff33/nz-legislation-mcp/security/advisories/new).
 Do not open a public issue.
 
 Include what you found, how to reproduce it, and the impact you expect. We aim to acknowledge reports promptly, normally within 5 New Zealand working days, and to agree a disclosure timeline with you.

@@ -40,5 +40,5 @@ CMD ["http"]
 
 LABEL org.opencontainers.image.title="nz-legislation-mcp" \
       org.opencontainers.image.description="Unofficial MCP server for the New Zealand Legislation API (remote HTTP mode)" \
-      org.opencontainers.image.source="https://github.com/thatskiff33-agents/nz-legislation-mcp" \
+      org.opencontainers.image.source="https://github.com/thatskiff33/nz-legislation-mcp" \
       org.opencontainers.image.licenses="Apache-2.0"

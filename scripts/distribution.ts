@@ -29,7 +29,7 @@ interface PackageJson {
 
 const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")) as PackageJson;
 
-const REPOSITORY = "https://github.com/thatskiff33-agents/nz-legislation-mcp";
+const REPOSITORY = "https://github.com/thatskiff33/nz-legislation-mcp";
 const AUTHOR = { name: "nz-legislation-mcp contributors", url: REPOSITORY };
 
 /** One line; the MCP Registry allows at most 100 characters. */
@@ -93,7 +93,7 @@ function marketplace(): string {
   return json({
     $schema: "https://json.schemastore.org/claude-code-marketplace.json",
     name: SERVER_NAME,
-    owner: { name: "thatskiff33-agents" },
+    owner: { name: "thatskiff33" },
     description: `Claude Code plugin for ${SERVER_NAME}.`,
     plugins: [
       {
