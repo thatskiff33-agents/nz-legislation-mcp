@@ -111,8 +111,9 @@ describe("resource templates", () => {
     const { client: c } = await connect([record(id, "act_public_2099_2")], { [id]: xml });
     const text = textOf(await c.readResource({ uri: `legislation://version/${id}/schedule/1` }));
     expect(text).toContain("schedule 1: Rates");
+    // The hint gives the whole continue_with, so the next page keeps the schedule and page size.
     expect(text).toMatch(
-      /\[Text continues: \d+ more characters\. Use the get_provision_text tool with version_id act_public_2099_2_en_2099-01-01 and offset 50000\.\]/u,
+      /\[Text continues: \d+ more characters\. Use the get_provision_text tool with these arguments: \{"version_id":"act_public_2099_2_en_2099-01-01","offset":50000,"max_chars":50000,"schedule":"1"\}\.\]/u,
     );
   });
 

@@ -569,6 +569,22 @@ describe("version safety and truncation (issue #40)", () => {
     expect(pinned.text).toBe(middle.text);
   });
 
+  it("gives the default page size in continue_with, which passes back as valid input", async () => {
+    const LONG = WAITANGI.replace("Observance of Waitangi Day", `Observance ${"x".repeat(16_000)}`);
+    const first = await getProvisionText.run(
+      { version_id: V2014, section: "4" },
+      deps([versionRecord(V2014)], "2026-11-02", { [V2014]: LONG }).deps,
+      signal,
+    );
+    expect(first.continue_with).toEqual({
+      version_id: V2014,
+      offset: 15_000,
+      max_chars: 15_000,
+      section: "4",
+    });
+    expect(getProvisionText.inputSchema.safeParse(first.continue_with).success).toBe(true);
+  });
+
   it("refuses a comparison whose versions or dates are the wrong way round", async () => {
     const { deps: d } = deps([versionRecord(V2014), versionRecord(V2007)], "x", {
       [V2007]: WAITANGI,
