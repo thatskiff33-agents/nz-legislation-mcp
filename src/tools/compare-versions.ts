@@ -1,6 +1,7 @@
 /** compare_versions: what changed in one provision between two versions or dates. */
 import { z } from "zod";
 import { readLegislation, type ReadResult } from "../text/document.js";
+import { safeCut } from "../text/slice.js";
 import { diffLines, formatDiff } from "../text/diff.js";
 import { VersionIdSchema, WorkIdSchema } from "../domain/schemas.js";
 import { defineTool, READ_ONLY_API_TOOL, ToolInputError, type ToolDeps } from "./shared.js";
@@ -158,7 +159,7 @@ export const compareVersions = defineTool({
       changed,
       lines_added: added,
       lines_removed: removed,
-      diff: full.slice(0, MAX_DIFF_CHARS),
+      diff: full.slice(0, safeCut(full, MAX_DIFF_CHARS)),
       diff_truncated: full.length > MAX_DIFF_CHARS,
       notes,
     };

@@ -235,6 +235,123 @@ describe("normalisePartLabel", () => {
   });
 });
 
+describe("structure fidelity", () => {
+  const one = (xml: string, section: string) =>
+    readLegislation(chunked(`<act><cover><title>T</title></cover><body>${xml}</body></act>`), {
+      target: { section },
+    });
+
+  it("returns closing words to the enclosing subsection's indent", async () => {
+    const doc = await one(
+      "<prov><label>2</label><heading>Lists</heading><prov.body><subprov><label>1</label><para><text>Lead in—</text><label-para><label>a</label><para><text>alpha; or</text></para></label-para><label-para><label>b</label><para><text>beta,</text></para></label-para><text>closing words.</text></para></subprov></prov.body></prov>",
+      "2",
+    );
+    expect(doc.text).toBe("2 Lists\n(1) Lead in—\n  (a) alpha; or\n  (b) beta,\nclosing words.");
+  });
+
+  it("returns closing words after a nested list to the outer paragraph's indent", async () => {
+    const doc = await one(
+      "<prov><label>3</label><heading>Nested</heading><prov.body><subprov><label>1</label><para><text>Lead in—</text><label-para><label>a</label><para><text>where—</text><label-para><label>i</label><para><text>one; or</text></para></label-para><text>inner closing,</text></para></label-para></para></subprov></prov.body></prov>",
+      "3",
+    );
+    expect(doc.text).toBe(
+      "3 Nested\n(1) Lead in—\n  (a) where—\n    (i) one; or\n  inner closing,",
+    );
+  });
+
+  const P = (inner: string) =>
+    `<prov><label>1</label><heading>H</heading><prov.body><subprov><label>1</label><para>${inner}</para></subprov></prov.body></prov>`;
+
+  it("keeps a closing quotation mark and full stop on the quoted list's last line", async () => {
+    const doc = await one(
+      P(
+        '<text>Insert: </text><amend.in quote="1"><label-para><label>a</label><para><text>one; and</text></para></label-para><label-para><label>b</label><para><text>two</text></para></label-para></amend.in><text>.</text>',
+      ),
+      "1",
+    );
+    expect(doc.text).toBe("1 H\n(1) Insert: “\n  (a) one; and\n  (b) two”.");
+  });
+
+  it("keeps table cells on one row after a list inside a cell", async () => {
+    const doc = await one(
+      P(
+        "<table><tgroup><tbody><row><entry><label-para><label>a</label><para><text>cell a</text></para></label-para></entry><entry><text>cell 2</text></entry></row></tbody></tgroup></table>",
+      ),
+      "1",
+    );
+    expect(doc.text).toBe("1 H\n(1)\n  (a) cell a | cell 2 |");
+  });
+
+  it("starts closing words on a new line after list items and formula variables", async () => {
+    const list = await one(
+      P(
+        "<text>Lead—</text><list><item><label>1</label><para><text>one</text></para></item><item><label>2</label><para><text>two</text></para></item></list><text>closing words.</text>",
+      ),
+      "1",
+    );
+    expect(list.text).toBe("1 H\n(1) Lead—\n1 one\n2 two\nclosing words.");
+    const formula = await one(
+      P(
+        "<text>where—</text><variable-def><variable>a</variable><text>is x</text></variable-def><text>closing words.</text>",
+      ),
+      "1",
+    );
+    expect(formula.text).toBe("1 H\n(1) where—\na is x\nclosing words.");
+  });
+
+  /** A two-item list then `after`, returning the lines from item (b) on. */
+  const afterList = async (after: string) =>
+    (
+      await one(
+        P(
+          `<text>Lead—</text><label-para><label>a</label><para><text>alpha; or</text></para></label-para><label-para><label>b</label><para><text>beta,</text></para></label-para>${after}`,
+        ),
+        "1",
+      )
+    ).text
+      ?.split("\n")
+      .slice(3);
+
+  it("starts closing words that open with a quotation mark or bracket on a new line", async () => {
+    expect(
+      await afterList('<amend.in quote="1">land</amend.in><text> includes buildings.</text>'),
+    ).toEqual(["  (b) beta,", "“land” includes buildings."]);
+    expect(
+      await afterList(
+        "<text>(</text><citation><intref>section 5</intref></citation><text>) applies.</text>",
+      ),
+    ).toEqual(["  (b) beta,", "(section 5) applies."]);
+  });
+
+  it("keeps punctuation that continues the last item on its line", async () => {
+    expect(await afterList("<text>; and</text>")).toEqual(["  (b) beta,; and"]);
+    expect(await afterList("<text>.</text>")).toEqual(["  (b) beta,."]);
+  });
+
+  it("still breaks before words that follow a graphic after a list", async () => {
+    expect(await afterList("<figure><graphic/></figure><text>closing words.</text>")).toEqual([
+      "  (b) beta, [graphic omitted]",
+      "closing words.",
+    ]);
+  });
+
+  it("replaces lone surrogates with the replacement character (defence in depth)", async () => {
+    // UTF-8 decoding cannot produce a lone surrogate, but text handed in as a string can.
+    const doc = await one(P("<text>bad \uD800 char</text>"), "1");
+    expect(doc.text).toBe("1 H\n(1) bad � char");
+  });
+
+  it("puts each signature line on its own line (Treaty of Waitangi schedule)", async () => {
+    const doc = await readLegislation(chunked(WAITANGI), { target: { schedule: "" } });
+    const lines = doc.text?.split("\n") ?? [];
+    const hobson = lines.indexOf("W Hobson,");
+    expect(hobson).toBeGreaterThan(0);
+    expect(lines[hobson + 1]).toBe("Lieutenant Governor.");
+    expect(lines[hobson + 2]?.startsWith("Now therefore We the Chiefs")).toBe(true);
+    expect(doc.text).not.toContain("Subjects.W Hobson");
+  });
+});
+
 describe("real extracts (GST Act 1985, Income Tax Act 2007)", () => {
   const REAL = loadXml("real-extracts.xml");
   const read = (target: { section?: string; schedule?: string; part?: string }) =>
@@ -270,6 +387,18 @@ describe("real extracts (GST Act 1985, Income Tax Act 2007)", () => {
     expect(lines.some((l) => l.startsWith("a is an amount equal to"))).toBe(true);
     expect(lines.some((l) => l.startsWith("b is an amount equal to"))).toBe(true);
     expect(lines.some((l) => /[a-z]b$/u.test(l) || l.endsWith("andb"))).toBe(false);
+  });
+
+  it("puts closing words after a list on their own line, not in the last item (GST s 19C(9))", async () => {
+    const lines = (await read({ section: "19C" })).text?.split("\n") ?? [];
+    const c = lines.findIndex((l) =>
+      l.startsWith("  (c) from a hybrid basis to an invoice or a payments basis"),
+    );
+    expect(c).toBeGreaterThan(0);
+    expect(lines[c - 1]?.startsWith("  (b) from a payments basis")).toBe(true);
+    expect(lines[c + 1]).toBe(
+      "shall be deemed to have been deducted, or accounted for, as the case may be, pursuant to section 20(3).",
+    );
   });
 
   it("puts list numbers on their own items (ITA schedule 21)", async () => {
