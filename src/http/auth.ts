@@ -201,6 +201,7 @@ export function createJwtVerifier(options: JwtVerifierOptions): OAuthTokenVerifi
       }
       const subject = payload.sub;
       if (typeof subject !== "string" || subject === "") {
+        options.onReject?.({ error: "JWTClaimValidationFailed", code: "missing_sub" });
         throw invalid("The access token is not valid for this server.");
       }
       const scopeClaim = payload["scope"];

@@ -31,28 +31,38 @@ describe("Secret", () => {
     expect(s.redact("x?api_key=a%2Bb%2Fc%3Dd&y")).toBe("x?api_key=[REDACTED]&y");
   });
 
-  // Characters that encodeURIComponent leaves alone but form encoding escapes, plus a space
-  // (+ in a form body, %20 in a URL query).
-  const awkward = "ab~c!d(e)f*g'h i+j";
+  // A key validateKey accepts (printable ASCII, no space, quote or backslash), using characters
+  // each encoding treats differently.
+  const awkward = "ab~c!d(e)f*g+h/i<j&k=l?m#n";
+  const whatwgQuery = (() => {
+    const url = new URL("https://api.example.test/v0/works/");
+    url.search = `k=${awkward}`;
+    return url.search.slice(3);
+  })();
 
   it.each([
     ["raw", awkward],
     ["encodeURIComponent", encodeURIComponent(awkward)],
-    ["form-encoded", new URLSearchParams({ api_key: awkward }).toString()],
+    ["lower-case percent", encodeURIComponent(awkward).toLowerCase()],
+    ["encodeURI", encodeURI(awkward)],
+    ["double-encoded", encodeURIComponent(encodeURIComponent(awkward))],
+    ["form-encoded", new URLSearchParams({ k: awkward }).toString().slice(2)],
+    ["WHATWG URL query", whatwgQuery],
+    ["JSON with escaped slashes", awkward.replaceAll("/", "\\/")],
     [
-      "WHATWG URL query",
-      (() => {
-        const url = new URL("https://api.example.test/v0/works/");
-        url.search = `api_key=${awkward}`;
-        return url.href;
-      })(),
+      "Go-style JSON",
+      awkward.replaceAll("<", "\\u003c").replaceAll(">", "\\u003e").replaceAll("&", "\\u0026"),
     ],
-  ])("redacts the %s form of a key with awkward characters", (_form, text) => {
-    const out = new Secret(awkward).redact(`before ${text} after`);
-    expect(out).toContain("[REDACTED]");
-    for (const fragment of ["ab~c", "ab%7Ec", "d(e)f", "d%28e%29f", "i+j", "i%2Bj"]) {
-      expect(out).not.toContain(fragment);
-    }
+  ])("redacts the %s form of a key with awkward characters", (_form, encoded) => {
+    expect(new Secret(awkward).redact(`before ${encoded} after`)).toBe("before [REDACTED] after");
+  });
+
+  it("redacts a key inside a full URL", () => {
+    const url = new URL("https://api.example.test/v0/works/");
+    url.searchParams.set("api_key", awkward);
+    expect(new Secret(awkward).redact(url.href)).toBe(
+      "https://api.example.test/v0/works/?api_key=[REDACTED]",
+    );
   });
 
   it("leaves text unchanged when the secret is empty", () => {

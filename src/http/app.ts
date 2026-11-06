@@ -30,6 +30,7 @@ import type { Logger } from "../logger.js";
 import { createServer } from "../server.js";
 import type { ToolDeps } from "../tools/shared.js";
 import { MCP_PATH, type HttpConfig } from "./config.js";
+import { throttledWarn } from "./log-throttle.js";
 import { RateLimiter } from "./rate-limit.js";
 
 export interface HttpAppOptions {
@@ -95,14 +96,12 @@ type RefusalReason =
   | "not_local"
   | "host_rejected"
   | "origin_rejected"
+  | "insufficient_scope"
   | "subject_not_allowed"
   | "rate_limited_ip"
   | "rate_limited_subject"
   | "payload_too_large"
   | "batch_rejected";
-
-/** At most one log record per refusal reason in this period, so a flood cannot flood the log. */
-const REFUSAL_LOG_INTERVAL_MS = 60_000;
 
 /**
  * A short one-way hash of a token subject, so operators can match refusals to an account
@@ -116,29 +115,18 @@ export function subjectHash(subject: string): string {
 }
 
 /**
- * Logs refusals at warn level, throttled per reason. Records carry the reason, a subject hash
- * where a token subject is known, and how many refusals of that reason went unlogged since the
- * last record. Never the raw subject or an IP address (Privacy Act 2020, IPPs 1 and 5).
+ * Logs refusals at warn level, throttled per reason (see log-throttle.ts). Records carry the
+ * reason and, where a token subject is known, its hash: never the raw subject or an IP address.
  */
 function refusalLog(
   logger: Logger,
   now: () => number,
 ): (reason: RefusalReason, subject?: string) => void {
-  const last = new Map<RefusalReason, { at: number; suppressed: number }>();
+  const warn = throttledWarn(logger, "request refused", now);
   return (reason, subject) => {
-    const time = now();
-    const entry = last.get(reason);
-    if (entry !== undefined && time - entry.at < REFUSAL_LOG_INTERVAL_MS) {
-      entry.suppressed += 1;
-      return;
-    }
-    last.set(reason, { at: time, suppressed: 0 });
-    logger.warn("request refused", {
+    warn(reason, {
       reason,
       ...(subject === undefined || subject === "" ? {} : { subjectHash: subjectHash(subject) }),
-      ...(entry === undefined || entry.suppressed === 0
-        ? {}
-        : { suppressedSinceLast: entry.suppressed }),
     });
   };
 }
@@ -359,7 +347,11 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
     if (gate !== undefined) {
       const result = await gate(request);
       if (result instanceof Response) {
-        if (ipLimiter.take(ip)) return result;
+        if (ipLimiter.take(ip)) {
+          // 403: a valid token without the required scopes (the verifier logs bad tokens).
+          if (result.status === 403) refused("insufficient_scope");
+          return result;
+        }
         refused("rate_limited_ip");
         return rateLimited();
       }

@@ -15,6 +15,7 @@ import {
 } from "./auth.js";
 import { createHttpApp } from "./app.js";
 import { loadHttpConfig, MCP_PATH } from "./config.js";
+import { throttledWarn } from "./log-throttle.js";
 import type { listen } from "./node.js";
 
 export interface HttpIo extends MainIo {
@@ -66,6 +67,8 @@ export async function serveHttp(io: HttpIo): Promise<number | undefined> {
         note: "Use this audience only for this server, or tokens issued for other services could be accepted.",
       });
     }
+    // Bad tokens are verified before any rate limit, so their log records are throttled too.
+    const tokenRefused = throttledWarn(logger, "access token refused");
     auth = {
       verifier: createJwtVerifier({
         issuer: metadata.issuer,
@@ -74,7 +77,7 @@ export async function serveHttp(io: HttpIo): Promise<number | undefined> {
         resource: config.resourceUrl,
         keys: remoteKeys(jwks),
         onReject: (reason) => {
-          logger.warn("access token refused", reason);
+          tokenRefused(reason.code, reason);
         },
       }),
       authorizationServer: metadata as unknown as OAuthMetadata,

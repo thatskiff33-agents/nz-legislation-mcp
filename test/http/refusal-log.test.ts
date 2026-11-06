@@ -44,12 +44,13 @@ afterEach(async () => {
 let clock = 0;
 const now = (): number => clock;
 
-async function oauthApp(rateLimit = "60") {
+async function oauthApp(rateLimit = "60", extra: Record<string, string> = {}) {
   clock = 1_000_000;
   const k = await testKeys();
   const { logger, records } = capture();
   const app = createHttpApp({
     config: loadHttpConfig({
+      ...extra,
       LEGISLATION_NZ_HTTP_HOST: "0.0.0.0",
       LEGISLATION_NZ_PUBLIC_URL: RESOURCE,
       LEGISLATION_NZ_OAUTH_ISSUER: ISSUER,
@@ -187,6 +188,19 @@ describe("refusal logging", () => {
       "subject_not_allowed",
       "rate_limited_ip",
     ]);
+  });
+
+  it("logs a valid token that lacks the required scope", async () => {
+    const { app, k, records } = await oauthApp("60", {
+      LEGISLATION_NZ_OAUTH_REQUIRED_SCOPES: "mcp",
+    });
+    const token = await k.mint({ scope: "read" });
+    const res = await app.fetch(request("/mcp", { authorization: `Bearer ${token}` }, "{}"), {
+      remoteAddress: IP,
+    });
+    expect(res.status).toBe(403);
+    expect(refusals(records).map((r) => r.fields)).toEqual([{ reason: "insufficient_scope" }]);
+    expectNoPersonalData(records);
   });
 
   it("logs batches and oversized bodies", async () => {

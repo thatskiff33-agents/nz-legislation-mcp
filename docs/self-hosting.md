@@ -179,9 +179,10 @@ Anyone can register a client with your tenant, but this server admits only the a
 
 ### Refusal logs
 
-Each refused request writes a `warn` record, `request refused`, to standard error. The `reason` field is one of:
+Requests refused for the reasons below are logged at `warn` level as `request refused`, on standard error, with a `reason` field:
 
-- `subject_not_allowed`
+- `subject_not_allowed`: a valid token whose `sub` is not in `LEGISLATION_NZ_OAUTH_ALLOWED_SUBJECTS`
+- `insufficient_scope`: a valid token without the scopes in `LEGISLATION_NZ_OAUTH_REQUIRED_SCOPES`
 - `host_rejected`
 - `origin_rejected`
 - `rate_limited_ip`
@@ -190,7 +191,9 @@ Each refused request writes a `warn` record, `request refused`, to standard erro
 - `batch_rejected`
 - `not_local` (local mode without sign-in)
 
-Each reason is logged at most once a minute. The next record for that reason carries `suppressedSinceLast` with the number not logged in between.
+Tokens that fail verification are logged separately as `access token refused`, with the error class and code only (never the token). A request with no token at all is normal sign-in discovery and is not logged.
+
+Each reason (and each token error code) is logged at most once a minute, so a flood of bad requests cannot flood the log. The next record carries `suppressedSinceLast` with the number not logged in between. Within that minute only the first refusal's details are kept.
 
 The records never contain a raw account ID or an IP address. Where a signed-in account is known, they carry `subjectHash`: the first 12 hexadecimal characters of the SHA-256 of the token's `sub`. To check whether a refusal was your own account, compute the hash of your `sub` and compare:
 
@@ -199,9 +202,9 @@ printf %s "<your sub>" | sha256sum | cut -c1-12
 node -e 'console.log(require("node:crypto").createHash("sha256").update(process.argv[1]).digest("hex").slice(0, 12))' "<your sub>"
 ```
 
-A typical cause of `subject_not_allowed` is a mistyped `LEGISLATION_NZ_OAUTH_ALLOWED_SUBJECTS`.
+Typical causes: a mistyped `LEGISLATION_NZ_OAUTH_ALLOWED_SUBJECTS` (`subject_not_allowed`) or required scopes your provider does not grant (`insufficient_scope`).
 
-Privacy: logging only what is needed to diagnose refusals, and no raw identifiers, is intended to support information privacy principles 1 (purpose for collection) and 5 (storage and security of information) in the Privacy Act 2020. Whether it is enough for your deployment is for you to assess. A short hash of a known identifier can still be matched by someone who already knows that identifier, so treat the logs as private.
+Privacy: the hash is pseudonymous, not anonymous. It is unsalted so that you can check it with the commands above, which also means anyone can hash a guessable or enumerable `sub` (for example a sequential number, or an email-style ID) and match it. Treat the hash as identifying, and treat these logs as private. Logging only what is needed to diagnose refusals, with no raw identifiers or IP addresses, is intended to support information privacy principles 1 (purpose for collection), 5 (storage and security of information) and 9 (limits on retention of personal information) in the Privacy Act 2020. Whether a hashed identifier is personal information under the Act, and whether this is enough for your deployment, is for you to assess (to confirm with your privacy adviser). Keep the logs no longer than you need them.
 
 ## Local HTTP mode (no sign-in)
 
