@@ -6,7 +6,9 @@ import { diffLines, formatDiff } from "../text/diff.js";
 import { VersionIdSchema, WorkIdSchema } from "../domain/schemas.js";
 import { defineTool, READ_ONLY_API_TOOL, ToolInputError, type ToolDeps } from "./shared.js";
 import {
+  describeScope,
   describeTarget,
+  scopeHint,
   provisionInfo,
   ProvisionInfoSchema,
   ProvisionShape,
@@ -163,7 +165,7 @@ export const compareVersions = defineTool({
     const found = after.found ?? before.found;
     if (found === null) {
       throw new ToolInputError(
-        `${what} was not found in either version. Use get_table_of_contents to see the labels.`,
+        `${what} was not found${args.part === undefined && args.subpart === undefined ? "" : ` within ${describeScope(args.part, args.subpart)}`} in either version.${scopeHint(after.outline, args.part, args.subpart)} Use get_table_of_contents to see the labels.`,
       );
     }
     if (same)

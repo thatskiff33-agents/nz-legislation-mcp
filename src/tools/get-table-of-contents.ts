@@ -9,9 +9,12 @@ import {
 } from "../text/document.js";
 import { cleanText, defineTool, permalink, PermalinkSchema, READ_ONLY_API_TOOL } from "./shared.js";
 import {
+  bareLabel,
   describeEnclosing,
+  describeScope,
   LabelSchema,
   PartSchema,
+  scopeHint,
   SubpartSchema,
   versionInfo,
   VersionInfoShape,
@@ -39,22 +42,9 @@ const InputSchema = z
   .superRefine((args, ctx) => {
     refineSelector(args, ctx);
     if ((args.part !== undefined || args.subpart !== undefined) && args.schedule !== undefined) {
-      ctx.addIssue({ code: "custom", message: "Give part and subpart, or schedule, not both." });
+      ctx.addIssue({ code: "custom", message: "Give part/subpart or schedule, not both." });
     }
   });
-
-/** The label without a leading "Part"/"Subpart" word, for messages. */
-const bare = (label: string): string => label.replace(/^(?:sub)?part\s+/iu, "").trim();
-
-/** "part 2", "subpart 1" or "part 2 subpart 1", for scope lines and notes. */
-function describeScope(part: string | undefined, subpart: string | undefined): string {
-  return [
-    part === undefined ? "" : `part ${bare(part)}`,
-    subpart === undefined ? "" : `subpart ${bare(subpart)}`,
-  ]
-    .filter((s) => s !== "")
-    .join(" ");
-}
 
 /** True for the part or subpart entry the caller named (it heads its own listing). */
 function isScopeItself(e: OutlineEntry, part: string | undefined, subpart: string | undefined) {
@@ -79,6 +69,11 @@ const EntrySchema = z.object({
   depth: z.number().int(),
   schedule: z.string().nullable(),
   repealed: z.boolean(),
+  within: z
+    .array(z.string())
+    .describe(
+      'Enclosing parts and subparts, e.g. ["Part 2", "Subpart 1"], to pass as part and subpart.',
+    ),
 });
 
 const OutputSchema = z.object({
@@ -104,6 +99,7 @@ function toEntry(e: OutlineEntry): z.output<typeof EntrySchema> {
     depth: e.depth,
     schedule: e.schedule === null ? null : cleanText(e.schedule),
     repealed: e.repealed,
+    within: e.within.map(describeEnclosing),
   };
 }
 
@@ -112,7 +108,7 @@ export const getTableOfContents = defineTool({
   title: "Table of contents",
   description: [
     "List the structure of a version of NZ legislation: parts, subparts, cross-headings, sections and schedules, with labels to pass to get_provision_text.",
-    "Choose the version with work_id (+ as_at) or version_id. For large Acts, pass part to list the sections inside one part or subpart, or schedule to list one schedule's clauses.",
+    "Choose the version with work_id (+ as_at) or version_id. For large Acts, pass part to list one Part's sections (with subpart for one subpart: subpart numbers often restart in each Part), or schedule to list one schedule's clauses. Each entry's within names its enclosing parts and subparts.",
   ].join(" "),
   inputSchema: InputSchema,
   outputSchema: OutputSchema,
@@ -149,7 +145,9 @@ export const getTableOfContents = defineTool({
       );
       scope = `Everything in ${what}.`;
       if (chosen.length === 0) {
-        notes.push(`No ${what} was found. Omit part and subpart to see the top level.`);
+        notes.push(
+          `No ${what} was found.${scopeHint(doc.outline, part, subpart)} Omit part and subpart to see the top level.`,
+        );
       } else {
         // Subpart numbers often restart in each part: say when one label matched in several.
         if (part === undefined) {
@@ -165,7 +163,7 @@ export const getTableOfContents = defineTool({
           );
           if (homes.size > 1) {
             notes.push(
-              `Subpart ${bare(String(subpart))} occurs in ${[...homes].map((h) => h || "the top level").join(", ")}; pass part as well to list just one.`,
+              `Subpart ${bareLabel(String(subpart))} occurs in ${[...homes].map((h) => h || "the top level").join(", ")}; pass part as well to list just one.`,
             );
           }
         }
@@ -176,7 +174,7 @@ export const getTableOfContents = defineTool({
             chosen = headings;
             scope = `Subparts of ${what} (it has too many entries to list at once).`;
             notes.push(
-              `${what} has ${String(count)} entries, too many to list at once; pass one of the subpart labels above as subpart (with part ${bare(String(part))}) to list its sections.`,
+              `${what} has ${String(count)} entries, too many to list at once; pass one of the subpart labels above as subpart (with part ${bareLabel(String(part))}) to list its sections.`,
             );
           }
         }

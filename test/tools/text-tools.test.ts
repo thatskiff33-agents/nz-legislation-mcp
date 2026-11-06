@@ -33,6 +33,7 @@ describe("get_table_of_contents", () => {
       depth: 0,
       schedule: null,
       repealed: false,
+      within: [],
     });
   });
 
@@ -505,7 +506,7 @@ describe("version safety and truncation (issue #40)", () => {
     });
     expect(both.success).toBe(false);
     expect(JSON.stringify(both.error?.issues)).toContain(
-      "Give part and subpart, or schedule, not both.",
+      "Give part/subpart or schedule, not both.",
     );
   });
 
@@ -539,12 +540,12 @@ describe("version safety and truncation (issue #40)", () => {
         signal,
       );
     const first = await page({ work_id: WORK });
-    expect(first.continue_with).toEqual({ version_id: V2014, offset: 1000 });
+    expect(first.continue_with).toEqual({ version_id: V2014, offset: 1000, section: "4" });
     expect(first.notes.join(" ")).not.toContain("chosen by date");
     // A middle page chosen by date: told to pin the version.
     const middle = await page({ work_id: WORK, offset: 1000 });
     expect(middle.notes.join(" ")).toContain(`continue with version_id ${V2014}`);
-    expect(middle.continue_with).toEqual({ version_id: V2014, offset: 2000 });
+    expect(middle.continue_with).toEqual({ version_id: V2014, offset: 2000, section: "4" });
     // The last page chosen by date: nothing to continue, just a check.
     const last = await page({ work_id: WORK, offset: 2000 });
     expect(last.continue_with).toBeNull();

@@ -572,7 +572,10 @@ export async function readLegislation(
       owner[field] = owner[field].replace(/\s+/gu, " ").trim();
       collect = null;
       if (field === "label" && (owner.kind === "part" || owner.kind === "subpart")) {
-        within[within.length - 1] = { kind: owner.kind, label: owner.label };
+        // A schedule's head1 is mapped to "part", but some are labelled "Subpart ...".
+        const kind =
+          owner.kind === "part" && /^subpart\b/iu.test(owner.label) ? "subpart" : owner.kind;
+        within[within.length - 1] = { kind, label: owner.label };
         withinDirty = true;
       }
       if (field === "label" && owner.kind === "schedule") {

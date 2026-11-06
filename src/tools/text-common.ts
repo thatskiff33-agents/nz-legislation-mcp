@@ -1,7 +1,12 @@
 /** Shared pieces for the tools that read legislation text. */
 import { z } from "zod";
 import { cleanText, versionDate } from "./shared.js";
-import type { Enclosing, Match, OutlineEntry } from "../text/document.js";
+import {
+  normalisePartLabel,
+  type Enclosing,
+  type Match,
+  type OutlineEntry,
+} from "../text/document.js";
 import type { VersionRecord } from "../api/client.js";
 
 /** Upper bound for section/schedule labels supplied by the caller. */
@@ -65,11 +70,63 @@ export function provisionInfo(entry: OutlineEntry): z.output<typeof ProvisionInf
   };
 }
 
-/** "Part 2" or "Subpart 1" (labels that already carry the word are left as they are). */
+/**
+ * "Part 2" or "Subpart 1". Only code-like labels ("2", "BB", "1A") get the word: labels that
+ * already carry it, or read as words ("Form 1"), are left as they are.
+ */
 export function describeEnclosing(enclosing: Enclosing): string {
   const label = cleanText(enclosing.label);
   const word = enclosing.kind === "part" ? "Part" : "Subpart";
-  return label === "" || /^(?:sub)?part\b/iu.test(label) ? label || word : `${word} ${label}`;
+  if (label === "") return word;
+  return /^[A-Za-z0-9.-]+$/u.test(label) && !/^(?:sub)?part\b/iu.test(label)
+    ? `${word} ${label}`
+    : label;
+}
+
+/** The label without a leading "Part"/"Subpart" word, for messages. */
+export const bareLabel = (label: string): string => label.replace(/^(?:sub)?part\s+/iu, "").trim();
+
+/** "part 2", "subpart 1" or "part 2 subpart 1", for scope lines and messages. */
+export function describeScope(part: string | undefined, subpart: string | undefined): string {
+  return [
+    part === undefined ? "" : `part ${bareLabel(part)}`,
+    subpart === undefined ? "" : `subpart ${bareLabel(subpart)}`,
+  ]
+    .filter((s) => s !== "")
+    .join(" ");
+}
+
+/**
+ * When a part or subpart was given but no such element exists, a hint if the label exists as the
+ * other kind (a subpart passed as part, or a part passed as subpart); otherwise "".
+ */
+export function scopeHint(
+  outline: readonly OutlineEntry[],
+  part: string | undefined,
+  subpart: string | undefined,
+): string {
+  const find = (kind: "part" | "subpart", label: string): OutlineEntry | undefined =>
+    outline.find(
+      (e) => e.kind === kind && normalisePartLabel(e.label) === normalisePartLabel(label),
+    );
+  if (part !== undefined && find("part", part) === undefined) {
+    const asSubpart = find("subpart", part);
+    if (asSubpart !== undefined) {
+      const home = asSubpart.within.filter((w) => w.kind === "part").at(-1);
+      const label = bareLabel(part);
+      return home === undefined
+        ? ` "${label}" is a subpart: pass subpart "${label}".`
+        : ` "${label}" is a subpart (in ${describeEnclosing(home)}): pass subpart "${label}" with part "${bareLabel(home.label)}".`;
+    }
+  }
+  if (
+    subpart !== undefined &&
+    find("subpart", subpart) === undefined &&
+    find("part", subpart) !== undefined
+  ) {
+    return ` "${bareLabel(subpart)}" is a part: pass part "${bareLabel(subpart)}".`;
+  }
+  return "";
 }
 
 /** Human description of a provision request, for messages. */
