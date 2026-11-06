@@ -10,3 +10,4 @@ server.json
 plugins/
 packaging/
 .release-please-manifest.json
+CHANGELOG.md
