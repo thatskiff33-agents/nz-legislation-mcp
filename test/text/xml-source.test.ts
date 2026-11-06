@@ -169,3 +169,46 @@ describe("streamVersionXml", () => {
     expect(await collect(streamVersionXml(ID, signal))).toBe("<act/>");
   });
 });
+
+describe("messages (issue #43): the website, not the API", () => {
+  const PAGE = "https://www.legislation.govt.nz/act/public/1976/33/en/2014-01-01/";
+  async function message(promise: Promise<unknown>): Promise<string> {
+    const e = await promise.then(
+      () => undefined,
+      (err: unknown) => err,
+    );
+    return e instanceof ApiError ? e.message : String(e);
+  }
+  const notApi = (text: string): void => {
+    expect(text).toMatch(/www\.legislation\.govt\.nz|legislation\.govt\.nz/u);
+    expect(text).not.toMatch(/Legislation API|per page/u);
+  };
+
+  it("names the version's page for a missing text", async () => {
+    const text = await message(
+      collect(streamVersionXml(ID, signal, { fetch: fakeFetch(xmlResponse("", 404)).fn })),
+    );
+    notApi(text);
+    expect(text).toContain(PAGE);
+  });
+
+  it("explains an oversized text and still suggests a single provision", async () => {
+    const text = await message(
+      collect(
+        streamVersionXml(ID, signal, {
+          fetch: fakeFetch(xmlResponse("x".repeat(5000))).fn,
+          maxBytes: 1000,
+        }),
+      ),
+    );
+    notApi(text);
+    expect(text).toContain("1000-byte safety limit");
+    expect(text).toContain("A single section or schedule (get_provision_text) may still work");
+    expect(text).toContain(PAGE);
+  });
+
+  it("names the website for a timeout", async () => {
+    const timeout = new DOMException("t", "TimeoutError");
+    notApi(await message(collect(streamVersionXml(ID, signal, { fetch: fakeFetch(timeout).fn }))));
+  });
+});

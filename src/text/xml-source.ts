@@ -5,7 +5,7 @@
  * host must be exactly WEBSITE_ORIGIN, no API key or credentials are sent, redirects are not
  * followed, and the body is size-capped while streaming.
  */
-import { apiErrors, type ApiError } from "../api/errors.js";
+import { apiErrors, xmlErrors, type ApiError } from "../api/errors.js";
 import { parseVersionId, websiteUrl } from "../domain/ids.js";
 import { WEBSITE_ORIGIN } from "../domain/vocabulary.js";
 import { ToolInputError } from "../tools/shared.js";
@@ -80,14 +80,14 @@ export async function* streamVersionXml(
   if (response.status !== 200) {
     await response.body?.cancel().catch(() => undefined);
     const { status } = response;
-    if (status === 404) throw apiErrors.notFound(`The text (XML) of ${versionId}`);
-    if (status >= 300 && status < 400) throw apiErrors.unexpectedRedirect(status);
+    if (status === 404) throw xmlErrors.notFound(versionId, pageUrl(url));
+    if (status >= 300 && status < 400) throw xmlErrors.unexpectedRedirect(status);
     if (status === 502 || status === 503 || status === 504) {
-      throw apiErrors.upstreamUnavailable(status);
+      throw xmlErrors.unavailable(status);
     }
-    throw apiErrors.upstreamError(status);
+    throw xmlErrors.unexpectedStatus(status);
   }
-  if (response.body === null) throw apiErrors.invalidResponse();
+  if (response.body === null) throw xmlErrors.unreadable();
 
   const reader = (response.body as ReadableStream<Uint8Array>).getReader();
   const decoder = new TextDecoder("utf-8");
@@ -102,7 +102,7 @@ export async function* streamVersionXml(
       }
       if (chunk.done) break;
       total += chunk.value.byteLength;
-      if (total > maxBytes) throw apiErrors.tooLarge(maxBytes);
+      if (total > maxBytes) throw xmlErrors.tooLarge(maxBytes, pageUrl(url));
       yield decoder.decode(chunk.value, { stream: true });
     }
     const tail = decoder.decode();
@@ -113,10 +113,15 @@ export async function* streamVersionXml(
   }
 }
 
+/** The version's page on the website, from its XML URL (same path, ending "/"). */
+function pageUrl(xml: URL): string {
+  return xml.href.replace(/.xml$/u, "/");
+}
+
 function transportError(error: unknown, timeoutMs: number, caller: AbortSignal): ApiError {
   if (caller.aborted) return apiErrors.cancelled();
   if (error instanceof DOMException && error.name === "TimeoutError") {
-    return apiErrors.timeout(timeoutMs);
+    return xmlErrors.timeout(timeoutMs);
   }
-  return apiErrors.network();
+  return xmlErrors.network();
 }
