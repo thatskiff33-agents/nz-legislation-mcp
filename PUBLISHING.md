@@ -92,13 +92,18 @@ Do these in order. Each one is an outward-facing change, so a maintainer does th
    the workflow's own token. Only the App may then create release tags (step 5), and the release
    pull requests and commits it makes start CI like any other.
    - Your GitHub settings, Developer settings, GitHub Apps, New GitHub App: any name (for
-     example `nz-legislation-mcp-release`), no webhook, repository permissions Contents
-     read and write and Pull requests read and write (Metadata read-only is added
-     automatically), installable only on this account.
+     example `nz-legislation-mcp-release`), the repository URL as the homepage, Webhook
+     "Active" unticked, repository permissions Contents read and write and Pull requests read
+     and write (Metadata read-only is added automatically), installable only on this account.
    - Install it on this repository only.
-   - Generate a private key. In this repository's Secrets and variables, Actions: add the
-     App's client ID as the variable `RELEASE_APP_CLIENT_ID` and the private key as the secret
-     `RELEASE_APP_PRIVATE_KEY`.
+   - Repository settings, Environments: create `release-pr` with no reviewers, limited to the
+     `main` branch. In it, add the App's client ID as the environment variable
+     `RELEASE_APP_CLIENT_ID` and a newly generated private key as the environment secret
+     `RELEASE_APP_PRIVATE_KEY`. Keeping the key in this environment (not as a repository
+     secret) means only the release jobs on `main` can read it, never a branch or pull request.
+     Delete the downloaded `.pem` file once it is stored.
+   - To rotate the key: generate a new one on the App's page, replace the environment secret,
+     then delete the old key on the App's page.
    - The workflow token stays read-only for these jobs, so "Allow GitHub Actions to create and
      approve pull requests" is not needed.
 2. Repository settings, Environments: create `release`, add required reviewers (the
@@ -117,8 +122,8 @@ Do these in order. Each one is an outward-facing change, so a maintainer does th
      the trusted publisher, and from then on disallow token publishing in the package settings.
 5. Repository settings, Rules, New tag ruleset: target tags matching `v*`, enforcement
    active, rules "Restrict creations", "Restrict updates" and "Restrict deletions", and add the
-   release App (step 1) as the only bypass actor. Release tags can then only be created by
-   release-please and never moved or deleted. GitHub Actions itself cannot be a bypass actor,
+   release App (step 1) as the only bypass actor, with bypass mode "Always allow" ("For pull requests only" would block tag creation). Release tags can then only be created with the
+   App's key (held only by the release jobs on `main`) and never moved or deleted. GitHub Actions itself cannot be a bypass actor,
    which is why the App is needed (#53). On the first release, check that the tag appears
    before the draft release and that the `pack` job checks it out; record the result on #53.
 6. Only when steps 1 to 5 are done: Repository settings, Secrets and variables, Actions,

@@ -154,10 +154,31 @@ describe("release workflow", () => {
 
     const sync = job("sync-release-pr");
     expect(sync).toContain(appStep);
+    expect(sync).toContain("client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}");
+    expect(sync).toContain("private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}");
     expect(sync).toContain("token: ${{ steps.app-token.outputs.token }}");
     expect(sync).toMatch(/permissions:\n {6}contents: read\n/u);
     expect(sync).not.toContain("permission-pull-requests");
     expect(sync).not.toContain("github-actions[bot]");
+    // The commit is attributed to the App's bot account: <id>+<slug>[bot]@users.noreply.github.com.
+    expect(sync).toContain(
+      'git config user.email "${bot_id}+${APP_SLUG}[bot]@users.noreply.github.com"',
+    );
+  });
+
+  it("keeps the App key in a main-only environment and never in a shell step (#53)", () => {
+    for (const name of ["release-please", "sync-release-pr"]) {
+      expect(job(name), name).toContain("    environment: release-pr\n");
+    }
+    // The key appears exactly twice, each as the private-key input of an app-token step.
+    const uses = workflow.split("secrets.RELEASE_APP_PRIVATE_KEY").length - 1;
+    expect(uses).toBe(2);
+    expect(workflow.split("private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}").length - 1).toBe(
+      2,
+    );
+    for (const { line, text } of runLines(workflow)) {
+      expect(text, `line ${String(line)}`).not.toContain("RELEASE_APP_PRIVATE_KEY");
+    }
   });
 
   it("publishes the draft GitHub release only after every artefact is out", () => {
