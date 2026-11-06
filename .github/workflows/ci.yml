@@ -85,3 +85,33 @@ jobs:
       # Builds the bundle with zip (as the release does), validates the manifest with the pinned
       # mcpb CLI and checks the bundle matches what `mcpb pack` produces. CI only: publishes nothing.
       - run: scripts/check-mcpb.sh
+
+  # Exercises the release's npm publish command (release.yml, npm job) on every pull request: the
+  # tarball is packed the same way and published with --dry-run, which needs no login and sends
+  # nothing. --provenance is left out because it needs the release job's OIDC token (#77).
+  publish-dry-run:
+    name: npm publish dry run
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+      # Node 24, as in the release npm job, so the dry run uses the same npm.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - name: Pack as the release does
+        run: |
+          mkdir -p npm-tarball
+          pnpm pack --pack-destination npm-tarball
+          tarball="$(cd npm-tarball && ls -- *.tgz)"
+          echo "TARBALL=$tarball" >> "$GITHUB_ENV"
+      - run: npm publish "./npm-tarball/$TARBALL" --access public --ignore-scripts --dry-run
