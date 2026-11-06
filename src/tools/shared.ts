@@ -11,6 +11,14 @@ import { ApiError } from "../api/errors.js";
 import { parseVersionId, websiteUrl } from "../domain/ids.js";
 import type { Logger } from "../logger.js";
 import { safeCut } from "../text/slice.js";
+import { REPOSITORY_URL } from "../version.js";
+import {
+  AGENCY_PUBLISHER,
+  CLASSIFICATIONS,
+  orList,
+  LEGISLATION_STATUSES,
+  LEGISLATION_TYPES,
+} from "../domain/vocabulary.js";
 
 /** Dependencies every tool handler receives. */
 export interface ToolDeps {
@@ -76,7 +84,7 @@ export function toErrorResult(error: unknown, logger: Logger, tool: string): Cal
     content: [
       {
         type: "text",
-        text: "An unexpected error occurred in this MCP server. Please report it at https://github.com/thatskiff33/nz-legislation-mcp/issues.",
+        text: `An unexpected error occurred in this MCP server. Please report it at ${REPOSITORY_URL}/issues.`,
       },
     ],
   };
@@ -148,15 +156,15 @@ const nullableText = z.string().nullable();
 
 /** Classification fields, flattened so each record has the same shape whatever its type. */
 export const ClassificationShape = {
-  legislation_type: nullableText.describe("act, bill, secondary_legislation or amendment_paper."),
+  legislation_type: nullableText.describe(`${orList(LEGISLATION_TYPES)}.`),
   legislation_status: nullableText.describe(
-    "Current status (today, not as at any date): in_force, not_in_force or no_value.",
+    `Current status (today, not as at any date): ${orList(LEGISLATION_STATUSES)}.`,
   ),
   type_status: nullableText.describe(
     "Current type-specific status (today): act_status, bill_status or instrument_status, e.g. repealed.",
   ),
   category: nullableText.describe("Sub-category: act_type, bill_type or instrument_type_group."),
-  classification: nullableText.describe("principal or amendment, where recorded."),
+  classification: nullableText.describe(`${orList(CLASSIFICATIONS)}, where recorded.`),
   publisher: nullableText,
   administering_agencies: z.array(z.string()),
   agency_pilot_record: z
@@ -199,7 +207,7 @@ export function classificationFrom(raw: RawClassification): {
     classification: raw.act_classification ?? raw.instrument_classification ?? null,
     publisher: raw.publisher ?? null,
     administering_agencies: (raw.administering_agencies ?? []).map(cleanText),
-    agency_pilot_record: raw.publisher === "Agency",
+    agency_pilot_record: raw.publisher === AGENCY_PUBLISHER,
   };
 }
 

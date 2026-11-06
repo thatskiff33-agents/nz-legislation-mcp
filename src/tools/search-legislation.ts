@@ -1,6 +1,7 @@
 /** search_legislation: search or browse works, mirroring the legislation.govt.nz search. */
 import { z } from "zod";
-import { SearchParamsSchema } from "../domain/schemas.js";
+import { MAX_SEARCH_PER_PAGE, SearchParamsSchema } from "../domain/schemas.js";
+import { API_LIMITS } from "../domain/vocabulary.js";
 import {
   AGENCY_PILOT_NOTE,
   ClassificationShape,
@@ -42,7 +43,7 @@ export const searchLegislation = defineTool({
     "Search New Zealand Acts, Bills, secondary legislation (regulations, orders, rules, etc.) and amendment papers on legislation.govt.nz.",
     "Search titles (search_field=title) or full text (search_field=content), or omit search_term to browse by filters.",
     "Type-specific filters (act_*, bill_*, instrument_*) require the matching legislation_type.",
-    "Returns work_id values for get_legislation (which gives links) and list_versions. Results are paged: per_page up to 50 (default 20).",
+    `Returns work_id values for get_legislation (which gives links) and list_versions. Results are paged: per_page up to ${String(MAX_SEARCH_PER_PAGE)} (default ${String(API_LIMITS.defaultPerPage)}).`,
   ].join(" "),
   inputSchema: SearchParamsSchema,
   outputSchema: OutputSchema,

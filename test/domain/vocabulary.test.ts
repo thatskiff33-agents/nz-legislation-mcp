@@ -70,3 +70,19 @@ describe("vocabulary matches the OpenAPI snapshot", () => {
     expect(new Set(all).size).toBe(all.length);
   });
 });
+
+describe("derived groups (issue #42)", () => {
+  it("draw only on the vocabularies, so a renamed value cannot slip through", () => {
+    const statuses = new Set<string>([
+      ...vocab.ACT_STATUSES,
+      ...vocab.INSTRUMENT_STATUSES,
+      ...vocab.BILL_STATUSES,
+    ]);
+    for (const status of vocab.ENDED_STATUSES) expect(statuses.has(status), status).toBe(true);
+    for (const type of vocab.STAGE_TYPES) {
+      expect((vocab.LEGISLATION_TYPES as readonly string[]).includes(type), type).toBe(true);
+    }
+    expect((vocab.PUBLISHERS as readonly string[]).includes(vocab.AGENCY_PUBLISHER)).toBe(true);
+    expect(vocab.API_LIMITS.defaultPerPage).toBeLessThanOrEqual(vocab.API_LIMITS.maxPerPage);
+  });
+});

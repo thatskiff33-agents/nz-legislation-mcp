@@ -6,6 +6,9 @@
  * the API key or raw upstream bodies.
  */
 
+import { API_LIMITS } from "../domain/vocabulary.js";
+import { REPOSITORY_URL } from "../version.js";
+
 export type ApiErrorKind =
   | "unauthorised"
   | "not_found"
@@ -23,7 +26,7 @@ export type ApiErrorKind =
   | "internal_error";
 
 /** Where users report problems with this server. */
-const REPORT_URL = "https://github.com/thatskiff33/nz-legislation-mcp/issues";
+const REPORT_URL = `${REPOSITORY_URL}/issues`;
 
 export class ApiError extends Error {
   override readonly name = "ApiError";
@@ -74,7 +77,7 @@ export const apiErrors = {
   burstLimit: (): ApiError =>
     new ApiError(
       "burst_limit_exceeded",
-      "Too many requests from this network in five minutes (403, limit 2,000 per IP). Wait five minutes before trying again, and make fewer, broader requests.",
+      `Too many requests from this network in ${String(API_LIMITS.burstMinutes)} minutes (403, limit ${API_LIMITS.burstRequests.toLocaleString("en-NZ")} per IP). Wait ${String(API_LIMITS.burstMinutes)} minutes before trying again, and make fewer, broader requests.`,
       true,
       403,
     ),
