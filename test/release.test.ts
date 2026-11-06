@@ -76,7 +76,7 @@ describe("release workflow", () => {
     expect(pack).toContain("sha256: ${{ steps.pack.outputs.sha256 }}");
   });
 
-  it("runs the bundle tool only in a job that cannot produce the npm tarball", () => {
+  it("builds the bundle only in a job that cannot produce the npm tarball", () => {
     for (const [name, text] of all) {
       if (name !== "bundle-build") expect(text, name).not.toMatch(/build-mcpb|mcpb@/u);
     }
@@ -84,6 +84,21 @@ describe("release workflow", () => {
     expect(build).toContain("scripts/build-mcpb.sh");
     expect(build).not.toContain("pnpm pack");
     expect(artifacts(build, "upload")).toEqual(["desktop-bundle"]);
+  });
+
+  it("runs no third-party bundle tool anywhere in a release (issue #37)", () => {
+    const commands = (text: string): string =>
+      text
+        .split("\n")
+        .filter((line) => !/^\s*#/u.test(line))
+        .join("\n");
+    expect(commands(workflow)).not.toMatch(/npx|bunx|pnpm dlx|npm exec|yarn dlx|mcpb@|check-mcpb/u);
+    const build = commands(readFileSync(join(ROOT, "scripts/build-mcpb.sh"), "utf8"));
+    expect(build).not.toMatch(/npx|mcpb@|pnpm dlx|npm exec/u);
+    expect(build).toContain("zip -q -r -9 -X -D");
+    // The official CLI checks the bundle in CI only (the claude desktop bundle job).
+    const ci = readFileSync(join(ROOT, ".github/workflows/ci.yml"), "utf8");
+    expect(ci).toContain("- run: scripts/check-mcpb.sh");
   });
 
   it("uploads the npm tarball from the pack job only", () => {
