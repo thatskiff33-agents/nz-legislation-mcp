@@ -87,7 +87,9 @@ const OutputSchema = z.object({
     ),
   diff_truncated: z
     .boolean()
-    .describe("True if the diff was cut (at a line boundary) to keep the result small; see notes."),
+    .describe(
+      'True if the diff was cut to keep the result small, usually at a line boundary; a line cut part-way ends with "[line cut]". See notes.',
+    ),
   notes: z.array(z.string()),
 });
 
@@ -136,7 +138,9 @@ export const compareVersions = defineTool({
     // provision would read as repealed).
     if (compareVersionIds(fromId, toId) > 0) {
       throw new ToolInputError(
-        `The "from" version (${fromId}) is later than the "to" version (${toId}). Swap them: "from" is the earlier version.`,
+        args.to_as_at === undefined && args.to_version_id === undefined
+          ? `The "from" version (${fromId}) is later than today's version (${toId}), which "to" defaulted to. Pass a later to_as_at or to_version_id, or an earlier "from".`
+          : `The "from" version (${fromId}) is later than the "to" version (${toId}). Swap them: "from" is the earlier version.`,
       );
     }
     const notes = [
@@ -178,14 +182,18 @@ export const compareVersions = defineTool({
     // Cut at the last whole line that fits, so no line is shown half-written, unless that would
     // drop most of the room (one very long changed line): then cut inside it, never mid-character.
     const lastBreak = full.lastIndexOf("\n", MAX_DIFF_CHARS);
-    const diff = truncated
-      ? full.slice(0, lastBreak >= MAX_DIFF_CHARS / 2 ? lastBreak : safeCut(full, MAX_DIFF_CHARS))
-      : full;
+    const midLine = truncated && lastBreak < MAX_DIFF_CHARS / 2;
+    // A line cut part-way is marked, so the visible part is never taken for the whole line.
+    const diff = !truncated
+      ? full
+      : midLine
+        ? `${full.slice(0, safeCut(full, MAX_DIFF_CHARS))} … [line cut]`
+        : full.slice(0, lastBreak);
     if (truncated) {
-      const shown = diff.split("\n").length;
+      const whole = diff.split("\n").length - (midLine ? 1 : 0);
       const total = full.split("\n").length;
       notes.push(
-        `The diff was cut to keep the result small: ${String(shown)} of ${String(total)} diff lines are shown. Compare a smaller provision (a clause rather than a whole schedule), or read each version with get_provision_text.`,
+        `The diff was cut to keep the result small: ${String(whole)} of ${String(total)} diff lines are shown in full${midLine ? ", and the last line shown is cut part-way (marked [line cut])" : ""}. Compare a smaller provision (a clause rather than a whole schedule), or read each version with get_provision_text.`,
       );
     }
     return {

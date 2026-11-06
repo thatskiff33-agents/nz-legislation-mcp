@@ -126,7 +126,7 @@ const OutputSchema = z.object({
     .object({ version_id: z.string(), offset: z.number().int() })
     .nullable()
     .describe(
-      "Arguments for the next page: pass this version_id and offset (with the same section, schedule and part). Null at the end. Using version_id keeps every page on the same version.",
+      "Arguments for the next page: pass this version_id (in place of work_id and as_at) and offset, with the same section, schedule, part and include_history. Null at the end. Using version_id keeps every page on the same version.",
     ),
   total_chars: z.number().int(),
   notes: z.array(z.string()),
@@ -182,7 +182,9 @@ export const getProvisionText = defineTool({
         // A later page chosen by date could come from a newer version than the first page.
         ...(offset > 0 && args.version_id === undefined
           ? [
-              `This page was chosen by date (${record.version_id}). To keep every page on one version, continue with version_id ${record.version_id} (continue_with gives it), and check it matches your first page.`,
+              end < doc.text.length
+                ? `This page was chosen by date (${record.version_id}). To keep every page on one version, continue with version_id ${record.version_id} (continue_with gives it), and check it matches your first page.`
+                : `This page was chosen by date (${record.version_id}); check it matches your first page's version_id.`,
             ]
           : []),
       ],

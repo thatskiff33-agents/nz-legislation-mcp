@@ -517,7 +517,7 @@ describe("version safety and truncation (issue #40)", () => {
   });
 
   it("gives continue_with to pin later pages to one version, with a note for date paging", async () => {
-    const LONG = WAITANGI.replace("Observance of Waitangi Day", `Observance ${"x".repeat(1200)}`);
+    const LONG = WAITANGI.replace("Observance of Waitangi Day", `Observance ${"x".repeat(2200)}`);
     const page = (args: { work_id?: string; version_id?: string; offset?: number }) =>
       getProvisionText.run(
         { section: "4", max_chars: 1000, ...args },
@@ -535,12 +535,18 @@ describe("version safety and truncation (issue #40)", () => {
     const first = await page({ work_id: WORK });
     expect(first.continue_with).toEqual({ version_id: V2014, offset: 1000 });
     expect(first.notes.join(" ")).not.toContain("chosen by date");
-    const byDate = await page({ work_id: WORK, offset: 1000 });
-    expect(byDate.notes.join(" ")).toContain(`continue with version_id ${V2014}`);
-    expect(byDate.continue_with).toBeNull();
+    // A middle page chosen by date: told to pin the version.
+    const middle = await page({ work_id: WORK, offset: 1000 });
+    expect(middle.notes.join(" ")).toContain(`continue with version_id ${V2014}`);
+    expect(middle.continue_with).toEqual({ version_id: V2014, offset: 2000 });
+    // The last page chosen by date: nothing to continue, just a check.
+    const last = await page({ work_id: WORK, offset: 2000 });
+    expect(last.continue_with).toBeNull();
+    expect(last.notes.join(" ")).toContain("check it matches your first page");
+    expect(last.notes.join(" ")).not.toContain("continue with version_id");
     const pinned = await page({ version_id: V2014, offset: 1000 });
     expect(pinned.notes.join(" ")).not.toContain("chosen by date");
-    expect(pinned.text).toBe(byDate.text);
+    expect(pinned.text).toBe(middle.text);
   });
 
   it("refuses a comparison whose versions or dates are the wrong way round", async () => {
@@ -567,6 +573,52 @@ describe("version safety and truncation (issue #40)", () => {
     expect(JSON.stringify(dates.error?.issues)).toContain(
       "from_as_at (2026-01-01) is later than to_as_at (2021-01-01)",
     );
+  });
+
+  it("says when a defaulted 'to' (today) is earlier than 'from', and accepts equal dates", async () => {
+    const { deps: d } = deps(
+      [versionRecord(V2014), json(versionsPage(WORK, ["2007-09-18"]))],
+      "2026-11-02",
+      { [V2007]: WAITANGI, [V2014]: WAITANGI },
+    );
+    await expect(
+      compareVersions.run({ work_id: WORK, section: "4", from_version_id: V2014 }, d, signal),
+    ).rejects.toThrow(`which "to" defaulted to. Pass a later to_as_at or to_version_id`);
+    const same = compareVersions.inputSchema.safeParse({
+      work_id: WORK,
+      section: "4",
+      from_as_at: "2021-01-01",
+      to_as_at: "2021-01-01",
+    });
+    expect(same.success).toBe(true);
+  });
+
+  it("refuses same-day versions in the wrong order (suffix rule)", async () => {
+    const V2014B = `${WORK}_en_2014-01-01B`;
+    const { deps: d } = deps([versionRecord(V2014B), versionRecord(V2014)], "x", {
+      [V2014]: WAITANGI,
+      [V2014B]: WAITANGI,
+    });
+    await expect(
+      compareVersions.run(
+        { work_id: WORK, section: "4", from_version_id: V2014B, to_version_id: V2014 },
+        d,
+        signal,
+      ),
+    ).rejects.toThrow("Swap them");
+  });
+
+  it("explains a capped schedule listing", async () => {
+    const clauses = Array.from(
+      { length: 600 },
+      (_, i) => `<prov><label>${String(i + 1)}</label><heading>C</heading></prov>`,
+    ).join("");
+    const xml = `<act><body/><schedule.group><schedule><label>1</label><heading>Big</heading><schedule.provisions>${clauses}</schedule.provisions></schedule></schedule.group></act>`;
+    const id = "act_public_2099_8_en_2099-01-01";
+    const { deps: d } = deps([versionRecord(id)], "x", { [id]: xml });
+    const out = await getTableOfContents.run({ version_id: id, schedule: "1" }, d, signal);
+    expect(out.truncated).toBe(true);
+    expect(out.notes.join(" ")).toContain("entries in this schedule are listed");
   });
 
   it("keeps the notes from both sides, labelled", async () => {
@@ -631,8 +683,11 @@ describe("version safety and truncation (issue #40)", () => {
       `<para><text>${"b".repeat(40_000)}</text></para>`,
     );
     expect(long.diff_truncated).toBe(true);
-    expect(long.diff).toHaveLength(30_000);
+    expect(long.diff.endsWith("a … [line cut]")).toBe(true);
+    expect(long.diff).toHaveLength(30_000 + " … [line cut]".length);
     expect(long.diff.split("\n")[1]?.startsWith("- aaa")).toBe(true);
-    expect(long.notes.join(" ")).toContain("2 of 3 diff lines are shown");
+    expect(long.notes.join(" ")).toContain(
+      "1 of 3 diff lines are shown in full, and the last line shown is cut part-way",
+    );
   });
 });

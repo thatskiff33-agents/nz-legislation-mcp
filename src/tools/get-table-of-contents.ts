@@ -146,7 +146,9 @@ export const getTableOfContents = defineTool({
 
     if (chosen.length > MAX_ENTRIES) {
       notes.push(
-        `Only the first ${String(MAX_ENTRIES)} of ${String(chosen.length)} matching entries are listed. Pass a narrower part or subpart, or a schedule, to see the rest.`,
+        args.schedule === undefined
+          ? `Only the first ${String(MAX_ENTRIES)} of ${String(chosen.length)} matching entries are listed. Pass a narrower part or subpart, or a schedule, to see the rest.`
+          : `Only the first ${String(MAX_ENTRIES)} of ${String(chosen.length)} entries in this schedule are listed. Use get_provision_text with the schedule and a clause label to read clauses further down.`,
       );
     }
 
