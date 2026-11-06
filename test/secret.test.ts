@@ -31,6 +31,30 @@ describe("Secret", () => {
     expect(s.redact("x?api_key=a%2Bb%2Fc%3Dd&y")).toBe("x?api_key=[REDACTED]&y");
   });
 
+  // Characters that encodeURIComponent leaves alone but form encoding escapes, plus a space
+  // (+ in a form body, %20 in a URL query).
+  const awkward = "ab~c!d(e)f*g'h i+j";
+
+  it.each([
+    ["raw", awkward],
+    ["encodeURIComponent", encodeURIComponent(awkward)],
+    ["form-encoded", new URLSearchParams({ api_key: awkward }).toString()],
+    [
+      "WHATWG URL query",
+      (() => {
+        const url = new URL("https://api.example.test/v0/works/");
+        url.search = `api_key=${awkward}`;
+        return url.href;
+      })(),
+    ],
+  ])("redacts the %s form of a key with awkward characters", (_form, text) => {
+    const out = new Secret(awkward).redact(`before ${text} after`);
+    expect(out).toContain("[REDACTED]");
+    for (const fragment of ["ab~c", "ab%7Ec", "d(e)f", "d%28e%29f", "i+j", "i%2Bj"]) {
+      expect(out).not.toContain(fragment);
+    }
+  });
+
   it("leaves text unchanged when the secret is empty", () => {
     expect(new Secret("").redact("anything")).toBe("anything");
   });

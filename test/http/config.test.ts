@@ -59,6 +59,39 @@ describe("loadHttpConfig", () => {
     expect(loadHttpConfig(remote).oauth?.requireAtJwt).toBe(false);
   });
 
+  it.each(["TRUE", "True", " true "])("accepts %j as true", (value) => {
+    const c = loadHttpConfig({
+      ...remote,
+      [HTTP_ENV.requireAtJwt]: value,
+      [HTTP_ENV.trustProxy]: value,
+    });
+    expect(c.oauth?.requireAtJwt).toBe(true);
+    expect(c.trustProxy).toBe(true);
+  });
+
+  it.each(["false", "FALSE", ""])("accepts %j as false", (value) => {
+    const c = loadHttpConfig({
+      ...remote,
+      [HTTP_ENV.requireAtJwt]: value,
+      [HTTP_ENV.trustProxy]: value,
+    });
+    expect(c.oauth?.requireAtJwt).toBe(false);
+    expect(c.trustProxy).toBe(false);
+  });
+
+  it.each(["1", "yes", "on", "0", "no"])(
+    "refuses %j for a true/false setting, naming the variable",
+    (value) => {
+      const out = problems({
+        ...remote,
+        [HTTP_ENV.requireAtJwt]: value,
+        [HTTP_ENV.trustProxy]: value,
+      });
+      expect(out).toContain(`${HTTP_ENV.requireAtJwt} must be true or false.`);
+      expect(out).toContain(`${HTTP_ENV.trustProxy} must be true or false.`);
+    },
+  );
+
   it("uses a custom audience when given", () => {
     expect(
       loadHttpConfig({ ...remote, [HTTP_ENV.audience]: "api://legislation" }).oauth?.audience,
