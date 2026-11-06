@@ -10,6 +10,7 @@ import type { LegislationClient } from "../api/client.js";
 import { ApiError } from "../api/errors.js";
 import { parseVersionId, websiteUrl } from "../domain/ids.js";
 import type { Logger } from "../logger.js";
+import { safeCut } from "../text/slice.js";
 
 /** Dependencies every tool handler receives. */
 export interface ToolDeps {
@@ -138,7 +139,9 @@ const CONTROL_CHARS = /[\u0000-\u001F\u007F-\u009F]+/g;
 /** Strips control characters and caps the length of text that came from the API. */
 export function cleanText(text: string): string {
   const flat = text.replace(CONTROL_CHARS, " ").trim();
-  return flat.length > MAX_TEXT_LENGTH ? `${flat.slice(0, MAX_TEXT_LENGTH - 1)}…` : flat;
+  return flat.length > MAX_TEXT_LENGTH
+    ? `${flat.slice(0, safeCut(flat, MAX_TEXT_LENGTH - 1))}…`
+    : flat;
 }
 
 const nullableText = z.string().nullable();

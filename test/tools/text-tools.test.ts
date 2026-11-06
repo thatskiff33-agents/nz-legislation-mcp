@@ -154,6 +154,33 @@ describe("get_provision_text", () => {
     expect(second.next_offset).toBe(100);
   });
 
+  it("never splits a character across pages", async () => {
+    // The rendered text is "1 Symbols\n(1) " (14 characters) then the paragraph, so 985 "a"s put
+    // the two halves of the maths symbol at offsets 999 and 1000: across the first page boundary.
+    const X = "\u{1D465}";
+    const MATHS = `<act><cover><title>Maths Act</title></cover><body><prov><label>1</label><heading>Symbols</heading><prov.body><subprov><label>1</label><para><text>${"a".repeat(985)}${X}${"b".repeat(1500)}</text></para></subprov></prov.body></prov></body></act>`;
+    const page = (offset?: number) =>
+      getProvisionText.run(
+        {
+          version_id: V2014,
+          section: "1",
+          max_chars: 1000,
+          ...(offset === undefined ? {} : { offset }),
+        },
+        deps([versionRecord(V2014)], "2026-11-02", { [V2014]: MATHS }).deps,
+        signal,
+      );
+    const first = await page();
+    expect(first.text).toHaveLength(999);
+    expect(first.next_offset).toBe(999);
+    const second = await page(999);
+    expect(second.text.startsWith(X)).toBe(true);
+    const full = `1 Symbols\n(1) ${"a".repeat(985)}${X}${"b".repeat(1500)}`;
+    expect(first.text + second.text).toBe(full.slice(0, 999 + second.text.length));
+    // An offset in the middle of the pair is moved back to the start of the character.
+    expect((await page(1000)).offset).toBe(999);
+  });
+
   it("pages long text with next_offset", async () => {
     const { deps: d } = deps([versionRecord(V2014), versionRecord(V2014)], "2026-11-02", {
       [V2014]: WAITANGI,
