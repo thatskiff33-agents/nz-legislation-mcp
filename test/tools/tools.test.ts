@@ -531,3 +531,27 @@ describe("compareVersionIds", () => {
     expect(compareVersionIds("not-an-id", "also-not")).toBe(0);
   });
 });
+
+describe("single source of truth (issue #42)", () => {
+  it("builds descriptions and limits from src/domain", async () => {
+    const { orList } = await import("../../src/tools/shared.js");
+    expect(orList(["a", "b", "c"])).toBe("a, b or c");
+    expect(orList(["a"])).toBe("a");
+    expect(orList([])).toBe("");
+    expect(getApiQuota.description).toContain("10,000 per day");
+    expect(new ApiError("burst_limit_exceeded", "", true).kind).toBe("burst_limit_exceeded");
+  });
+
+  it("tolerates a versions page without per_page (not required by the spec)", async () => {
+    const page = versionsPage(WORK, ["2026-09-04"]);
+    delete page["per_page"];
+    const { deps: d } = deps([json(page)]);
+    const out = await listVersions.run({ work_id: WORK, per_page: 50 }, d, signal);
+    expect(out.per_page).toBe(50);
+    const { deps: d2 } = deps([json(page)]);
+    expect((await listVersions.run({ work_id: WORK }, d2, signal)).per_page).toBe(20);
+    const { deps: d3 } = deps([json(page)]);
+    const chosen = await getLegislation.run({ work_id: WORK, as_at: "2026-10-01" }, d3, signal);
+    expect(chosen.version_id).toBe(`${WORK}_en_2026-09-04`);
+  });
+});

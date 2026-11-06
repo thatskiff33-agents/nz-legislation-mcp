@@ -7,6 +7,8 @@
  * server reads itself.
  */
 
+import { MIN_NODE_MAJOR, REPOSITORY_SLUG, REPOSITORY_URL } from "../version.js";
+
 /**
  * The name the server is registered under in client configs.
  *
@@ -60,7 +62,7 @@ const CLIENTS: readonly ClientGuide[] = [
       "Or install the plugin, which asks for your API key and keeps it in your system's secure credential store (no `setup` needed):",
       block(
         "sh",
-        "claude plugin marketplace add thatskiff33/nz-legislation-mcp\nclaude plugin install nz-legislation-mcp@nz-legislation-mcp --scope user",
+        `claude plugin marketplace add ${REPOSITORY_SLUG}\nclaude plugin install nz-legislation-mcp@nz-legislation-mcp --scope user`,
       ),
     ],
   },
@@ -126,7 +128,7 @@ export const CLIENT_SETUP_HINT = [
   `  Codex CLI:    codex mcp add ${SERVER_ID} -- ${CLIENT_LAUNCH.command} ${CLIENT_LAUNCH.args.join(" ")}`,
   "",
   "Other clients (Claude Desktop, Cursor, VS Code, Gemini CLI): see docs/clients.md",
-  "https://github.com/thatskiff33/nz-legislation-mcp/blob/main/docs/clients.md",
+  `${REPOSITORY_URL}/blob/main/docs/clients.md`,
   "",
 ].join("\n");
 
@@ -156,7 +158,7 @@ If your terminal can't hide typing (for example Git Bash or mintty on Windows), 
 
 Check everything is working at any time with \`npx -y nz-legislation-mcp doctor\`. It exits with code 1 if a required check fails (Node.js, the key, the Legislation API). A warning about legislation.govt.nz, which only the text tools need, is reported but does not change the exit code.
 
-Node.js 22 or later is required.
+Node.js ${String(MIN_NODE_MAJOR)} or later is required.
 
 ${sections.join("\n\n")}
 

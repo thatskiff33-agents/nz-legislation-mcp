@@ -4,6 +4,7 @@
  */
 import { z } from "zod";
 import type { VersionRecord } from "../api/client.js";
+import { ENDED_STATUSES, STAGE_TYPES } from "../domain/vocabulary.js";
 import {
   AGENCY_PILOT_NOTE,
   ClassificationShape,
@@ -44,9 +45,9 @@ const OutputSchema = z.object({
 type Output = z.output<typeof OutputSchema>;
 
 /** Types whose versions are parliamentary stages rather than law in force. */
-const STAGE_TYPES = new Set(["bill", "amendment_paper"]);
+const STAGES = new Set<string>(STAGE_TYPES);
 /** Current statuses that mean the work may not have been in force on a later as_at. */
-const ENDED_STATUSES = new Set(["repealed", "revoked", "expired", "superseded", "terminated"]);
+const ENDED = new Set<string>(ENDED_STATUSES);
 
 function describe(
   record: VersionRecord,
@@ -56,7 +57,7 @@ function describe(
   const classification = classificationFrom(record);
   if (classification.agency_pilot_record) notes.push(AGENCY_PILOT_NOTE);
   if (extra.as_at !== null) {
-    const stages = STAGE_TYPES.has(String(classification.legislation_type));
+    const stages = STAGES.has(String(classification.legislation_type));
     if (stages) {
       notes.push(
         "For bills and amendment papers, versions are parliamentary stages, not law in force: this is the latest stage dated on or before as_at.",
@@ -69,7 +70,7 @@ function describe(
           : "Newer versions exist, dated after as_at (amendments made or in force later). Some later amendments may apply retrospectively to this date (common in tax legislation); check them with list_versions.",
       );
     }
-    if (classification.type_status !== null && ENDED_STATUSES.has(classification.type_status)) {
+    if (classification.type_status !== null && ENDED.has(classification.type_status)) {
       notes.push(
         stages
           ? `This bill's current status is "${classification.type_status}". Status fields describe today, not as_at.`

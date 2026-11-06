@@ -59,6 +59,49 @@ export const INSTRUMENT_STATUSES = [
 export const BILL_TYPES = ["government", "local", "member", "private"] as const;
 export const BILL_STATUSES = ["current", "enacted", "terminated"] as const;
 
+// ---------------------------------------------------------------------------
+// Groups derived from the vocabularies above (`satisfies` makes a typo a compile error)
+// ---------------------------------------------------------------------------
+
+type Status =
+  | (typeof ACT_STATUSES)[number]
+  | (typeof INSTRUMENT_STATUSES)[number]
+  | (typeof BILL_STATUSES)[number];
+
+/** Legislation types whose versions are parliamentary stages rather than law in force. */
+export const STAGE_TYPES = [
+  "bill",
+  "amendment_paper",
+] as const satisfies readonly LegislationType[];
+
+/** Type-specific statuses meaning the work has ended (repealed, revoked and so on). */
+export const ENDED_STATUSES = [
+  "repealed",
+  "revoked",
+  "expired",
+  "superseded",
+  "terminated",
+] as const satisfies readonly Status[];
+
+/** The publisher value that marks a record drafted and published by an agency (pilot). */
+export const AGENCY_PUBLISHER = "Agency" satisfies (typeof PUBLISHERS)[number];
+
+// ---------------------------------------------------------------------------
+// API limits (https://api.legislation.govt.nz/docs/ and docs/api-notes.md)
+// ---------------------------------------------------------------------------
+
+export const API_LIMITS = {
+  /** Requests per key per day by default; resets at midnight New Zealand time. */
+  dailyRequests: 10_000,
+  /** Requests per IP address in each burst window (403 when exceeded); not reported by the API. */
+  burstRequests: 2_000,
+  burstMinutes: 5,
+  /** Largest page size the API accepts. */
+  maxPerPage: 100,
+  /** Page size the API uses when none is given. */
+  defaultPerPage: 20,
+} as const;
+
 export const VERSION_SORTS = ["asc", "desc"] as const;
 
 // ---------------------------------------------------------------------------

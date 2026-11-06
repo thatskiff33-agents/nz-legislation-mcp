@@ -4,13 +4,12 @@
  */
 import { z } from "zod";
 import type { LegislationClient, VersionRecord } from "../api/client.js";
-import { VersionIdSchema, WorkIdSchema } from "../domain/schemas.js";
+import { MAX_PER_PAGE, VersionIdSchema, WorkIdSchema } from "../domain/schemas.js";
 import type { Logger } from "../logger.js";
 import { suffixOf, ToolInputError, versionDate } from "./shared.js";
 
 /** Bound on version-history pages scanned for as_at (100 versions per page). */
 const MAX_HISTORY_PAGES = 20;
-const PER_PAGE = 100;
 
 /** Input fields that pick a version. Combine with {@link refineSelector}. */
 export const VersionSelectorShape = {
@@ -104,7 +103,7 @@ export async function selectVersion(
   let leftDate = false;
   for (let page = 1; page <= MAX_HISTORY_PAGES; page += 1) {
     const response = await client.listVersions(
-      { work_id: workId, sort: "desc", page, per_page: PER_PAGE },
+      { work_id: workId, sort: "desc", page, per_page: MAX_PER_PAGE },
       { signal },
     );
     for (const version of response.results) {
@@ -131,7 +130,8 @@ export async function selectVersion(
         }
       }
     }
-    const lastPage = response.results.length === 0 || page * response.per_page >= response.total;
+    const lastPage =
+      response.results.length === 0 || page * (response.per_page ?? MAX_PER_PAGE) >= response.total;
     if (lastPage) exhausted = true;
     if (leftDate || lastPage) break;
   }

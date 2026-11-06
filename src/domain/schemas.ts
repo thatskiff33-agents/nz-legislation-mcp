@@ -28,6 +28,7 @@ import {
   SORT_ORDERS,
   TYPE_SPECIFIC_FILTERS,
   VERSION_SORTS,
+  API_LIMITS,
 } from "./vocabulary.js";
 
 // ---------------------------------------------------------------------------
@@ -98,7 +99,7 @@ const MAX_SEARCH_TERM_LENGTH = 500;
 /** Agency names must match the website's "browse agencies" list exactly. */
 const MAX_AGENCY_LENGTH = 200;
 /** API maximum page size (used for version lists, whose items are small). */
-const MAX_PER_PAGE = 100;
+export const MAX_PER_PAGE = API_LIMITS.maxPerPage;
 /** Search page cap: search results are large, so 50 keeps a page within client output limits. */
 const MAX_SEARCH_PER_PAGE = 50;
 /** Sanity bound on page numbers (the whole corpus is under 50,000 works, so under 500 pages of 100). */
@@ -117,7 +118,9 @@ const perPageParam = z
   .min(1)
   .max(MAX_PER_PAGE)
   .optional()
-  .describe(`Results per page, 1 to ${String(MAX_PER_PAGE)}. API default is 20.`);
+  .describe(
+    `Results per page, 1 to ${String(MAX_PER_PAGE)}. API default is ${String(API_LIMITS.defaultPerPage)}.`,
+  );
 
 const onlyWith = (type: string): string => `Only with legislation_type=${type}.`;
 
@@ -139,7 +142,7 @@ export const SearchParamsSchema = strictParams({
   legislation_status: z
     .enum(LEGISLATION_STATUSES)
     .optional()
-    .describe("in_force, not_in_force, or no_value (status not recorded, e.g. bills)."),
+    .describe(`${LEGISLATION_STATUSES.join(", ")} (no_value: status not recorded, e.g. bills).`),
   act_type: z.enum(ACT_TYPES).optional().describe(onlyWith("act")),
   act_status: z.enum(ACT_STATUSES).optional().describe(onlyWith("act")),
   act_classification: z.enum(CLASSIFICATIONS).optional().describe(onlyWith("act")),
@@ -179,7 +182,9 @@ export const SearchParamsSchema = strictParams({
     .min(1)
     .max(MAX_SEARCH_PER_PAGE)
     .optional()
-    .describe(`Results per page, 1 to ${String(MAX_SEARCH_PER_PAGE)}. Default 20.`),
+    .describe(
+      `Results per page, 1 to ${String(MAX_SEARCH_PER_PAGE)}. Default ${String(API_LIMITS.defaultPerPage)}.`,
+    ),
 }).superRefine((params, ctx) => {
   // Reject type-specific filters used without (or with the wrong) legislation_type.
   for (const type of LEGISLATION_TYPES) {
@@ -315,4 +320,6 @@ export const SearchResponseSchema = z.object({
 export const VersionListResponseSchema = z.object({
   results: z.array(VersionRecordSchema),
   ...pageFields,
+  // Not required by the spec for this endpoint: callers fall back to the size they asked for.
+  per_page: pageFields.per_page.optional(),
 });
