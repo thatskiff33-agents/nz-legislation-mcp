@@ -76,7 +76,7 @@ describe("release workflow", () => {
     expect(pack).toContain("sha256: ${{ steps.pack.outputs.sha256 }}");
   });
 
-  it("runs the bundle tool only in a job that cannot produce the npm tarball", () => {
+  it("builds the bundle only in a job that cannot produce the npm tarball", () => {
     for (const [name, text] of all) {
       if (name !== "bundle-build") expect(text, name).not.toMatch(/build-mcpb|mcpb@/u);
     }
@@ -92,7 +92,7 @@ describe("release workflow", () => {
         .split("\n")
         .filter((line) => !/^\s*#/u.test(line))
         .join("\n");
-    expect(commands(workflow)).not.toMatch(/npx|mcpb@|check-mcpb/u);
+    expect(commands(workflow)).not.toMatch(/npx|bunx|pnpm dlx|npm exec|yarn dlx|mcpb@|check-mcpb/u);
     const build = commands(readFileSync(join(ROOT, "scripts/build-mcpb.sh"), "utf8"));
     expect(build).not.toMatch(/npx|mcpb@|pnpm dlx|npm exec/u);
     expect(build).toContain("zip -q -r -9 -X -D");

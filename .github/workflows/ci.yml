@@ -71,7 +71,8 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
-          cache: pnpm
+          # No cache: this job runs npx-resolved code (check-mcpb.sh), which must not be able to
+          # write a pnpm store that other jobs restore.
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       # Builds the bundle with zip (as the release does), validates the manifest with the pinned

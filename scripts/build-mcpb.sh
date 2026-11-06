@@ -33,8 +33,16 @@ rm -f "$stage/pnpm-lock.yaml" "$stage/pnpm-workspace.yaml" \
   "$stage/node_modules/.modules.yaml" "$stage"/node_modules/.pnpm-workspace-state*.json
 rm -rf "$stage/node_modules/.pnpm"
 
-# 3. The bundle manifest (generated and drift-tested by scripts/distribution.ts).
+# 3. The bundle manifest (generated and drift-tested by scripts/distribution.ts). Its version must
+#    match the package being bundled (release-please bumps both; CI validates the schema).
 cp packaging/mcpb/manifest.json "$stage/manifest.json"
+node -e '
+  const read = (f) => JSON.parse(require("node:fs").readFileSync(f, "utf8")).version;
+  const [manifest, pkg] = [read(process.argv[1]), read(process.argv[2])];
+  if (manifest !== pkg) {
+    console.error(`manifest.json version ${manifest} does not match package.json ${pkg}`);
+    process.exit(1);
+  }' "$stage/manifest.json" "$stage/package.json"
 if [[ -n "${MCPB_KEEP_STAGE:-}" ]]; then cp -a "$stage" "$MCPB_KEEP_STAGE"; fi
 
 # 4. The bundle: maximum compression, Unix permissions kept, no directory entries or extra

@@ -18,9 +18,12 @@ mcpb() { npm_config_ignore_scripts=true npx -y @anthropic-ai/mcpb@2.1.2 "$@"; }
 mcpb validate "$work/stage/manifest.json"
 mcpb pack "$work/stage" "$work/reference.mcpb" >/dev/null
 
-# "permissions path" for each file entry (zipinfo: "-rw-r--r--  3.0 unx  size ... path").
+# "permissions path" for each file entry. zipinfo prints eight fields before the name
+# ("-rw-r--r--  3.0 unx  size tx defN date time path"); stripping them keeps names with spaces.
 list() {
-  zipinfo "$1" | awk '$3 == "unx" && $NF !~ /\/$/ { print substr($1, 2, 9), $NF }' | LC_ALL=C sort
+  zipinfo "$1" | awk '$3 == "unx" && $NF !~ /\/$/ {
+    perms = substr($1, 2, 9); name = $0; sub(/^([^ ]+ +){8}/, "", name); print perms, name
+  }' | LC_ALL=C sort
 }
 ours="$(list dist/nz-legislation-mcp.mcpb)"
 reference="$(list "$work/reference.mcpb")"
