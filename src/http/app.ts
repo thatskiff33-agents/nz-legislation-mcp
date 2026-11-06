@@ -25,6 +25,7 @@ import {
   type OAuthMetadata,
   type OAuthTokenVerifier,
 } from "@modelcontextprotocol/server";
+import { createHash } from "node:crypto";
 import type { Logger } from "../logger.js";
 import { createServer } from "../server.js";
 import type { ToolDeps } from "../tools/shared.js";
@@ -88,6 +89,59 @@ const rateLimited = (): Response =>
     { error: "rate_limited", message: "Too many requests. Wait a minute and try again." },
     { "Retry-After": "60" },
   );
+
+/** Why a request was refused, as written to the log. */
+type RefusalReason =
+  | "not_local"
+  | "host_rejected"
+  | "origin_rejected"
+  | "subject_not_allowed"
+  | "rate_limited_ip"
+  | "rate_limited_subject"
+  | "payload_too_large"
+  | "batch_rejected";
+
+/** At most one log record per refusal reason in this period, so a flood cannot flood the log. */
+const REFUSAL_LOG_INTERVAL_MS = 60_000;
+
+/**
+ * A short one-way hash of a token subject, so operators can match refusals to an account
+ * without the log holding the raw identifier. Compute your own with:
+ * printf %s "<sub>" | sha256sum | cut -c1-12
+ *
+ * @internal Exported for tests.
+ */
+export function subjectHash(subject: string): string {
+  return createHash("sha256").update(subject).digest("hex").slice(0, 12);
+}
+
+/**
+ * Logs refusals at warn level, throttled per reason. Records carry the reason, a subject hash
+ * where a token subject is known, and how many refusals of that reason went unlogged since the
+ * last record. Never the raw subject or an IP address (Privacy Act 2020, IPPs 1 and 5).
+ */
+function refusalLog(
+  logger: Logger,
+  now: () => number,
+): (reason: RefusalReason, subject?: string) => void {
+  const last = new Map<RefusalReason, { at: number; suppressed: number }>();
+  return (reason, subject) => {
+    const time = now();
+    const entry = last.get(reason);
+    if (entry !== undefined && time - entry.at < REFUSAL_LOG_INTERVAL_MS) {
+      entry.suppressed += 1;
+      return;
+    }
+    last.set(reason, { at: time, suppressed: 0 });
+    logger.warn("request refused", {
+      reason,
+      ...(subject === undefined || subject === "" ? {} : { subjectHash: subjectHash(subject) }),
+      ...(entry === undefined || entry.suppressed === 0
+        ? {}
+        : { suppressedSinceLast: entry.suppressed }),
+    });
+  };
+}
 
 /** The verified token subject ("local" without OAuth, "" if a verifier supplied none). */
 function subjectOf(authInfo: AuthInfo | undefined): string {
@@ -237,6 +291,10 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
     options.now,
   );
   const allowedSubjects = new Set(config.oauth?.allowedSubjects ?? []);
+  const refused = refusalLog(logger, options.now ?? Date.now);
+  /** The subject to hash in refusal logs: only real token subjects, never the local stand-in. */
+  const loggedSubject = (authInfo: AuthInfo | undefined): string | undefined =>
+    authInfo === undefined ? undefined : subjectOf(authInfo);
   const metadataUrl = getOAuthProtectedResourceMetadataUrl(config.resourceUrl);
   const auth = options.auth;
   const gate =
@@ -267,6 +325,7 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
     const ip = ipKey(remoteAddress);
     const isMetadata = path.startsWith("/.well-known/");
     if (path !== MCP_PATH && !(isMetadata ? metadataLimiter : ipLimiter).take(ip)) {
+      refused("rate_limited_ip");
       return rateLimited();
     }
     // With OAuth, liveness answers any Host and Origin (still rate-limited above), so a container
@@ -277,9 +336,15 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
     if (healthz && config.oauth !== undefined) return json(200, { status: "ok" });
 
     const hostRejected = hostHeaderValidationResponse(request, allowedHosts);
-    if (hostRejected !== undefined) return hostRejected;
+    if (hostRejected !== undefined) {
+      refused("host_rejected");
+      return hostRejected;
+    }
     const originRejected = originValidationResponse(request, allowedOrigins);
-    if (originRejected !== undefined) return originRejected;
+    if (originRejected !== undefined) {
+      refused("origin_rejected");
+      return originRejected;
+    }
 
     if (healthz) return json(200, { status: "ok" });
 
@@ -293,11 +358,19 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
     let authInfo: AuthInfo | undefined;
     if (gate !== undefined) {
       const result = await gate(request);
-      if (result instanceof Response) return ipLimiter.take(ip) ? result : rateLimited();
+      if (result instanceof Response) {
+        if (ipLimiter.take(ip)) return result;
+        refused("rate_limited_ip");
+        return rateLimited();
+      }
       authInfo = result;
       // Valid token, but only the API key holder may use this server (PCO terms clause 6).
       if (!allowedSubjects.has(subjectOf(authInfo))) {
-        if (!ipLimiter.take(ip)) return rateLimited();
+        if (!ipLimiter.take(ip)) {
+          refused("rate_limited_ip");
+          return rateLimited();
+        }
+        refused("subject_not_allowed", loggedSubject(authInfo));
         return json(403, {
           error: "forbidden",
           message: "This account is not allowed to use this server.",
@@ -307,15 +380,22 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
 
     // Rate-limit per user (token subject), not per OAuth client, so new client
     // registrations cannot reset the limit.
-    if (!limiter.take(subjectOf(authInfo))) return rateLimited();
+    if (!limiter.take(subjectOf(authInfo))) {
+      refused("rate_limited_subject", loggedSubject(authInfo));
+      return rateLimited();
+    }
 
     let forwarded = request;
     if (request.method === "POST") {
       const body = await readBody(request);
-      if (body === null) return json(413, { error: "payload_too_large" });
+      if (body === null) {
+        refused("payload_too_large", loggedSubject(authInfo));
+        return json(413, { error: "payload_too_large" });
+      }
       // JSON-RPC batches (allowed by older protocol revisions) would let one request carry
       // many tool calls past the rate limit; MCP no longer uses them, so refuse them.
       if (body.trimStart().startsWith("[")) {
+        refused("batch_rejected", loggedSubject(authInfo));
         return json(400, {
           error: "batch_not_supported",
           message: "Send one JSON-RPC message per request.",
@@ -330,12 +410,13 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
     async fetch(request: Request, meta = { remoteAddress: "unknown" }): Promise<Response> {
       let response: Response;
       try {
-        const refused =
+        const rejected =
           config.oauth === undefined
             ? unauthenticatedRejection(request, meta.remoteAddress)
             : undefined;
+        if (rejected !== undefined) refused("not_local");
         response =
-          refused ??
+          rejected ??
           (await route(request, clientAddress(request, meta.remoteAddress, config.trustProxy)));
       } catch (error) {
         logger.error("unhandled http error", { error });

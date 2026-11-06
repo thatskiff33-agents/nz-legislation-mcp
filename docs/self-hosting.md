@@ -177,6 +177,32 @@ Anyone can register a client with your tenant, but this server admits only the a
 | `429`                                                 | Rate limit reached; wait a minute or raise `LEGISLATION_NZ_RATE_LIMIT_PER_MINUTE`.                                                        |
 | Tool results say the daily quota is used up           | Your key's daily allowance (10,000 requests by default) is spent; it resets at midnight NZ time.                                          |
 
+### Refusal logs
+
+Each refused request writes a `warn` record, `request refused`, to standard error. The `reason` field is one of:
+
+- `subject_not_allowed`
+- `host_rejected`
+- `origin_rejected`
+- `rate_limited_ip`
+- `rate_limited_subject`
+- `payload_too_large`
+- `batch_rejected`
+- `not_local` (local mode without sign-in)
+
+Each reason is logged at most once a minute. The next record for that reason carries `suppressedSinceLast` with the number not logged in between.
+
+The records never contain a raw account ID or an IP address. Where a signed-in account is known, they carry `subjectHash`: the first 12 hexadecimal characters of the SHA-256 of the token's `sub`. To check whether a refusal was your own account, compute the hash of your `sub` and compare:
+
+```sh
+printf %s "<your sub>" | sha256sum | cut -c1-12
+node -e 'console.log(require("node:crypto").createHash("sha256").update(process.argv[1]).digest("hex").slice(0, 12))' "<your sub>"
+```
+
+A typical cause of `subject_not_allowed` is a mistyped `LEGISLATION_NZ_OAUTH_ALLOWED_SUBJECTS`.
+
+Privacy: logging only what is needed to diagnose refusals, and no raw identifiers, is intended to support information privacy principles 1 (purpose for collection) and 5 (storage and security of information) in the Privacy Act 2020. Whether it is enough for your deployment is for you to assess. A short hash of a known identifier can still be matched by someone who already knows that identifier, so treat the logs as private.
+
 ## Local HTTP mode (no sign-in)
 
 `nz-legislation-mcp http` with no OAuth settings listens on `127.0.0.1` only and answers only `localhost` host names. It is for a single user on their own computer (for example a client that prefers HTTP to stdio). Anyone else with access to that computer could use it. Never expose it through a tunnel or proxy (see the warning above).
