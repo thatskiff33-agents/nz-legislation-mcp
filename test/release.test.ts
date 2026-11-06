@@ -129,6 +129,25 @@ describe("release workflow", () => {
     expect(job("container")).toContain("needs: [release-please, pack, bundle-build]");
   });
 
+  it("publishes the tarball by local path, and CI dry-runs the same command (#77)", () => {
+    // npm reads a bare "dir/file.tgz" as a GitHub user/repo, so a local tarball needs "./".
+    const publish = (text: string): string[] =>
+      runLines(text)
+        .map(({ text: line }) => line.trim())
+        .filter((line) => line.startsWith("npm publish "));
+    const release = publish(workflow);
+    expect(release).toEqual([
+      'npm publish "./npm-tarball/$TARBALL" --access public --provenance --ignore-scripts',
+    ]);
+    const ci = publish(readFileSync(join(ROOT, ".github/workflows/ci.yml"), "utf8"));
+    expect(ci).toHaveLength(1);
+    // The dry run is the release command without --provenance (it needs the release OIDC token).
+    const words = (line: string): string[] => line.split(" ").sort();
+    expect(words(ci[0] ?? "")).toEqual(
+      words(`${(release[0] ?? "").replace(" --provenance", "")} --dry-run`),
+    );
+  });
+
   it("publishes npm with no install, no scripts and provenance", () => {
     const npm = job("npm");
     expect(npm).toContain("environment: release");

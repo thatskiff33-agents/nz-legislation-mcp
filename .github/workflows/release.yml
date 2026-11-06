@@ -224,9 +224,11 @@ jobs:
         with:
           node-version: 24
       # --ignore-scripts: no lifecycle script runs while this job can mint an OIDC token.
+      # "./" matters: npm reads a bare "dir/file.tgz" as a GitHub user/repo, not a local file (#77).
+      # CI's "npm publish dry run" job runs this same command with --dry-run on every pull request.
       - env:
           TARBALL: ${{ needs.pack.outputs.tarball }}
-        run: npm publish "npm-tarball/$TARBALL" --access public --provenance --ignore-scripts
+        run: npm publish "./npm-tarball/$TARBALL" --access public --provenance --ignore-scripts
 
   # Claude Desktop bundle and checksums, attached to the (still draft) GitHub release.
   bundle:
