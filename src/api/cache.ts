@@ -48,23 +48,24 @@ export class MemoryCache implements ResponseCache {
   }
 
   set(key: string, value: unknown, ttlMs: number): void {
-    const previous = this.#entries.get(key);
-    if (previous !== undefined) this.#remove(key, previous);
+    // Weigh first: a weight that is not a finite, non-negative number would corrupt the running
+    // total, so it is refused before anything changes (the key keeps any value it had).
     const weight = this.budget?.weigh(value) ?? 0;
-    // A weight that is not a finite, non-negative number would corrupt the running total.
     if (!Number.isFinite(weight) || weight < 0) {
       throw new RangeError(
         `Cache weight must be a finite, non-negative number, got ${String(weight)}.`,
       );
     }
+    const previous = this.#entries.get(key);
+    if (previous !== undefined) this.#remove(key, previous);
     if (this.budget !== undefined && weight > this.budget.maxWeight) return;
     this.#add(key, { value, expiresAt: this.now() + ttlMs, weight });
     const maxWeight = this.budget?.maxWeight ?? Infinity;
     // Over a limit: drop expired entries first, so they never push out live ones.
     const time = this.now();
     if (this.#entries.size > this.maxEntries || this.#weight > maxWeight) {
-      for (const [key, entry] of this.#entries) {
-        if (entry.expiresAt <= time) this.#remove(key, entry);
+      for (const [staleKey, stale] of this.#entries) {
+        if (stale.expiresAt <= time) this.#remove(staleKey, stale);
       }
     }
     // Then evict least recently used entries (Map iterates oldest first; deleting while iterating is safe).

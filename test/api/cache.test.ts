@@ -105,6 +105,20 @@ describe("MemoryCache with a size budget", () => {
     expect(cache.weight).toBe(80);
   });
 
+  it("keeps a key's existing value when a new value's weight is refused", () => {
+    let bad = false;
+    const cache = new MemoryCache(10, Date.now, {
+      maxWeight: 100,
+      weigh: (value) => (bad ? Number.NaN : String(value).length),
+    });
+    cache.set("a", "good", 1000);
+    bad = true;
+    expect(() => {
+      cache.set("a", "worse", 1000);
+    }).toThrow(RangeError);
+    expect([cache.get("a"), cache.weight]).toEqual(["good", 4]);
+  });
+
   it.each([Number.NaN, -1, Infinity])("refuses a weight of %s", (weight) => {
     const cache = new MemoryCache(10, Date.now, { maxWeight: 100, weigh: () => weight });
     expect(() => {
