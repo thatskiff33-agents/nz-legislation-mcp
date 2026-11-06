@@ -54,7 +54,7 @@ function citingFiles(): string[] {
   walk("scripts", ".ts");
   walk("docs", ".md");
   out.push(...readdirSync(ROOT).filter((name) => name.endsWith(".md")));
-  out.push("spec/README.md");
+  out.push("spec/README.md", ".github/pull_request_template.md", "deploy/secrets/README.md");
   return out;
 }
 
@@ -79,11 +79,21 @@ describe("paths and commands cited in docs and source", () => {
         (JSON.parse(read("package.json")) as { scripts: Record<string, string> }).scripts,
       ),
     );
-    // pnpm's own commands, which are not package scripts.
-    const builtIn = new Set(["install", "add", "audit", "pack", "exec", "dlx", "run", "why"]);
+    // pnpm's own commands (not package scripts), and "lockfile" as in prose about pnpm's lockfile.
+    const builtIn = new Set([
+      "install",
+      "add",
+      "audit",
+      "pack",
+      "exec",
+      "dlx",
+      "run",
+      "why",
+      "lockfile",
+    ]);
     const unknown = files.flatMap((file) =>
-      // Commands only: in backticks or quotes, or at the start of a line (code blocks).
-      [...read(file).matchAll(/(?:^|[`"]|\$ )pnpm (?:run )?([a-z][\w:-]*)/gmu)]
+      // Any "pnpm <word>" not inside another word or path (prose, code blocks, `corepack pnpm x`).
+      [...read(file).matchAll(/(?<![\w@/-])pnpm (?:run )?([a-z][\w:-]*)/gu)]
         .map((m) => String(m[1]))
         .filter((name) => !scripts.has(name) && !builtIn.has(name))
         .map((name) => `${file}: pnpm ${name}`),

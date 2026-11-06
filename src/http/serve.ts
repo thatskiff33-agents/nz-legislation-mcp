@@ -100,7 +100,7 @@ export async function serveHttp(io: HttpIo): Promise<number | undefined> {
   });
   if (auth === undefined) {
     logger.warn(
-      "no authentication: HTTP mode is bound to loopback only and must not be exposed. Anyone else signed in to this computer can use it, and your API key, so do not use it on a shared machine.",
+      "no authentication: HTTP mode is bound to loopback only and must not be exposed. Anyone else signed in to this computer can use it, and through it your API key, so do not use it on a shared machine.",
     );
   }
 

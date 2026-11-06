@@ -28,6 +28,6 @@ Out of scope:
 
 ## Handling of API keys (design commitments)
 
-The server never puts your key in a URL, never logs it or returns it in output, and sends it only to `api.legislation.govt.nz`, as the `X-Api-Key` header. Automated tests check these commitments: the key is redacted from log records and error messages in every common encoded form, it never appears in tool output or in requests to `www.legislation.govt.nz`, and requests go only to allowlisted hosts with redirects refused.
+The server never puts your key in a URL, never logs it or returns it in output, and sends it only to `api.legislation.govt.nz`, as the `X-Api-Key` header. Automated tests check these commitments: the key is redacted from log records and error messages in every common encoded form, it never appears in tool error output or in requests to `www.legislation.govt.nz`, and requests to the Legislation API and website go only to those fixed hosts, with redirects refused.
 
 If you believe your key has been exposed, contact the Parliamentary Counsel Office to have it revoked or replaced.

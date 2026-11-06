@@ -208,7 +208,7 @@ Privacy: the hash is pseudonymous, not anonymous. It is unsalted so that you can
 
 ## Local HTTP mode (no sign-in)
 
-`nz-legislation-mcp http` with no OAuth settings listens on `127.0.0.1` only and answers only `localhost` host names. It is for a single user on their own computer (for example a client that prefers HTTP to stdio). Anyone else with access to that computer could use it. Never expose it through a tunnel or proxy (see the warning above).
+`nz-legislation-mcp http` with no OAuth settings listens on `127.0.0.1` only and answers only `localhost` host names. It is for a single user on their own computer (for example a client that prefers HTTP to stdio). Anyone else with access to that computer could use it. Do not use it on a shared machine. Never expose it through a tunnel or proxy (see the warning above).
 
 ## Sources
 

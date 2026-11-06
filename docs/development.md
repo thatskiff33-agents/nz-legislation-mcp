@@ -14,7 +14,7 @@
 | Command             | What it does                                                                                                      |
 | ------------------- | ----------------------------------------------------------------------------------------------------------------- |
 | `pnpm install`      | Install dependencies. Refuses packages younger than 14 days and blocks install scripts.                           |
-| `pnpm check`        | Everything CI runs: typecheck, lint, format check, dead-code check (knip), tests with 100% coverage, build.       |
+| `pnpm check`        | The main CI check: typecheck, lint, format check, dead-code check (knip), tests with 100% coverage, build.        |
 | `pnpm check:static` | The static part of `pnpm check`: typecheck, lint, format check and dead-code check (knip).                        |
 | `pnpm test`         | Tests with coverage.                                                                                              |
 | `pnpm test:watch`   | Tests in watch mode.                                                                                              |

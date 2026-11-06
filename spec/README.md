@@ -5,6 +5,6 @@
 It is used to:
 
 - check that `src/domain/vocabulary.ts` matches every enum in the spec (unit test), and
-- detect upstream changes: when the snapshot is refreshed by hand, its diff shows what PCO changed. There is no scheduled contract job yet.
+- detect upstream changes: when the snapshot is deliberately refreshed, its diff shows what PCO changed. There is no scheduled contract job yet.
 
 Do not edit it by hand. Refresh it only as a deliberate change, with a note in `docs/api-notes.md`.
