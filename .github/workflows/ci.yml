@@ -89,6 +89,8 @@ jobs:
   # Exercises the release's npm publish command (release.yml, npm job) on every pull request: the
   # tarball is packed the same way and published with --dry-run, which needs no login and sends
   # nothing. --provenance is left out because it needs the release job's OIDC token (#77).
+  # npm refuses even a dry run of a version it already has, and between releases package.json
+  # holds the published version, so this job (only) moves to the next patch version first (#82).
   publish-dry-run:
     name: npm publish dry run
     runs-on: ubuntu-latest
@@ -108,6 +110,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
+      - name: Use a version npm has not published
+        run: npm version patch --no-git-tag-version --ignore-scripts
       - name: Pack as the release does
         run: |
           mkdir -p npm-tarball
