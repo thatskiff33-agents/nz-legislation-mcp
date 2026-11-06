@@ -93,7 +93,8 @@ cancelled.
 Do these in order. Each one is an outward-facing change, made by a maintainer or with the
 owner's approval.
 
-Status on 7 November 2026: steps 1 to 6 are done (#53, #11). Step 7 follows the first release.
+Status on 7 November 2026: steps 1 to 7 are done (#53, #11). 1.0.1 is the first published
+release. Still to do: the npm "disallow tokens" setting (step 4).
 
 1. Release App: release-please and the plugin-pin job write with a dedicated GitHub App, not
    the workflow's own token. Only the App may then create release tags (step 5), and the release
@@ -128,7 +129,9 @@ Status on 7 November 2026: steps 1 to 6 are done (#53, #11). Step 7 follows the 
      `0.0.0-placeholder.0`, approving the two-factor prompt in the browser. On 6 November 2026
      the registry also showed a `0.0.0-stage` holding version, created a few minutes before the
      placeholder appeared (observed; cause to confirm). Deprecate both (`npm deprecate`), saying they have no
-     code.
+     code. Once the first release is live from CI, unpublish both
+     (`npm unpublish nz-legislation-mcp@<version>`, naming each version) and remove the
+     `placeholder` dist-tag, so only real releases remain.
    - Add the trusted publisher (npm 11.15.0 or later), or use the package's settings page on
      npmjs.com with the same owner, repository, workflow and environment:
 
@@ -155,7 +158,8 @@ Status on 7 November 2026: steps 1 to 6 are done (#53, #11). Step 7 follows the 
    This matters because GitHub creates a missing environment automatically, with no
    protection, the first time a job uses it.
 7. GitHub Container Registry: after the first image is pushed, set the package's visibility to
-   public and link it to this repository.
+   public and link it to this repository. After the 1.0.1 release (7 November 2026) the package
+   was already public and linked to this repository; no change was needed.
 
 ## MCP Registry (manual, after npm)
 

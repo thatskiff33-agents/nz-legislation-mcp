@@ -4,7 +4,9 @@ Unofficial Model Context Protocol (MCP) server for the New Zealand Legislation A
 (`api.legislation.govt.nz`). Search and read NZ Acts, Bills and secondary legislation
 from Claude, ChatGPT/Codex, Cursor, Grok and other MCP clients, using your own API key.
 
-**Status:** pre-release. Not yet published to npm. See the epic issue for progress.
+**Status:** released. Available on npm as `nz-legislation-mcp`, as a Claude Desktop bundle on the
+[GitHub releases](https://github.com/thatskiff33/nz-legislation-mcp/releases) page, and as the container image
+`ghcr.io/thatskiff33/nz-legislation-mcp`.
 
 Not an official Parliamentary Counsel Office product. Always check the official
 version on [legislation.govt.nz](https://www.legislation.govt.nz) before relying on it.
