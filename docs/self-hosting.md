@@ -32,7 +32,7 @@ sequenceDiagram
 
 ## What you need
 
-1. A Legislation API key (request one from contact@pco.govt.nz).
+1. A Legislation API key (request one by email to contact@pco.govt.nz; see https://www.legislation.govt.nz/developer-api/).
 2. A domain name for the server, for example `mcp.example.com`. The Caddy example below obtains HTTPS certificates automatically.
 3. Somewhere to run containers (a small virtual machine or container host).
 4. An identity provider account. See [Choosing a provider](#choosing-a-provider).

@@ -250,7 +250,7 @@ export function loadConfig(
     }
     if (contents === undefined && problems.length === 0) {
       problems.push(
-        `No API key found. Run "npx nz-legislation-mcp setup", or set ${ENV.apiKey} (request a key from contact@pco.govt.nz).`,
+        `No API key found. Run "npx nz-legislation-mcp setup", or set ${ENV.apiKey} (request a key by email to contact@pco.govt.nz).`,
       );
     } else if (contents !== undefined) {
       const result = validateKey(contents, `The key file ${keyFilePath}`);
