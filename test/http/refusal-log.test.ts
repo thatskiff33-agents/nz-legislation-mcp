@@ -131,11 +131,11 @@ describe("refusal logging", () => {
 
   it("throttles each reason separately", async () => {
     const { app, records } = await oauthApp();
-    await app.fetch(request("/healthz", { host: "evil.example" }), { remoteAddress: IP });
+    await app.fetch(request("/other", { host: "evil.example" }), { remoteAddress: IP });
     await app.fetch(request("/mcp", { origin: "https://evil.example" }, "{}"), {
       remoteAddress: IP,
     });
-    await app.fetch(request("/healthz", { host: "evil.example" }), { remoteAddress: IP });
+    await app.fetch(request("/other", { host: "evil.example" }), { remoteAddress: IP });
     expect(refusals(records).map((r) => r.fields)).toEqual([
       { reason: "host_rejected" },
       { reason: "origin_rejected" },
