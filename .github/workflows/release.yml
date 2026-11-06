@@ -28,9 +28,9 @@ jobs:
     if: vars.RELEASE_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # GITHUB_TOKEN only reads: the App token (below) does the writing.
     permissions:
-      contents: write
-      pull-requests: write
+      contents: read
     outputs:
       created: ${{ steps.release.outputs.release_created }}
       tag: ${{ steps.release.outputs.tag_name }}
@@ -40,9 +40,20 @@ jobs:
       - uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2
         with:
           egress-policy: audit
+      # A dedicated GitHub App, not GITHUB_TOKEN, writes release branches, pull requests and tags:
+      # the v* tag ruleset lets only that App create release tags (GitHub Actions cannot be a
+      # ruleset bypass actor), and what the App pushes triggers CI as normal. See PUBLISHING.md.
+      - id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
       - id: release
         uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         with:
+          token: ${{ steps.app-token.outputs.token }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
@@ -54,21 +65,34 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
-      contents: write
+      contents: read
     steps:
       - uses: step-security/harden-runner@dc2769abcc0fcfbadfc1df54081c1608579ef6b2 # v2.22.2
         with:
           egress-policy: audit
+      # A dedicated GitHub App, not GITHUB_TOKEN, writes release branches, pull requests and tags:
+      # the v* tag ruleset lets only that App create release tags (GitHub Actions cannot be a
+      # ruleset bypass actor), and what the App pushes triggers CI as normal. See PUBLISHING.md.
+      - id: app-token
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}
+          private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
+          permission-contents: write
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ fromJSON(needs.release-please.outputs.pr).headBranchName }}
-          persist-credentials: true # needed to push the update to the release branch
+          token: ${{ steps.app-token.outputs.token }}
+          # Needed to push the update; pushed with the App token, so CI runs on the new commit.
+          persist-credentials: true
       - run: node scripts/sync-release-files.mjs
       - name: Commit if changed
+        env:
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
         run: |
           if ! git diff --quiet; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git config user.name "${APP_SLUG}[bot]"
+            git config user.email "${APP_SLUG}[bot]@users.noreply.github.com"
             git commit -am "chore: pin the Claude Code plugin to the release version"
             git push
           fi
