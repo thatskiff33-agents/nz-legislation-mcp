@@ -109,6 +109,19 @@ function boundedInt(
   return fallback;
 }
 
+/**
+ * Parses an optional true/false setting (case-insensitive). Anything else is a problem rather
+ * than silently false, so a value such as "1" or "yes" cannot leave hardening switched off.
+ */
+function booleanSetting(raw: string | undefined, name: string, problems: string[]): boolean {
+  if (raw === undefined) return false;
+  const value = raw.toLowerCase();
+  if (value === "true") return true;
+  if (value === "false") return false;
+  problems.push(`${name} must be true or false.`);
+  return false;
+}
+
 /** Loads and checks HTTP-mode settings. Throws ConfigError listing every problem. */
 export function loadHttpConfig(env: Env): HttpConfig {
   const problems: string[] = [];
@@ -135,6 +148,8 @@ export function loadHttpConfig(env: Env): HttpConfig {
     problems,
   );
   const loopback = isLoopback(host);
+  const requireAtJwt = booleanSetting(get(HTTP_ENV.requireAtJwt), HTTP_ENV.requireAtJwt, problems);
+  const trustProxy = booleanSetting(get(HTTP_ENV.trustProxy), HTTP_ENV.trustProxy, problems);
 
   const publicValue = get(HTTP_ENV.publicUrl);
   let resourceUrl: URL | undefined;
@@ -188,7 +203,7 @@ export function loadHttpConfig(env: Env): HttpConfig {
         jwksUrl,
         allowedSubjects,
         requiredScopes: list(get(HTTP_ENV.requiredScopes)),
-        requireAtJwt: get(HTTP_ENV.requireAtJwt) === "true",
+        requireAtJwt,
       };
     }
   } else if (!loopback || !isLoopback(resourceUrl.hostname)) {
@@ -206,6 +221,6 @@ export function loadHttpConfig(env: Env): HttpConfig {
     allowedOrigins: list(get(HTTP_ENV.allowedOrigins)),
     rateLimitPerMinute,
     loopback,
-    trustProxy: get(HTTP_ENV.trustProxy) === "true",
+    trustProxy,
   };
 }

@@ -103,25 +103,25 @@ Put an HTTPS reverse proxy in front of port 8080. Pass the original `Host` heade
 
 All settings are environment variables. The server checks them at start-up and exits with a clear message if anything is wrong or unsafe.
 
-| Variable                                | Required         | Default                                  | Meaning                                                                                                                                                                    |
-| --------------------------------------- | ---------------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `LEGISLATION_NZ_API_KEY`                | One of these two |                                          | Your Legislation API key.                                                                                                                                                  |
-| `LEGISLATION_NZ_API_KEY_FILE`           | One of these two |                                          | Path to a file holding the key (preferred in containers).                                                                                                                  |
-| `LEGISLATION_NZ_PUBLIC_URL`             | Remote           |                                          | Public URL of the endpoint, ending in `/mcp`, for example `https://mcp.example.com/mcp`. It is also the token audience.                                                    |
-| `LEGISLATION_NZ_OAUTH_ISSUER`           | Remote           |                                          | Your provider's issuer, exactly as it appears in tokens (`iss`). Copy the `issuer` value from your provider's discovery document (`.../.well-known/openid-configuration`). |
-| `LEGISLATION_NZ_OAUTH_ALLOWED_SUBJECTS` | Remote           |                                          | Comma-separated account IDs (`sub` claim) allowed in: you.                                                                                                                 |
-| `LEGISLATION_NZ_OAUTH_AUDIENCE`         | No               | the public URL                           | Expected token audience, if your provider cannot use the URL. Use a value unique to this server.                                                                           |
-| `LEGISLATION_NZ_OAUTH_JWKS_URL`         | No               | discovered                               | Signing-key URL, if your provider's metadata has none. Must be https.                                                                                                      |
-| `LEGISLATION_NZ_OAUTH_REQUIRED_SCOPES`  | No               | none                                     | Scopes every token must carry, space or comma separated.                                                                                                                   |
-| `LEGISLATION_NZ_OAUTH_REQUIRE_AT_JWT`   | No               | `false`                                  | `true` to require the RFC 9068 `at+jwt` token type (if your provider sets it).                                                                                             |
-| `LEGISLATION_NZ_HTTP_HOST`              | No               | `127.0.0.1` (`0.0.0.0` in the container) | Address to listen on.                                                                                                                                                      |
-| `LEGISLATION_NZ_HTTP_PORT`              | No               | `8080`                                   | Port to listen on.                                                                                                                                                         |
-| `LEGISLATION_NZ_TRUST_PROXY`            | No               | `false`                                  | `true` when a reverse proxy in front of the server appends the client address to `X-Forwarded-For` (the Compose example sets this).                                        |
-| `LEGISLATION_NZ_ALLOWED_ORIGINS`        | No               | none                                     | Browser origins (hostnames) allowed to call the endpoint directly. Not needed for ChatGPT or Claude, which call from their servers.                                        |
-| `LEGISLATION_NZ_RATE_LIMIT_PER_MINUTE`  | No               | `60`                                     | Requests per minute per signed-in user. Public routes and failed sign-ins are limited per IP address at five times this.                                                   |
-| `LEGISLATION_NZ_TIMEOUT_MS`             | No               | `15000`                                  | Timeout for each Legislation API request.                                                                                                                                  |
-| `LEGISLATION_NZ_CACHE`                  | No               | `off`                                    | `memory` to cache API responses and rendered text in memory. Off until the PCO confirms caching is allowed.                                                                |
-| `LEGISLATION_NZ_LOG_LEVEL`              | No               | `info`                                   | `debug`, `info`, `warn` or `error`. Logs go to stderr as JSON lines, with your key redacted.                                                                               |
+| Variable                                | Required         | Default                                  | Meaning                                                                                                                                                                                            |
+| --------------------------------------- | ---------------- | ---------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `LEGISLATION_NZ_API_KEY`                | One of these two |                                          | Your Legislation API key.                                                                                                                                                                          |
+| `LEGISLATION_NZ_API_KEY_FILE`           | One of these two |                                          | Path to a file holding the key (preferred in containers).                                                                                                                                          |
+| `LEGISLATION_NZ_PUBLIC_URL`             | Remote           |                                          | Public URL of the endpoint, ending in `/mcp`, for example `https://mcp.example.com/mcp`. It is also the token audience.                                                                            |
+| `LEGISLATION_NZ_OAUTH_ISSUER`           | Remote           |                                          | Your provider's issuer, exactly as it appears in tokens (`iss`). Copy the `issuer` value from your provider's discovery document (`.../.well-known/openid-configuration`).                         |
+| `LEGISLATION_NZ_OAUTH_ALLOWED_SUBJECTS` | Remote           |                                          | Comma-separated account IDs (`sub` claim) allowed in: you.                                                                                                                                         |
+| `LEGISLATION_NZ_OAUTH_AUDIENCE`         | No               | the public URL                           | Expected token audience, if your provider cannot use the URL. Use a value unique to this server.                                                                                                   |
+| `LEGISLATION_NZ_OAUTH_JWKS_URL`         | No               | discovered                               | Signing-key URL, if your provider's metadata has none. Must be https.                                                                                                                              |
+| `LEGISLATION_NZ_OAUTH_REQUIRED_SCOPES`  | No               | none                                     | Scopes every token must carry, space or comma separated.                                                                                                                                           |
+| `LEGISLATION_NZ_OAUTH_REQUIRE_AT_JWT`   | No               | `false`                                  | `true` to require the RFC 9068 `at+jwt` token type (if your provider sets it). Only `true` or `false` (any case); other values stop start-up.                                                      |
+| `LEGISLATION_NZ_HTTP_HOST`              | No               | `127.0.0.1` (`0.0.0.0` in the container) | Address to listen on.                                                                                                                                                                              |
+| `LEGISLATION_NZ_HTTP_PORT`              | No               | `8080`                                   | Port to listen on.                                                                                                                                                                                 |
+| `LEGISLATION_NZ_TRUST_PROXY`            | No               | `false`                                  | `true` when a reverse proxy in front of the server appends the client address to `X-Forwarded-For` (the Compose example sets this). Only `true` or `false` (any case); other values stop start-up. |
+| `LEGISLATION_NZ_ALLOWED_ORIGINS`        | No               | none                                     | Browser origins (hostnames) allowed to call the endpoint directly. Not needed for ChatGPT or Claude, which call from their servers.                                                                |
+| `LEGISLATION_NZ_RATE_LIMIT_PER_MINUTE`  | No               | `60`                                     | Requests per minute per signed-in user. Public routes and failed sign-ins are limited per IP address at five times this.                                                                           |
+| `LEGISLATION_NZ_TIMEOUT_MS`             | No               | `15000`                                  | Timeout for each Legislation API request.                                                                                                                                                          |
+| `LEGISLATION_NZ_CACHE`                  | No               | `off`                                    | `memory` to cache API responses and rendered text in memory. Off until the PCO confirms caching is allowed.                                                                                        |
+| `LEGISLATION_NZ_LOG_LEVEL`              | No               | `info`                                   | `debug`, `info`, `warn` or `error`. Logs go to stderr as JSON lines, with your key redacted.                                                                                                       |
 
 ## Choosing a provider
 
@@ -176,6 +176,35 @@ Anyone can register a client with your tenant, but this server admits only the a
 | `403` "Invalid Host"                                  | Your reverse proxy changed the `Host` header; pass it through unchanged.                                                                  |
 | `429`                                                 | Rate limit reached; wait a minute or raise `LEGISLATION_NZ_RATE_LIMIT_PER_MINUTE`.                                                        |
 | Tool results say the daily quota is used up           | Your key's daily allowance (10,000 requests by default) is spent; it resets at midnight NZ time.                                          |
+
+### Refusal logs
+
+Requests refused for the reasons below are logged at `warn` level as `request refused`, on standard error, with a `reason` field:
+
+- `subject_not_allowed`: a valid token whose `sub` is not in `LEGISLATION_NZ_OAUTH_ALLOWED_SUBJECTS`
+- `insufficient_scope`: a valid token without the scopes in `LEGISLATION_NZ_OAUTH_REQUIRED_SCOPES`
+- `host_rejected`
+- `origin_rejected`
+- `rate_limited_ip`
+- `rate_limited_subject`
+- `payload_too_large`
+- `batch_rejected`
+- `not_local` (local mode without sign-in)
+
+Tokens that fail verification are logged separately as `access token refused`, with the error class and code only (never the token). A request with no token at all is normal sign-in discovery and is not logged.
+
+Each reason (and each token error code) is logged at most once a minute, so a flood of bad requests cannot flood the log. The next record carries `suppressedSinceLast` with the number not logged in between. Within that minute only the first refusal's details are kept.
+
+The records never contain a raw account ID or an IP address. Where a signed-in account is known, they carry `subjectHash`: the first 12 hexadecimal characters of the SHA-256 of the token's `sub`. To check whether a refusal was your own account, compute the hash of your `sub` and compare:
+
+```sh
+printf %s "<your sub>" | sha256sum | cut -c1-12
+node -e 'console.log(require("node:crypto").createHash("sha256").update(process.argv[1]).digest("hex").slice(0, 12))' "<your sub>"
+```
+
+Typical causes: a mistyped `LEGISLATION_NZ_OAUTH_ALLOWED_SUBJECTS` (`subject_not_allowed`) or required scopes your provider does not grant (`insufficient_scope`).
+
+Privacy: the hash is pseudonymous, not anonymous. It is unsalted so that you can check it with the commands above, which also means anyone can hash a guessable or enumerable `sub` (for example a sequential number, or an email-style ID) and match it. Treat the hash as identifying, and treat these logs as private. Logging only what is needed to diagnose refusals, with no raw identifiers or IP addresses, is intended to support information privacy principles 1 (purpose for collection), 5 (storage and security of information) and 9 (limits on retention of personal information) in the Privacy Act 2020. Whether a hashed identifier is personal information under the Act, and whether this is enough for your deployment, is for you to assess (to confirm with your privacy adviser). Keep the logs no longer than you need them.
 
 ## Local HTTP mode (no sign-in)
 

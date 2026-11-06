@@ -120,6 +120,18 @@ describe("serveHttp", () => {
     expect(logged).toContain('"message":"access token refused"');
     expect(logged).toContain('"code":"ERR_JWS_INVALID"');
     expect(logged).not.toContain("not.a.jwt");
+    // Repeats within a minute are counted, not logged (bad tokens come before rate limits).
+    for (let i = 0; i < 3; i += 1) {
+      await handler?.(
+        new Request("https://mcp.example.com/mcp", {
+          method: "POST",
+          headers: { host: "mcp.example.com", authorization: "Bearer not.a.jwt" },
+          body: "{}",
+        }),
+        { remoteAddress: "192.0.2.1" },
+      );
+    }
+    expect(t.stderr.join("").split('"message":"access token refused"')).toHaveLength(2);
   });
 
   it("uses a configured JWKS URL instead of the discovered one", async () => {

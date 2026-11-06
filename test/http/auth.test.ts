@@ -123,10 +123,13 @@ describe("createJwtVerifier", () => {
         throw "odd";
       }).verifyAccessToken(token),
     );
+    // A signed token whose subject is empty passes jose's checks but not ours.
+    await rejection(make(k.keys).verifyAccessToken(await k.mint({ sub: "" })));
     expect(reasons).toEqual([
       { error: "JWSInvalid", code: "ERR_JWS_INVALID" },
       { error: "TypeError", code: "error" },
       { error: "unknown", code: "unknown" },
+      { error: "JWTClaimValidationFailed", code: "missing_sub" },
     ]);
     expect(JSON.stringify(reasons)).not.toContain(token);
   });
