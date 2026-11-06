@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { getFileInfo } from "prettier";
 import { describe, expect, it } from "vitest";
+import { runLines } from "./workflow.js";
 
 const ROOT = join(import.meta.dirname, "..");
 const workflow = readFileSync(join(ROOT, ".github/workflows/release.yml"), "utf8");
@@ -143,23 +144,9 @@ describe("release workflow", () => {
   });
 
   it("keeps ${{ }} expressions out of run steps, including multi-line bodies", () => {
-    const lines = workflow.split("\n");
-    let runs = 0;
-    lines.forEach((line, i) => {
-      const run = /^(\s+)(?:- )?run: (.*)$/u.exec(line);
-      if (run === null) return;
-      runs += 1;
-      expect(run[2], `line ${String(i + 1)}`).not.toContain("${{");
-      if (run[2] !== "|") return;
-      // The block body is every following line indented deeper than the "run:" key.
-      const keyIndent = (run[1] ?? "").length + (line.trimStart().startsWith("- ") ? 2 : 0);
-      for (let j = i + 1; j < lines.length; j += 1) {
-        const body = lines[j] ?? "";
-        if (body.trim() !== "" && body.length - body.trimStart().length <= keyIndent) break;
-        expect(body, `line ${String(j + 1)}`).not.toContain("${{");
-      }
-    });
-    expect(runs).toBeGreaterThan(5);
+    const lines = runLines(workflow);
+    expect(lines.length).toBeGreaterThan(20);
+    for (const { line, text } of lines) expect(text, `line ${String(line)}`).not.toContain("${{");
   });
 
   it("lets a re-run replace partly uploaded release assets", () => {

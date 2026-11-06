@@ -1,5 +1,6 @@
-# syntax=docker/dockerfile:1
 # Container image for remote (HTTP) mode. Base images are pinned by digest (updated by Dependabot).
+# No "# syntax=" line: the builder's built-in Dockerfile frontend is used, so no unpinned
+# frontend image is pulled at build time.
 #
 # Build:  docker build -t nz-legislation-mcp .
 # Run:    see docs/self-hosting.md (OAuth is required: the container binds 0.0.0.0).
@@ -35,6 +36,10 @@ ENV NODE_ENV=production \
     LEGISLATION_NZ_HTTP_PORT=8080
 USER nonroot
 EXPOSE 8080
+# Health check with Node itself (distroless has no shell or curl). /healthz answers any Host, so
+# the check works however LEGISLATION_NZ_PUBLIC_URL is set.
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD ["/nodejs/bin/node", "-e", "fetch('http://127.0.0.1:' + (process.env.LEGISLATION_NZ_HTTP_PORT || 8080) + '/healthz').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
 ENTRYPOINT ["/nodejs/bin/node", "dist/cli.js"]
 CMD ["http"]
 

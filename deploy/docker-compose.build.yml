@@ -1,0 +1,9 @@
+# Build override: builds the mcp image from this repository instead of using a published release.
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+# The image is tagged nz-legislation-mcp:local, never a published name, so a local build cannot
+# masquerade as a verified release.
+services:
+  mcp:
+    image: nz-legislation-mcp:local
+    build:
+      context: ..
