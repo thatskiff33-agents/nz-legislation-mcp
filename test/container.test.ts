@@ -36,6 +36,25 @@ describe("container workflow", () => {
     expect(workflow).toContain("sha256sum --check --strict");
   });
 
+  it("lets only the merge job mint a signing token", () => {
+    const jobs = workflow.slice(workflow.indexOf("\njobs:\n"));
+    const job = (name: string): string => {
+      const start = jobs.indexOf(`\n  ${name}:\n`);
+      const next = jobs.slice(start + 1).search(/\n {2}[a-z-]+:\n/u);
+      return next < 0 ? jobs.slice(start) : jobs.slice(start, start + 1 + next);
+    };
+    expect(job("build")).not.toContain("id-token");
+    expect(job("scan")).not.toContain("id-token");
+    expect(job("merge")).toContain("id-token: write");
+    // The scanner runs before any registry login in the build job.
+    const build = job("build");
+    expect(build.indexOf("trivy-action@")).toBeLessThan(build.indexOf("docker/login-action@"));
+  });
+
+  it("checks the tagged index holds exactly the images just built before signing", () => {
+    expect(workflow).toContain('[[ -n "$expected" && "$expected" == "$actual" ]]');
+  });
+
   it("pushes by digest, then tags and signs the merged image by digest", () => {
     expect(workflow).toContain("push-by-digest=true");
     expect(workflow).toContain("docker buildx imagetools create");

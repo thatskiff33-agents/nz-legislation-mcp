@@ -21,9 +21,10 @@ Nothing leaves GitHub until someone approves the `release` environment.
      the Claude Desktop bundle from it with the standard `zip` command: no third-party tool runs
      in a release. It cannot change what npm publishes: tampering with the tarball artifact fails
      the checksum check and stops the release.
-   - Three publishing jobs then wait for approval on the `release` environment. The npm and
-     bundle jobs install nothing, run no project tooling, and verify every file against the
-     job-output checksums before using it:
+   - The publishing jobs then wait for approval on the `release` environment: npm, the bundle,
+     the two container builds (approved together) and, once those finish, the container merge
+     (approved again). The npm and bundle jobs install nothing, run no project tooling, and
+     verify every file against the job-output checksums before using it:
      - npm: publishes the checked tarball with provenance, using trusted publishing (no npm
        token is stored).
      - Claude Desktop bundle: attached to the draft GitHub release with SHA-256 checksums.
@@ -77,6 +78,11 @@ if another job was declined.
   - Check each file against the SHA-256 printed in the `pack` and `bundle-build` job summaries.
   - Write `SHA256SUMS` for the two files, attach the bundle and `SHA256SUMS` to the draft, then
     publish it (`gh release edit <tag> --draft=false`).
+- **A container build failed, or the merge was declined:** the image built by any finished leg
+  is already in the registry by digest, but untagged and unsigned, so nothing points users at it.
+  Re-run the failed jobs (each leg replaces its digest record; the merge checks there are exactly
+  two). If the release is abandoned, delete the untagged versions from the package's page on
+  GitHub.
 
 ## One-time setup (before the first release)
 

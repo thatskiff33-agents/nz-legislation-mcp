@@ -420,10 +420,21 @@ describe("HTTP app on loopback without OAuth", () => {
       logger: silentLogger,
     });
     apps.push(app);
-    const res = await app.fetch(
-      new Request("http://localhost:8080/healthz", { headers: { host: "mcp.example.com" } }),
+    // From a loopback peer, so the Host check itself is what refuses (DNS rebinding), not the
+    // peer-address check. /healthz is not exempt without OAuth.
+    for (const path of ["/healthz", "/mcp"]) {
+      const res = await app.fetch(
+        new Request(`http://localhost:8080${path}`, { headers: { host: "mcp.example.com" } }),
+        LOCAL,
+      );
+      expect(res.status, path).toBe(403);
+      expect(await res.text(), path).toContain("Invalid Host");
+    }
+    const ok = await app.fetch(
+      new Request("http://localhost:8080/healthz", { headers: { host: "localhost:8080" } }),
+      LOCAL,
     );
-    expect(res.status).toBe(403);
+    expect(ok.status).toBe(200);
   });
 
   it("serves MCP locally with no token and no HSTS", async () => {

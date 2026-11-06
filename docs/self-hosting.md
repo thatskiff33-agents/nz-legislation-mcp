@@ -56,7 +56,7 @@ sequenceDiagram
    - Published image (set `NZLM_IMAGE` in `deploy/.env` to a verified digest first): `docker compose pull && docker compose up -d`
    - Built from source: `docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build`
 
-   Caddy starts once the server passes its container health check.
+   Caddy starts once the server passes its container health check, which connects to `127.0.0.1` inside the container. If you set `LEGISLATION_NZ_HTTP_HOST` to a specific address instead of the default `0.0.0.0`, the check cannot connect and Caddy will not start: keep the default in the container.
 
 5. Check that `https://mcp.example.com/healthz` returns `{"status":"ok"}`, and that `https://mcp.example.com/.well-known/oauth-protected-resource/mcp` names your provider.
 

@@ -35,6 +35,7 @@ env:
 jobs:
   # Pull requests: build and scan each architecture on its own native runner (nothing is pushed).
   scan:
+    name: scan (${{ matrix.arch }})
     if: github.event_name == 'pull_request'
     strategy:
       fail-fast: false
@@ -103,6 +104,7 @@ jobs:
   # pushed by digest only (no tag) with an SBOM and provenance. `merge` tags and signs the
   # multi-architecture image once both are in.
   build:
+    name: build (${{ matrix.arch }})
     if: github.event_name != 'pull_request'
     strategy:
       fail-fast: true
@@ -134,15 +136,6 @@ jobs:
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
         with:
           driver-opts: image=${{ env.BUILDKIT_IMAGE }}
-      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - id: meta
-        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
-        with:
-          images: ${{ env.IMAGE }}
       - name: Build for scanning (not pushed)
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
@@ -170,6 +163,20 @@ jobs:
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           exit-code: "1"
+      # Registry login only after the scan, so the scanner never runs with credentials on disk.
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      # The same semver tags as `merge` (not applied here): they set the version label.
+      - id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=semver,pattern={{version}},value=${{ inputs.tag }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ inputs.tag }}
       - id: build
         name: Push by digest (no tag yet)
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
@@ -195,6 +202,8 @@ jobs:
           path: ${{ runner.temp }}/digests/*
           if-no-files-found: error
           retention-days: 7
+          # A re-run of a failed leg replaces its earlier digest file (merge checks the count).
+          overwrite: true
 
   # Tag the multi-architecture image (both digests) and sign it, keyless, by digest.
   merge:
@@ -250,6 +259,19 @@ jobs:
           docker buildx imagetools create "${tags[@]}" "${sources[@]}"
           digest="$(docker buildx imagetools inspect "$IMAGE:$VERSION" --format '{{json .Manifest}}' | jq -r .digest)"
           [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || { echo "Not a digest: $digest" >&2; exit 1; }
+          # The tag was read back above, so check the index it points to holds exactly our two
+          # builds (their platform and attestation manifests) before signing it: if the tag had
+          # been moved in between, the project identity would otherwise sign someone else's image.
+          children() {
+            docker buildx imagetools inspect --raw "$1" \
+              | jq -r --arg self "${1#*@}" 'if .manifests then .manifests[].digest else $self end'
+          }
+          expected="$(for s in "${sources[@]}"; do children "$s"; done | LC_ALL=C sort)"
+          actual="$(children "$IMAGE@$digest" | LC_ALL=C sort)"
+          [[ -n "$expected" && "$expected" == "$actual" ]] || {
+            echo "The tagged index does not match the images just built; not signing." >&2
+            exit 1
+          }
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
           echo "Multi-architecture image: $IMAGE@$digest" >> "$GITHUB_STEP_SUMMARY"
       - uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
