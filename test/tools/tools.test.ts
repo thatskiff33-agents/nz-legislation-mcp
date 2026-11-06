@@ -417,7 +417,7 @@ describe("text helpers", () => {
         a,
       ),
     ).toBe(
-      "This label appears 2 times (at the top level; at the top level). Used the one at the top level. Pass part to choose another.",
+      "This label appears 2 times (at the top level; at the top level). Used the one at the top level. Pass part (and subpart) to choose another.",
     );
     const schedule = { ...a, kind: "schedule" as const };
     expect(
