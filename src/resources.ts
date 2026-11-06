@@ -157,7 +157,7 @@ async function readProvision(
       ? []
       : [
           "",
-          `[Text continues: ${String(out.total_chars - out.next_offset)} more characters. Use the get_provision_text tool with offset ${String(out.next_offset)}.]`,
+          `[Text continues: ${String(out.total_chars - out.next_offset)} more characters. Use the get_provision_text tool with version_id ${out.version_id} and offset ${String(out.next_offset)}.]`,
         ]),
     "",
     ...out.notes.filter((note) => note !== TEXT_SOURCE_NOTE).map(forResource),

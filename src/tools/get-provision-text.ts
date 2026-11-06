@@ -99,7 +99,9 @@ const InputSchema = z
       .int()
       .min(0)
       .optional()
-      .describe("Character offset to continue from (use next_offset from a previous call)."),
+      .describe(
+        "Character offset to continue from. To continue, pass continue_with from the previous page (its version_id and offset), so every page comes from the same version.",
+      ),
   })
   .superRefine((args, ctx) => {
     refineSelector(args, ctx);
@@ -119,7 +121,13 @@ const OutputSchema = z.object({
     .number()
     .int()
     .nullable()
-    .describe("Pass as offset to get the rest, or null if this is the end."),
+    .describe("Offset of the next page, or null if this is the end."),
+  continue_with: z
+    .object({ version_id: z.string(), offset: z.number().int() })
+    .nullable()
+    .describe(
+      "Arguments for the next page: pass this version_id (in place of work_id and as_at) and offset, with the same section, schedule, part and include_history. Null at the end. Using version_id keeps every page on the same version.",
+    ),
   total_chars: z.number().int(),
   notes: z.array(z.string()),
 });
@@ -130,7 +138,7 @@ export const getProvisionText = defineTool({
   description: [
     "Get the text of one section, a clause in a schedule, or a whole schedule, from the official XML.",
     "Choose the version with work_id (+ as_at, default today in New Zealand) or version_id. Labels come from get_table_of_contents.",
-    "Long text is paged: pass next_offset as offset to continue (or raise max_chars for very long provisions such as definitions sections).",
+    "Long text is paged: continue with the continue_with version_id and offset from the previous page, so all pages come from one version (or raise max_chars for very long provisions such as definitions sections).",
     "Repealed provisions are marked [Repealed]; quoted words appear in quotation marks.",
   ].join(" "),
   inputSchema: InputSchema,
@@ -162,6 +170,7 @@ export const getProvisionText = defineTool({
       text: doc.text.slice(offset, end),
       offset,
       next_offset: end < doc.text.length ? end : null,
+      continue_with: end < doc.text.length ? { version_id: record.version_id, offset: end } : null,
       total_chars: doc.text.length,
       notes: [
         TEXT_SOURCE_NOTE,
@@ -170,6 +179,14 @@ export const getProvisionText = defineTool({
           ? ["This provision has been repealed; only a marker remains in this version."]
           : []),
         ...nonNull(duplicatesNote(doc.matches, doc.found)),
+        // A later page chosen by date could come from a newer version than the first page.
+        ...(offset > 0 && args.version_id === undefined
+          ? [
+              end < doc.text.length
+                ? `This page was chosen by date (${record.version_id}). To keep every page on one version, continue with version_id ${record.version_id} (continue_with gives it), and check it matches your first page.`
+                : `This page was chosen by date (${record.version_id}); check it matches your first page's version_id.`,
+            ]
+          : []),
       ],
     };
   },
