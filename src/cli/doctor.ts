@@ -1,10 +1,15 @@
 /**
  * `nz-legislation-mcp doctor`: checks that everything needed to run the server is in place.
  * Makes one API request (counts against the daily quota) and one request to the website.
+ *
+ * Exit code: 1 if a required check failed (Node.js version, configuration and key, the
+ * Legislation API), otherwise 0. Warnings (the website, which only the text tools need) do not
+ * change the exit code, but the summary says they happened.
  */
 import { LegislationClient } from "../api/client.js";
 import type { ApiError } from "../api/errors.js";
-import { loadConfig, type ConfigError } from "../config.js";
+import { existsSync } from "node:fs";
+import { defaultKeyFilePath, loadConfig, type ConfigError } from "../config.js";
 import { WEBSITE_ORIGIN } from "../domain/vocabulary.js";
 import { USER_AGENT, VERSION } from "../version.js";
 
@@ -32,7 +37,12 @@ export async function runDoctor(io: DoctorIo): Promise<number> {
   let config;
   try {
     config = loadConfig(io.env);
-    report("ok", "API key", "found and well-formed");
+    report("ok", "API key", `found and well-formed, from ${config.keySource}`);
+    // A stale environment setting silently overrides the key saved by setup; say so.
+    const saved = defaultKeyFilePath(io.env);
+    if (!config.keySource.includes(saved) && existsSync(saved)) {
+      report("warn", "Saved key", `the key saved by setup at ${saved} is not being used`);
+    }
   } catch (error) {
     // loadConfig only throws ConfigError.
     report("fail", "Configuration", (error as ConfigError).problems.join(" "));
@@ -79,6 +89,13 @@ export async function runDoctor(io: DoctorIo): Promise<number> {
   }
 
   const failed = results.includes("fail");
-  io.stdout(failed ? "\nSome checks failed.\n" : "\nAll checks passed.\n");
+  const warned = results.includes("warn");
+  io.stdout(
+    failed
+      ? "\nSome required checks failed.\n"
+      : warned
+        ? "\nAll required checks passed, with warnings.\n"
+        : "\nAll checks passed.\n",
+  );
   return failed ? 1 : 0;
 }

@@ -175,6 +175,25 @@ describe("runCli setup and doctor", () => {
     expect(t.stderr.join("")).toContain("rejected the API key");
   });
 
+  it("refuses --key-stdin from an interactive terminal, saving nothing", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "nzlm-cli-"));
+    const t = io({ XDG_CONFIG_HOME: dir, APPDATA: dir });
+    const value = { ...t.value, stdin: fakeStdin(`${KEY}\n`, true) };
+    expect(await runCli(["setup", "--key-stdin", "--no-verify"], value)).toBe(1);
+    expect(t.stderr.join("")).toContain("--key-stdin is for piped input");
+    expect(() => readFileSync(join(dir, "nz-legislation-mcp", "key"))).toThrow();
+  });
+
+  it("refuses to prompt when standard input cannot hide the key, saving nothing", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "nzlm-cli-"));
+    const t = io({ XDG_CONFIG_HOME: dir, APPDATA: dir });
+    const value = { ...t.value, stdin: fakeStdin(`${KEY}\n`, false) };
+    expect(await runCli(["setup", "--no-verify"], value)).toBe(1);
+    expect(t.stderr.join("")).toContain("This terminal can't hide your key.");
+    expect(t.stderr.join("")).not.toContain("Paste your");
+    expect(() => readFileSync(join(dir, "nz-legislation-mcp", "key"))).toThrow();
+  });
+
   it("runs doctor", async () => {
     vi.stubGlobal("fetch", fakeFetch(() => new Response(null, { status: 200 })).fn);
     const t = io({ XDG_CONFIG_HOME: "/nonexistent-nzlm-test", APPDATA: "/nonexistent-nzlm-test" });
