@@ -7,12 +7,12 @@
     "url": "https://github.com/thatskiff33/nz-legislation-mcp",
     "source": "github"
   },
-  "version": "0.0.0",
+  "version": "1.0.0",
   "packages": [
     {
       "registryType": "npm",
       "identifier": "nz-legislation-mcp",
-      "version": "0.0.0",
+      "version": "1.0.0",
       "transport": {
         "type": "stdio"
       },
