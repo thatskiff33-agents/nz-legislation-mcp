@@ -113,7 +113,7 @@ describe("table of contents with schedules", () => {
 });
 
 describe("get_provision_text", () => {
-  it("returns a section as at a date, with paging", async () => {
+  it("returns a short section as at a date, in one page", async () => {
     const { deps: d } = deps(
       [json(versionsPage(WORK, ["2014-01-01", "2007-09-18"]))],
       "2026-11-02",
@@ -134,14 +134,24 @@ describe("get_provision_text", () => {
     });
     expect(out.text.startsWith("4 Observance of Waitangi Day")).toBe(true);
     expect(out.notes.join(" ")).toContain("as_at defaulted");
-    if (out.next_offset !== null) {
-      const rest = await getProvisionText.run(
-        { work_id: WORK, section: "4", offset: out.next_offset },
+    // Section 4 is shorter than max_chars, so there is no next page.
+    expect(out.next_offset).toBeNull();
+  });
+
+  it("continues a section from next_offset when the version is chosen by date", async () => {
+    const page = (offset?: number) =>
+      getProvisionText.run(
+        { work_id: WORK, section: "4", max_chars: 50, ...(offset === undefined ? {} : { offset }) },
         deps([json(versionsPage(WORK, ["2014-01-01"]))], "2026-11-02", { [V2014]: WAITANGI }).deps,
         signal,
       );
-      expect(rest.offset).toBe(out.next_offset);
-    }
+    const first = await page();
+    expect(first.text).toHaveLength(50);
+    expect(first.next_offset).toBe(50);
+    const second = await page(50);
+    expect(second.offset).toBe(50);
+    expect(second.text.startsWith(first.text)).toBe(false);
+    expect(second.next_offset).toBe(100);
   });
 
   it("pages long text with next_offset", async () => {
