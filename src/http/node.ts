@@ -128,7 +128,9 @@ export async function listen(
       res.end('{"error":"method_not_allowed"}');
       return;
     }
-    // rawHeaders alternates names and values; at the limit, some headers may have been dropped.
+    // rawHeaders alternates names and values. Some Node releases cut it at exactly the limit with no
+    // other signal (seen on 24.15.0); newer ones refuse such requests themselves (seen in CI on
+    // 22.23.4 and 24.22.2). A request at the limit is refused here either way: keep ">=".
     if (req.rawHeaders.length / 2 >= MAX_HEADERS) {
       res.writeHead(431, { "Content-Type": "application/json", Connection: "close" });
       res.end('{"error":"too_many_headers"}');

@@ -277,10 +277,36 @@ describe("listen", () => {
       });
     // 2 + 120 + 1 headers: Node keeps the first 100, so the forwarding header would be lost.
     expect(await send(120)).toContain("431");
+    // Exactly at the limit (2 + 97 + 1 = 100) is refused too: it looks the same as a cut request.
+    expect(await send(97)).toContain("431");
     expect(seen).toBeUndefined();
     // 2 + 96 + 1 = 99 headers: below the limit, served, with the forwarding header intact.
     expect(await send(96)).toContain("200");
     expect(seen).toBe("203.0.113.9");
+  });
+
+  it("refuses at the header limit in its own handler, whatever Node itself does", async () => {
+    let called = false;
+    server = await listen(
+      () => {
+        called = true;
+        return Promise.resolve(new Response("ok"));
+      },
+      { host: "127.0.0.1", port: 0, logger: silentLogger },
+    );
+    // A request as Node delivers it after cutting the header list at the limit.
+    const written: { status?: number; body?: string } = {};
+    const res = {
+      writeHead: (status: number) => {
+        written.status = status;
+      },
+      end: (body: string) => {
+        written.body = body;
+      },
+    };
+    server.emit("request", { method: "GET", rawHeaders: Array<string>(200).fill("x") }, res);
+    expect(written).toEqual({ status: 431, body: '{"error":"too_many_headers"}' });
+    expect(called).toBe(false);
   });
 
   it("rejects when the port is unavailable", async () => {
