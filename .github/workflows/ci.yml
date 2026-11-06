@@ -74,5 +74,6 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
-      # Validates the manifest and packs the bundle from the npm package contents.
-      - run: scripts/build-mcpb.sh
+      # Builds the bundle with zip (as the release does), validates the manifest with the pinned
+      # mcpb CLI and checks the bundle matches what `mcpb pack` produces. CI only: publishes nothing.
+      - run: scripts/check-mcpb.sh
