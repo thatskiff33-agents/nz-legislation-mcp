@@ -1,6 +1,7 @@
 /** list_versions: the point-in-time version history of one work. */
 import { z } from "zod";
-import { VersionListParamsSchema } from "../domain/schemas.js";
+import { MAX_PER_PAGE, VersionListParamsSchema } from "../domain/schemas.js";
+import { API_LIMITS } from "../domain/vocabulary.js";
 import {
   cleanText,
   defineTool,
@@ -34,7 +35,7 @@ export const listVersions = defineTool({
   title: "List versions of a work",
   description: [
     "List the versions of one work (e.g. an Act as at each amendment date), newest first by default.",
-    "Each version_id can be passed to get_legislation. Use per_page up to 100 and page to go further back.",
+    `Each version_id can be passed to get_legislation. Use per_page up to ${String(MAX_PER_PAGE)} and page to go further back.`,
     "To find the version in force on a particular date, prefer get_legislation with as_at.",
   ].join(" "),
   inputSchema: VersionListParamsSchema,
@@ -42,12 +43,14 @@ export const listVersions = defineTool({
   annotations: READ_ONLY_API_TOOL,
   async run(args, { client }, signal) {
     const response = await client.listVersions(args, { signal });
+    // per_page is not required in the API response: fall back to the size asked for.
+    const perPage = response.per_page ?? args.per_page ?? API_LIMITS.defaultPerPage;
     return {
       work_id: args.work_id,
       total: response.total,
       page: response.page,
-      per_page: response.per_page,
-      has_more: response.page * response.per_page < response.total,
+      per_page: perPage,
+      has_more: response.page * perPage < response.total,
       versions: response.results.map((v) => ({
         version_id: v.version_id,
         title: cleanText(v.title),

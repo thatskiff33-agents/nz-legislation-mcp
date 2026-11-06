@@ -1,5 +1,6 @@
 /** get_api_quota: the last rate-limit figures seen from the API (makes no API call). */
 import { z } from "zod";
+import { API_LIMITS } from "../domain/vocabulary.js";
 import { defineTool } from "./shared.js";
 
 const OutputSchema = z.object({
@@ -14,8 +15,7 @@ const OutputSchema = z.object({
 export const getApiQuota = defineTool({
   name: "get_api_quota",
   title: "API quota status",
-  description:
-    "Show how many Legislation API requests remain today for this API key (10,000 per day by default, resetting at midnight NZ time). Uses the last figures seen; makes no API call.",
+  description: `Show how many Legislation API requests remain today for this API key (${API_LIMITS.dailyRequests.toLocaleString("en-NZ")} per day by default, resetting at midnight NZ time). Uses the last figures seen; makes no API call.`,
   inputSchema: z.strictObject({}),
   outputSchema: OutputSchema,
   annotations: {
@@ -26,8 +26,7 @@ export const getApiQuota = defineTool({
   },
   run(_args, { client }) {
     const quota = client.quota;
-    const note =
-      "There is also a limit of 2,000 requests per IP address per five minutes, which is not reported by the API.";
+    const note = `There is also a limit of ${API_LIMITS.burstRequests.toLocaleString("en-NZ")} requests per IP address per ${String(API_LIMITS.burstMinutes)} minutes, which is not reported by the API.`;
     if (quota === undefined) {
       return Promise.resolve({
         known: false,

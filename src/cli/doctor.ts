@@ -11,7 +11,7 @@ import type { ApiError } from "../api/errors.js";
 import { existsSync } from "node:fs";
 import { defaultKeyFilePath, loadConfig, type ConfigError } from "../config.js";
 import { WEBSITE_ORIGIN } from "../domain/vocabulary.js";
-import { USER_AGENT, VERSION } from "../version.js";
+import { MIN_NODE_MAJOR, USER_AGENT, VERSION } from "../version.js";
 
 export interface DoctorIo {
   readonly env: Readonly<Record<string, string | undefined>>;
@@ -31,8 +31,13 @@ export async function runDoctor(io: DoctorIo): Promise<number> {
 
   io.stdout(`nz-legislation-mcp ${VERSION}\n`);
   const major = Number(/^v?(\d+)/u.exec(io.nodeVersion)?.[1] ?? 0);
-  if (major >= 22) report("ok", "Node.js", io.nodeVersion);
-  else report("fail", "Node.js", `${io.nodeVersion} (version 22 or later is required)`);
+  if (major >= MIN_NODE_MAJOR) report("ok", "Node.js", io.nodeVersion);
+  else
+    report(
+      "fail",
+      "Node.js",
+      `${io.nodeVersion} (version ${String(MIN_NODE_MAJOR)} or later is required)`,
+    );
 
   let config;
   try {
