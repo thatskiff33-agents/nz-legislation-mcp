@@ -80,8 +80,14 @@ const OutputSchema = z.object({
   to: SideSchema,
   same_version: z.boolean(),
   changed: z.boolean(),
-  lines_added: z.number().int(),
-  lines_removed: z.number().int(),
+  lines_added: z
+    .number()
+    .int()
+    .describe("Lines added across the whole comparison, including any left out of a cut diff."),
+  lines_removed: z
+    .number()
+    .int()
+    .describe("Lines removed across the whole comparison, including any left out of a cut diff."),
   diff: z
     .string()
     .describe(
@@ -201,7 +207,7 @@ export const compareVersions = defineTool({
       const whole = diff.split("\n").length - (midLine ? 1 : 0);
       const total = full.split("\n").length;
       notes.push(
-        `The diff was cut to keep the result small: ${String(whole)} of ${String(total)} diff lines are shown in full${midLine ? ", and the last line shown is cut part-way (marked [line cut])" : ""}. Compare a smaller provision (a clause rather than a whole schedule), or read each version with get_provision_text.`,
+        `The diff was cut to keep the result small: ${String(whole)} of ${String(total)} diff lines are shown in full${midLine ? ", and the last line shown is cut part-way (marked [line cut])" : ""}. Compare a smaller provision (a clause rather than a whole schedule), or read each version with get_provision_text. lines_added and lines_removed still count the whole comparison.`,
       );
     }
     return {

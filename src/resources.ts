@@ -153,11 +153,11 @@ async function readProvision(
     versionLine(out.version_id, out.permalink),
     "",
     out.text,
-    ...(out.next_offset === null
+    ...(out.continue_with === null
       ? []
       : [
           "",
-          `[Text continues: ${String(out.total_chars - out.next_offset)} more characters. Use the get_provision_text tool with version_id ${out.version_id} and offset ${String(out.next_offset)}.]`,
+          `[Text continues: ${String(out.total_chars - out.continue_with.offset)} more characters. Use the get_provision_text tool with these arguments: ${JSON.stringify(out.continue_with)}.]`,
         ]),
     "",
     ...out.notes.filter((note) => note !== TEXT_SOURCE_NOTE).map(forResource),

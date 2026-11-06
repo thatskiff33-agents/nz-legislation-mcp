@@ -543,12 +543,22 @@ describe("version safety and truncation (issue #40)", () => {
         signal,
       );
     const first = await page({ work_id: WORK });
-    expect(first.continue_with).toEqual({ version_id: V2014, offset: 1000, section: "4" });
+    expect(first.continue_with).toEqual({
+      version_id: V2014,
+      offset: 1000,
+      max_chars: 1000,
+      section: "4",
+    });
     expect(first.notes.join(" ")).not.toContain("chosen by date");
     // A middle page chosen by date: told to pin the version.
     const middle = await page({ work_id: WORK, offset: 1000 });
     expect(middle.notes.join(" ")).toContain(`continue with version_id ${V2014}`);
-    expect(middle.continue_with).toEqual({ version_id: V2014, offset: 2000, section: "4" });
+    expect(middle.continue_with).toEqual({
+      version_id: V2014,
+      offset: 2000,
+      max_chars: 1000,
+      section: "4",
+    });
     // The last page chosen by date: nothing to continue, just a check.
     const last = await page({ work_id: WORK, offset: 2000 });
     expect(last.continue_with).toBeNull();
@@ -557,6 +567,22 @@ describe("version safety and truncation (issue #40)", () => {
     const pinned = await page({ version_id: V2014, offset: 1000 });
     expect(pinned.notes.join(" ")).not.toContain("chosen by date");
     expect(pinned.text).toBe(middle.text);
+  });
+
+  it("gives the default page size in continue_with, which passes back as valid input", async () => {
+    const LONG = WAITANGI.replace("Observance of Waitangi Day", `Observance ${"x".repeat(16_000)}`);
+    const first = await getProvisionText.run(
+      { version_id: V2014, section: "4" },
+      deps([versionRecord(V2014)], "2026-11-02", { [V2014]: LONG }).deps,
+      signal,
+    );
+    expect(first.continue_with).toEqual({
+      version_id: V2014,
+      offset: 15_000,
+      max_chars: 15_000,
+      section: "4",
+    });
+    expect(getProvisionText.inputSchema.safeParse(first.continue_with).success).toBe(true);
   });
 
   it("refuses a comparison whose versions or dates are the wrong way round", async () => {
@@ -688,6 +714,10 @@ describe("version safety and truncation (issue #40)", () => {
       expect(line).toMatch(/^(?:[-+] (?:old|new) \d+ x{20}| {2}.*|…)$/u);
     }
     expect(many.notes.join(" ")).toMatch(/The diff was cut .*: \d+ of \d+ diff lines are shown/u);
+    // The counts cover the whole comparison, not just the lines shown.
+    const shown = many.diff.split("\n").filter((line) => line.startsWith("+ ")).length;
+    expect(many.lines_added).toBeGreaterThan(shown);
+    expect(many.notes.join(" ")).toContain("lines_added and lines_removed still count the whole");
     const long = await run(
       `<para><text>${"a".repeat(40_000)}</text></para>`,
       `<para><text>${"b".repeat(40_000)}</text></para>`,
