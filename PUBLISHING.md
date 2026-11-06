@@ -1,7 +1,8 @@
 # Publishing a release
 
-Releases are prepared automatically and published only after a maintainer approves them.
-Nothing leaves GitHub until someone approves the `release` environment.
+Releases are prepared automatically. Merging the release pull request is the decision to
+release. The publishing jobs then wait 30 minutes on the `release` environment, so a mistaken
+run can be cancelled from the Actions page before anything leaves GitHub.
 
 ## How a release works
 
@@ -21,9 +22,10 @@ Nothing leaves GitHub until someone approves the `release` environment.
      the Claude Desktop bundle from it with the standard `zip` command: no third-party tool runs
      in a release. It cannot change what npm publishes: tampering with the tarball artifact fails
      the checksum check and stops the release.
-   - The publishing jobs then wait for approval on the `release` environment: npm, the bundle,
-     the two container builds (approved together) and, once those finish, the container merge
-     (approved again). The npm and bundle jobs install nothing, run no project tooling, and
+   - The publishing jobs then wait out the `release` environment's 30-minute timer: npm, the
+     bundle, the two container builds and, once those finish, the container merge (which waits
+     again). Cancelling the workflow run during a wait stops the release before that job
+     publishes. The npm and bundle jobs install nothing, run no project tooling, and
      verify every file against the job-output checksums before using it:
      - npm: publishes the checked tarball with provenance, using trusted publishing (no npm
        token is stored).
@@ -63,22 +65,24 @@ failed build or bundle stops everything before anything is published.
 rebuild the changelog from the whole history. (This, and the skipped version number below, come
 from reading release-please 17.6.0's code; to confirm on the first real release.)
 
-Approvals are given per job. Use the second case below if npm was approved and published, even
-if another job was declined.
+Each publishing job waits on its own timer, so a cancelled run may have published some jobs
+already. Use the second case below if npm published, even if another job failed or was
+cancelled.
 
-- **Build or bundle failed, or every approval was declined:** nothing was published.
+- **Build or bundle failed, or the run was cancelled before any publishing job ran:** nothing
+  was published.
   - If re-running the failed jobs from the workflow run can fix it, do that.
   - Otherwise, delete only the draft release (`gh release delete <tag>`, without
     `--cleanup-tag`), fix the problem on `main`, and release again. The next release pull
     request is for the next version; the failed version number is skipped.
-- **npm published, but a later job failed or was declined:** npm versions cannot be reused. Re-run the failed
-  jobs from the workflow run; the bundle upload replaces any partly uploaded assets.
+- **npm published, but a later job failed or was cancelled:** npm versions cannot be reused.
+  Re-run the failed jobs from the workflow run; the bundle upload replaces any partly uploaded assets.
   - If a re-run is not possible, download the `npm-tarball` and `desktop-bundle` artifacts from
     the run.
   - Check each file against the SHA-256 printed in the `pack` and `bundle-build` job summaries.
   - Write `SHA256SUMS` for the two files, attach the bundle and `SHA256SUMS` to the draft, then
     publish it (`gh release edit <tag> --draft=false`).
-- **A container build failed, or the merge was declined:** the image built by any finished leg
+- **A container build failed, or the merge was cancelled:** the image built by any finished leg
   is already in the registry by digest, but untagged and unsigned, so nothing points users at it.
   Re-run the failed jobs (each leg replaces its digest record; the merge checks there are exactly
   two). If the release is abandoned, delete the untagged versions from the package's page on
@@ -86,7 +90,10 @@ if another job was declined.
 
 ## One-time setup (before the first release)
 
-Do these in order. Each one is an outward-facing change, so a maintainer does them by hand.
+Do these in order. Each one is an outward-facing change, made by a maintainer or with the
+owner's approval.
+
+Status on 7 November 2026: steps 1 to 6 are done (#53, #11). Step 7 follows the first release.
 
 1. Release App: release-please and the plugin-pin job write with a dedicated GitHub App, not
    the workflow's own token. Only the App may then create release tags (step 5), and the release
@@ -106,20 +113,37 @@ Do these in order. Each one is an outward-facing change, so a maintainer does th
      then delete the old key on the App's page.
    - The workflow token stays read-only for these jobs, so "Allow GitHub Actions to create and
      approve pull requests" is not needed.
-2. Repository settings, Environments: create `release`, add required reviewers (the
-   maintainers), and limit it to the `main` branch and `v*` tags.
+2. Repository settings, Environments: create `release`, limited to the `main` branch and `v*`
+   tags, with no required reviewers and a 30-minute wait timer (owner decision, 7 November 2026).
+   "Allow administrators to bypass configured protection rules" is off (set by the agent on 7
+   November 2026 under the owner's approval for the release settings, so the timer binds
+   everyone). The timer is the cancel window. An agent may merge the release pull request once its CI is
+   green and an independent review has signed off (AGENTS.md).
 3. npm: sign in to the account that will own `nz-legislation-mcp` and turn on two-factor
-   authentication.
-4. npm trusted publisher: on the package's settings page, add a GitHub Actions trusted
-   publisher with owner `thatskiff33`, repository `nz-legislation-mcp`, workflow
-   `release.yml` and environment `release`. Trusted publishing needs npm 11.5.1 or later
-   (the workflow publishes with Node 24's npm). A new trusted publisher must complete a
-   successful publish within 2 days or it expires, so add it shortly before releasing.
-   - To confirm: npm's documentation does not say whether a trusted publisher can be added
-     before the package exists (third-party guides say it cannot). If it cannot, publish the
-     first version by hand from a clean checkout of the release tag
-     (`pnpm install --frozen-lockfile && pnpm check && npm publish --access public`), then add
-     the trusted publisher, and from then on disallow token publishing in the package settings.
+   authentication for authorisation and writes.
+4. npm trusted publisher. npm only accepts one for a package that already exists ("The package
+   you're configuring must already exist on the npm registry", `npm trust` documentation), so:
+   - Claim the name with a placeholder that holds a README and no code: from a folder outside
+     this repository, `npm publish --access public --tag placeholder` for version
+     `0.0.0-placeholder.0`, approving the two-factor prompt in the browser. On 6 November 2026
+     the registry also showed a `0.0.0-stage` holding version, created a few minutes before the
+     placeholder appeared (observed; cause to confirm). Deprecate both (`npm deprecate`), saying they have no
+     code.
+   - Add the trusted publisher (npm 11.15.0 or later), or use the package's settings page on
+     npmjs.com with the same owner, repository, workflow and environment:
+
+     ```sh
+     npm trust github nz-legislation-mcp --file release.yml --repo thatskiff33/nz-legislation-mcp --env release --allow-publish
+     ```
+
+     Then `npm logout`, so no npm credential stays on the computer.
+
+   - A new trusted publisher must complete a successful publish within 2 days or it expires,
+     so add it shortly before releasing. If it expires, remove it (`npm trust list`, then
+     `npm trust revoke --id <id>`) and add it again.
+   - Trusted publishing needs npm 11.5.1 or later (the workflow publishes with Node 24's npm).
+   - After the first release publishes from CI: the package's settings, Publishing access,
+     "Require two-factor authentication and disallow tokens".
 5. Repository settings, Rules, New tag ruleset: target tags matching `v*`, enforcement
    active, rules "Restrict creations", "Restrict updates" and "Restrict deletions", and add the
    release App (step 1) as the only bypass actor, with bypass mode "Always allow" ("For pull requests only" would block tag creation). Release tags can then only be created with the
@@ -145,7 +169,7 @@ The registry checks that the npm package belongs to this server through the `mcp
    `mcp-publisher publish`. It reads `server.json`.
 3. Check the listing at `https://registry.modelcontextprotocol.io/v0/servers?search=nz-legislation-mcp`.
 
-## Checks before approving
+## Checks before merging the release pull request
 
 - The release pull request's changelog reads correctly.
 - CI is green on the release commit, including the "pin the Claude Code plugin" commit. Both
