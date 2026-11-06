@@ -18,7 +18,7 @@
  * no DOCTYPE. Rendered text is whitespace-normalised and control characters are dropped.
  */
 import sax from "sax";
-import { apiErrors } from "../api/errors.js";
+import { xmlErrors } from "../api/errors.js";
 import { safeCut, wellFormed } from "./slice.js";
 
 type OutlineKind = "part" | "subpart" | "crosshead" | "section" | "schedule";
@@ -656,7 +656,7 @@ export async function readLegislation(
   const stoppedEarly = state.stop && options.fullOutline !== true;
   if (state.parseError === undefined && !stoppedEarly) parser.close();
   if (state.parseError !== undefined && state.matches.length === 0) {
-    throw apiErrors.invalidResponse();
+    throw xmlErrors.unreadable();
   }
 
   const preferred = state.matches.find((m) => !m.entry.repealed) ?? state.matches[0];
