@@ -58,6 +58,18 @@ function laterSuffix(a: string, b: string): boolean {
   return a.length !== b.length ? a.length > b.length : a > b;
 }
 
+/**
+ * Orders two version_ids by date, then by same-day suffix (the rule selectVersion uses):
+ * negative if `a` is earlier, positive if later, 0 if the same point in time.
+ */
+export function compareVersionIds(a: string, b: string): number {
+  const [dateA, dateB] = [versionDate(a) ?? "", versionDate(b) ?? ""];
+  if (dateA !== dateB) return dateA < dateB ? -1 : 1;
+  const [suffixA, suffixB] = [suffixOf(a), suffixOf(b)];
+  if (suffixA === suffixB) return 0;
+  return laterSuffix(suffixA, suffixB) ? 1 : -1;
+}
+
 /** Picks a version per the selector. Notes explain any defaults or ambiguity. */
 export async function selectVersion(
   args: SelectorArgs,

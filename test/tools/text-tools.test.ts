@@ -365,13 +365,14 @@ describe("compare_versions", () => {
     expect(out.notes.join(" ")).toContain("was added");
     expect(out.diff.split("\n").every((l) => l.startsWith("+ "))).toBe(true);
 
-    const reverse = deps([versionRecord(V2014), versionRecord(V2007)], "x", {
-      [V2007]: without6A,
-      [V2014]: WAITANGI,
+    // Removed: the earlier version has 6A and the later one does not.
+    const removed = deps([versionRecord(V2007), versionRecord(V2014)], "x", {
+      [V2007]: WAITANGI,
+      [V2014]: without6A,
     });
     const back = await compareVersions.run(
-      { work_id: WORK, section: "6A", from_version_id: V2014, to_version_id: V2007 },
-      reverse.deps,
+      { work_id: WORK, section: "6A", from_version_id: V2007, to_version_id: V2014 },
+      removed.deps,
       signal,
     );
     expect(back.notes.join(" ")).toContain("repealed or renumbered");
@@ -443,7 +444,7 @@ describe("compare_versions", () => {
       signal,
     );
     expect(out.diff_truncated).toBe(true);
-    expect(out.diff.length).toBe(30_000);
+    expect(out.diff.length).toBeLessThanOrEqual(30_000);
   });
 
   it.each([
@@ -467,5 +468,226 @@ describe("compare_versions", () => {
     const r = compareVersions.inputSchema.safeParse(input);
     expect(r.success).toBe(false);
     expect(JSON.stringify(r.error?.issues)).toContain(message);
+  });
+});
+
+describe("version safety and truncation (issue #40)", () => {
+  const SYNTH_ID = "act_public_2099_5_en_2099-01-01";
+
+  it("lists one schedule's clauses with the schedule filter", async () => {
+    const { deps: d } = deps([versionRecord(SYNTH_ID), versionRecord(SYNTH_ID)], "x", {
+      [SYNTH_ID]: loadXml("synthetic-structures.xml"),
+    });
+    const one = await getTableOfContents.run({ version_id: SYNTH_ID, schedule: "1" }, d, signal);
+    expect(one.entries.map((e) => `${e.kind}:${e.label}:${String(e.schedule)}`)).toEqual([
+      "schedule:1:null",
+      "section:1:1",
+    ]);
+    expect(one.scope).toBe("Everything in schedule 1.");
+    const none = await getTableOfContents.run({ version_id: SYNTH_ID, schedule: "9" }, d, signal);
+    expect(none.entries).toEqual([]);
+    expect(none.notes.join(" ")).toContain('No schedule labelled "9"');
+  });
+
+  it("names an unnumbered schedule and refuses part with schedule", async () => {
+    const { deps: d } = deps([versionRecord(V2014)], "x", { [V2014]: WAITANGI });
+    const out = await getTableOfContents.run({ version_id: V2014, schedule: "" }, d, signal);
+    expect(out.scope).toBe("Everything in schedule (unnumbered).");
+    expect(out.entries[0]?.kind).toBe("schedule");
+    const both = getTableOfContents.inputSchema.safeParse({
+      version_id: V2014,
+      part: "1",
+      schedule: "1",
+    });
+    expect(both.success).toBe(false);
+    expect(JSON.stringify(both.error?.issues)).toContain("Give part or schedule, not both.");
+  });
+
+  it("explains a capped listing", async () => {
+    const sections = Array.from(
+      { length: 600 },
+      (_, i) => `<prov><label>${String(i + 1)}</label><heading>S</heading></prov>`,
+    ).join("");
+    const flat = `<act><body><part><label>1</label><heading>Only</heading>${sections}</part></body></act>`;
+    const flatId = "act_public_2099_7_en_2099-01-01";
+    const { deps: d } = deps([versionRecord(flatId)], "x", { [flatId]: flat });
+    const capped = await getTableOfContents.run({ version_id: flatId, part: "1" }, d, signal);
+    expect(capped.truncated).toBe(true);
+    expect(capped.notes.join(" ")).toContain("Only the first 500 of 601 matching entries");
+  });
+
+  it("gives continue_with to pin later pages to one version, with a note for date paging", async () => {
+    const LONG = WAITANGI.replace("Observance of Waitangi Day", `Observance ${"x".repeat(2200)}`);
+    const page = (args: { work_id?: string; version_id?: string; offset?: number }) =>
+      getProvisionText.run(
+        { section: "4", max_chars: 1000, ...args },
+        deps(
+          [
+            args.version_id === undefined
+              ? json(versionsPage(WORK, ["2014-01-01"]))
+              : versionRecord(V2014),
+          ],
+          "2026-11-02",
+          { [V2014]: LONG },
+        ).deps,
+        signal,
+      );
+    const first = await page({ work_id: WORK });
+    expect(first.continue_with).toEqual({ version_id: V2014, offset: 1000 });
+    expect(first.notes.join(" ")).not.toContain("chosen by date");
+    // A middle page chosen by date: told to pin the version.
+    const middle = await page({ work_id: WORK, offset: 1000 });
+    expect(middle.notes.join(" ")).toContain(`continue with version_id ${V2014}`);
+    expect(middle.continue_with).toEqual({ version_id: V2014, offset: 2000 });
+    // The last page chosen by date: nothing to continue, just a check.
+    const last = await page({ work_id: WORK, offset: 2000 });
+    expect(last.continue_with).toBeNull();
+    expect(last.notes.join(" ")).toContain("check it matches your first page");
+    expect(last.notes.join(" ")).not.toContain("continue with version_id");
+    const pinned = await page({ version_id: V2014, offset: 1000 });
+    expect(pinned.notes.join(" ")).not.toContain("chosen by date");
+    expect(pinned.text).toBe(middle.text);
+  });
+
+  it("refuses a comparison whose versions or dates are the wrong way round", async () => {
+    const { deps: d } = deps([versionRecord(V2014), versionRecord(V2007)], "x", {
+      [V2007]: WAITANGI,
+      [V2014]: WAITANGI,
+    });
+    await expect(
+      compareVersions.run(
+        { work_id: WORK, section: "4", from_version_id: V2014, to_version_id: V2007 },
+        d,
+        signal,
+      ),
+    ).rejects.toThrow(
+      `The "from" version (${V2014}) is later than the "to" version (${V2007}). Swap them`,
+    );
+    const dates = compareVersions.inputSchema.safeParse({
+      work_id: WORK,
+      section: "4",
+      from_as_at: "2026-01-01",
+      to_as_at: "2021-01-01",
+    });
+    expect(dates.success).toBe(false);
+    expect(JSON.stringify(dates.error?.issues)).toContain(
+      "from_as_at (2026-01-01) is later than to_as_at (2021-01-01)",
+    );
+  });
+
+  it("says when a defaulted 'to' (today) is earlier than 'from', and accepts equal dates", async () => {
+    const { deps: d } = deps(
+      [versionRecord(V2014), json(versionsPage(WORK, ["2007-09-18"]))],
+      "2026-11-02",
+      { [V2007]: WAITANGI, [V2014]: WAITANGI },
+    );
+    await expect(
+      compareVersions.run({ work_id: WORK, section: "4", from_version_id: V2014 }, d, signal),
+    ).rejects.toThrow(`which "to" defaulted to. Pass a later to_as_at or to_version_id`);
+    const same = compareVersions.inputSchema.safeParse({
+      work_id: WORK,
+      section: "4",
+      from_as_at: "2021-01-01",
+      to_as_at: "2021-01-01",
+    });
+    expect(same.success).toBe(true);
+  });
+
+  it("refuses same-day versions in the wrong order (suffix rule)", async () => {
+    const V2014B = `${WORK}_en_2014-01-01B`;
+    const { deps: d } = deps([versionRecord(V2014B), versionRecord(V2014)], "x", {
+      [V2014]: WAITANGI,
+      [V2014B]: WAITANGI,
+    });
+    await expect(
+      compareVersions.run(
+        { work_id: WORK, section: "4", from_version_id: V2014B, to_version_id: V2014 },
+        d,
+        signal,
+      ),
+    ).rejects.toThrow("Swap them");
+  });
+
+  it("explains a capped schedule listing", async () => {
+    const clauses = Array.from(
+      { length: 600 },
+      (_, i) => `<prov><label>${String(i + 1)}</label><heading>C</heading></prov>`,
+    ).join("");
+    const xml = `<act><body/><schedule.group><schedule><label>1</label><heading>Big</heading><schedule.provisions>${clauses}</schedule.provisions></schedule></schedule.group></act>`;
+    const id = "act_public_2099_8_en_2099-01-01";
+    const { deps: d } = deps([versionRecord(id)], "x", { [id]: xml });
+    const out = await getTableOfContents.run({ version_id: id, schedule: "1" }, d, signal);
+    expect(out.truncated).toBe(true);
+    expect(out.notes.join(" ")).toContain("entries in this schedule are listed");
+  });
+
+  it("keeps the notes from both sides, labelled", async () => {
+    const V2007B = `${WORK}_en_2007-09-18B`;
+    const { deps: d } = deps(
+      [json(versionsPage(WORK, ["2007-09-18B", "2007-09-18"])), versionRecord(V2014)],
+      "x",
+      { [V2007B]: WAITANGI, [V2014]: WAITANGI },
+    );
+    const out = await compareVersions.run(
+      { work_id: WORK, section: "4", from_as_at: "2010-01-01", to_version_id: V2014 },
+      d,
+      signal,
+    );
+    expect(
+      out.notes.some((n) => n.startsWith("From: Several versions share the date 2007-09-18")),
+    ).toBe(true);
+    // The "to" side was chosen by version_id, so it adds no notes.
+    expect(out.notes.some((n) => n.startsWith("To: "))).toBe(false);
+  });
+
+  it("labels the to side's notes too", async () => {
+    const { deps: d } = deps(
+      [versionRecord(V2007), json(versionsPage(WORK, ["2014-01-01"]))],
+      "2026-11-02",
+      { [V2007]: WAITANGI, [V2014]: WAITANGI },
+    );
+    const out = await compareVersions.run(
+      { work_id: WORK, section: "4", from_version_id: V2007 },
+      d,
+      signal,
+    );
+    expect(out.notes.some((n) => n.startsWith("To: as_at defaulted to today"))).toBe(true);
+  });
+
+  it("cuts a long diff at a whole line, or inside one very long line at a safe point", async () => {
+    const paras = (word: string) =>
+      Array.from(
+        { length: 1500 },
+        (_, i) => `<para><text>${word} ${String(i)} ${"x".repeat(20)}</text></para>`,
+      ).join("");
+    const doc = (body: string) =>
+      `<act><body><prov><label>1</label><heading>L</heading><prov.body><subprov><label/>${body}</subprov></prov.body></prov></body></act>`;
+    const run = async (before: string, after: string) =>
+      compareVersions.run(
+        { work_id: WORK, section: "1", from_version_id: V2007, to_version_id: V2014 },
+        deps([versionRecord(V2007), versionRecord(V2014)], "x", {
+          [V2007]: doc(before),
+          [V2014]: doc(after),
+        }).deps,
+        signal,
+      );
+    const many = await run(paras("old"), paras("new"));
+    expect(many.diff_truncated).toBe(true);
+    expect(many.diff.length).toBeLessThanOrEqual(30_000);
+    for (const line of many.diff.split("\n")) {
+      expect(line).toMatch(/^(?:[-+] (?:old|new) \d+ x{20}| {2}.*|…)$/u);
+    }
+    expect(many.notes.join(" ")).toMatch(/The diff was cut .*: \d+ of \d+ diff lines are shown/u);
+    const long = await run(
+      `<para><text>${"a".repeat(40_000)}</text></para>`,
+      `<para><text>${"b".repeat(40_000)}</text></para>`,
+    );
+    expect(long.diff_truncated).toBe(true);
+    expect(long.diff.endsWith("a … [line cut]")).toBe(true);
+    expect(long.diff).toHaveLength(30_000 + " … [line cut]".length);
+    expect(long.diff.split("\n")[1]?.startsWith("- aaa")).toBe(true);
+    expect(long.notes.join(" ")).toContain(
+      "1 of 3 diff lines are shown in full, and the last line shown is cut part-way",
+    );
   });
 });

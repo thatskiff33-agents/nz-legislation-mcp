@@ -112,7 +112,7 @@ describe("resource templates", () => {
     const text = textOf(await c.readResource({ uri: `legislation://version/${id}/schedule/1` }));
     expect(text).toContain("schedule 1: Rates");
     expect(text).toMatch(
-      /\[Text continues: \d+ more characters\. Use the get_provision_text tool with offset 50000\.\]/u,
+      /\[Text continues: \d+ more characters\. Use the get_provision_text tool with version_id act_public_2099_2_en_2099-01-01 and offset 50000\.\]/u,
     );
   });
 
