@@ -161,6 +161,7 @@ describe("serveHttp", () => {
     const t = io({ LEGISLATION_NZ_API_KEY: DUMMY_KEY });
     expect(await serveHttp(t.value)).toBeUndefined();
     expect(t.stderr.join("")).toContain("no authentication");
+    expect(t.stderr.join("")).toContain("shared machine");
   });
 
   it("reports a port that cannot be bound", async () => {

@@ -96,7 +96,7 @@ describe("loadConfig", () => {
         `The key file ${dir} is not a regular file`,
       );
       expect(problems({})).toEqual([
-        'No API key found. Run "npx nz-legislation-mcp setup", or set LEGISLATION_NZ_API_KEY (request a key from contact@pco.govt.nz).',
+        'No API key found. Run "npx nz-legislation-mcp setup", or set LEGISLATION_NZ_API_KEY (request a key by email to contact@pco.govt.nz).',
       ]);
       const throwing = () => {
         throw new Error("boom");

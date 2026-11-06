@@ -31,8 +31,8 @@ For clients that support them, there are also:
 
 ## Quick start
 
-You need Node.js 22 or later and your own Legislation API key. Request one from the
-Parliamentary Counsel Office: see [legislation.govt.nz/developer-api](https://www.legislation.govt.nz/developer-api/).
+You need Node.js 22 or later and your own Legislation API key. Request one by email to
+contact@pco.govt.nz (see [legislation.govt.nz/developer-api](https://www.legislation.govt.nz/developer-api/)).
 The key is personal: PCO's terms do not allow it to be shared.
 
 1. Save your key once. Input is hidden, the key is checked with the API, and it is stored
@@ -86,7 +86,7 @@ Clients that cannot start a local program need a remote HTTPS endpoint. The serv
   logged, put in a URL or returned to the AI client.
 - The tools are read-only and only fetch from `api.legislation.govt.nz` and
   `www.legislation.govt.nz` (in remote mode the server also fetches your OAuth provider's
-  public signing keys).
+  discovery metadata and public signing keys).
 - Report vulnerabilities privately: see [SECURITY.md](SECURITY.md).
 
 ## Contributing

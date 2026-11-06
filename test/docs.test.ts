@@ -1,5 +1,5 @@
 // Documentation drift checks: the docs must describe every setting the code reads.
-import { readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { ENV } from "../src/config.js";
@@ -37,5 +37,67 @@ describe("deploy/", () => {
     const known = new Set<string>([...Object.values(ENV), ...Object.values(HTTP_ENV)]);
     const used = [...files.matchAll(/(LEGISLATION_NZ_[A-Z_]+)/gu)].map((m) => String(m[1]));
     expect(used.filter((name) => !known.has(name))).toEqual([]);
+  });
+});
+
+/** Every text file the drift checks below read: the docs and the source that cites them. */
+function citingFiles(): string[] {
+  const out: string[] = [];
+  const walk = (dir: string, extension: string): void => {
+    for (const entry of readdirSync(join(ROOT, dir), { withFileTypes: true })) {
+      const path = `${dir}/${entry.name}`;
+      if (entry.isDirectory()) walk(path, extension);
+      else if (entry.name.endsWith(extension)) out.push(path);
+    }
+  };
+  walk("src", ".ts");
+  walk("scripts", ".ts");
+  walk("docs", ".md");
+  out.push(...readdirSync(ROOT).filter((name) => name.endsWith(".md")));
+  out.push("spec/README.md", ".github/pull_request_template.md", "deploy/secrets/README.md");
+  return out;
+}
+
+describe("paths and commands cited in docs and source", () => {
+  const files = citingFiles();
+
+  it("cite only repository paths that exist", () => {
+    const pattern =
+      /(?<![\w./-])((?:src|docs|test|scripts|spec|deploy|packaging|plugins|\.github)\/[\w./-]*[\w-]\.(?:ts|mjs|md|json|ya?ml|sh|toml|html))(?![\w/*<])/gu;
+    const missing = files.flatMap((file) =>
+      [...read(file).matchAll(pattern)]
+        .map((m) => String(m[1]))
+        .filter((path) => !existsSync(join(ROOT, path)))
+        .map((path) => `${file}: ${path}`),
+    );
+    expect(missing).toEqual([]);
+  });
+
+  it("mention only pnpm scripts that exist", () => {
+    const scripts = new Set(
+      Object.keys(
+        (JSON.parse(read("package.json")) as { scripts: Record<string, string> }).scripts,
+      ),
+    );
+    // pnpm's own commands (not package scripts), and "lockfile" as in prose about pnpm's lockfile.
+    const builtIn = new Set([
+      "install",
+      "add",
+      "audit",
+      "pack",
+      "exec",
+      "dlx",
+      "run",
+      "why",
+      "lockfile",
+    ]);
+    const unknown = files.flatMap((file) =>
+      // Any "pnpm <word>" not inside another word or path (prose, code blocks, `corepack pnpm x`).
+      [...read(file).matchAll(/(?<![\w@/-])pnpm (?:run )?([a-z][\w:-]*)/gu)]
+        .map((m) => String(m[1]))
+        .filter((name) => !scripts.has(name) && !builtIn.has(name))
+        .map((name) => `${file}: pnpm ${name}`),
+    );
+    expect(unknown).toEqual([]);
   });
 });

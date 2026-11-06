@@ -73,7 +73,7 @@
     "api_key": {
       "type": "string",
       "title": "Legislation API key",
-      "description": "Your own API key for api.legislation.govt.nz (request one at https://www.legislation.govt.nz/developer-api/). It is sent only to that API.",
+      "description": "Your own API key for api.legislation.govt.nz (request one by email to contact@pco.govt.nz; see https://www.legislation.govt.nz/developer-api/). It is sent only to that API.",
       "required": true,
       "sensitive": true
     }
