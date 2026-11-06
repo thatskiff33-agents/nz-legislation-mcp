@@ -3,7 +3,7 @@
 Facts the design relies on, with their sources and as-at dates. Update this file whenever the API or the terms change.
 
 - **API version:** v0. The developer page calls it "a version 0 beta" and says "Feedback from your real-world use of version 0 will directly shape version 1". The API documentation calls it "Version Zero". Expect breaking changes.
-- **Live probe date:** 2 November 2026, using the owner's key. The saved probe made 19 requests to the API and 1 XML download. The last saved response headers (the 9th request) showed 9,993 of 10,000 requests remaining; headers for the 4 later search requests were not saved.
+- **Live probe date:** 2 November 2026, using the owner's key. The saved probe made 19 requests to the API (18 with the owner's key, 1 without a key) and 1 XML download. The last saved response headers (file 09, the 15th request) showed 9,993 of 10,000 requests remaining; headers for the 4 later search requests were not saved.
 - **Fixtures:** `test/fixtures/api/` holds responses from that probe (searches by type, version lists and records, and errors). They contain public API data only, with no keys or personal information.
 - **Key format:** not recorded. The probe kept the key out of every saved file, so its character set and length are unknown here. `KEY_CHARSET` in `src/config.ts` therefore stays broad (printable ASCII without spaces, quotes or backslashes) until PCO's format is known.
 
@@ -47,12 +47,12 @@ Base `https://api.legislation.govt.nz`. Authentication is the `X-Api-Key` header
 
 ## Errors (observed)
 
-| Status | Body                                    | Meaning                                                                                                                                          |
-| ------ | --------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 401    | `{"error":"API key is required"}`       | Missing key (observed). Invalid key (per the docs, not tested).                                                                                  |
-| 404    | `{"error":"404","message":"Not Found"}` | Unknown version, or a path the API does not serve. Content-Type has no charset. An unknown version used quota; the 404s for other paths did not. |
-| 429    | not triggered                           | Daily quota exhausted (per docs).                                                                                                                |
-| 403    | not triggered                           | Per-IP burst limit (per docs).                                                                                                                   |
+| Status | Body                                    | Meaning                                                                                                                                                                                                                                                           |
+| ------ | --------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 401    | `{"error":"API key is required"}`       | Missing key (observed). Invalid key (per the docs, not tested).                                                                                                                                                                                                   |
+| 404    | `{"error":"404","message":"Not Found"}` | Unknown version, or a path the API does not serve. Content-Type has no charset. An unknown-version request used quota (9,997 before it, 9,995 at the next request). The `/api/rss/search/` 404, and six spec-path requests whose status was not saved, used none. |
+| 429    | not triggered                           | Daily quota exhausted (per docs).                                                                                                                                                                                                                                 |
+| 403    | not triggered                           | Per-IP burst limit (per docs).                                                                                                                                                                                                                                    |
 
 ## Response headers
 
@@ -64,7 +64,7 @@ Base `https://api.legislation.govt.nz`. Authentication is the `X-Api-Key` header
 - XML, HTML and PDF formats are served from `https://www.legislation.govt.nz`. **No API key is needed, so the key is never sent there.** The key goes only to `api.legislation.govt.nz`.
 - **Documents are large.** The Income Tax Act 2007, as at 2010-04-01, is 15.2 MB (15,214,525 bytes) of XML. The XML pipeline must stream, enforce byte caps, and not build a full DOM.
 - The root element (for example `<act>`) carries useful attributes: `date.as.at`, `date.assent`, `stage`, `act.type`, `year`, `act.no`.
-- Elements carry `DLM` ids (the Act's root element is `DLM1512300`). We use them as anchors for provisions. Whether they stay stable across versions is to confirm with PCO.
+- Provision elements (`<prov>`) carry `DLM` ids, for example `DLM1512304`; the Act's root element is `DLM1512300`. The parser records these ids, but no tool uses them yet. Whether they stay stable across versions is to confirm with PCO.
 - `robots.txt` disallows `/items/` and query-string URLs. Format URLs have neither.
 
 ## Rate-limit budget per tool call (targets)
@@ -77,6 +77,7 @@ Base `https://api.legislation.govt.nz`. Authentication is the `X-Api-Key` header
 ## Sources
 
 - <https://www.legislation.govt.nz/learn-more/legislation-data/api-terms-of-use/>: terms of use, clauses 1 to 27 (read 2 and 6 November 2026).
-- <https://www.legislation.govt.nz/developer-api/>: "version 0 beta", key requests by email to contact@pco.govt.nz, and the encouragement to migrate from classic site web feeds (which are served from classic.legislation.govt.nz) (read 6 November 2026).
+- <https://www.legislation.govt.nz/developer-api/>: "version 0 beta", key requests by email to contact@pco.govt.nz, and the encouragement to migrate from classic site web feeds (read 6 November 2026).
+- <https://www.legislation.govt.nz/learn-more/find-and-use-legislation/keep-up-to-date-with-legislation/>: classic site web feeds are served from classic.legislation.govt.nz (read 6 November 2026).
 - <https://api.legislation.govt.nz/docs/>: the API documentation and embedded OpenAPI specification, snapshot in `spec/legislation-api-v0.openapi.json` (2 November 2026).
 - The live probe of 2 November 2026: response bodies and headers, kept as fixtures in `test/fixtures/api/`.
