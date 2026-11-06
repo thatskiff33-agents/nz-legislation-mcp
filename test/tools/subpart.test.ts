@@ -218,6 +218,7 @@ describe("review follow-ups", () => {
     expect(second.continue_with).toEqual({
       version_id: V1,
       offset: 1000,
+      max_chars: 1000,
       section: "1",
       schedule: "1",
       part: "1",
@@ -234,6 +235,7 @@ describe("review follow-ups", () => {
     expect(out.continue_with).toEqual({
       version_id: V1,
       offset: 1000,
+      max_chars: 1000,
       schedule: "1",
       include_history: true,
     });

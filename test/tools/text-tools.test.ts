@@ -543,12 +543,22 @@ describe("version safety and truncation (issue #40)", () => {
         signal,
       );
     const first = await page({ work_id: WORK });
-    expect(first.continue_with).toEqual({ version_id: V2014, offset: 1000, section: "4" });
+    expect(first.continue_with).toEqual({
+      version_id: V2014,
+      offset: 1000,
+      max_chars: 1000,
+      section: "4",
+    });
     expect(first.notes.join(" ")).not.toContain("chosen by date");
     // A middle page chosen by date: told to pin the version.
     const middle = await page({ work_id: WORK, offset: 1000 });
     expect(middle.notes.join(" ")).toContain(`continue with version_id ${V2014}`);
-    expect(middle.continue_with).toEqual({ version_id: V2014, offset: 2000, section: "4" });
+    expect(middle.continue_with).toEqual({
+      version_id: V2014,
+      offset: 2000,
+      max_chars: 1000,
+      section: "4",
+    });
     // The last page chosen by date: nothing to continue, just a check.
     const last = await page({ work_id: WORK, offset: 2000 });
     expect(last.continue_with).toBeNull();
@@ -688,6 +698,10 @@ describe("version safety and truncation (issue #40)", () => {
       expect(line).toMatch(/^(?:[-+] (?:old|new) \d+ x{20}| {2}.*|…)$/u);
     }
     expect(many.notes.join(" ")).toMatch(/The diff was cut .*: \d+ of \d+ diff lines are shown/u);
+    // The counts cover the whole comparison, not just the lines shown.
+    const shown = many.diff.split("\n").filter((line) => line.startsWith("+ ")).length;
+    expect(many.lines_added).toBeGreaterThan(shown);
+    expect(many.notes.join(" ")).toContain("lines_added and lines_removed still count the whole");
     const long = await run(
       `<para><text>${"a".repeat(40_000)}</text></para>`,
       `<para><text>${"b".repeat(40_000)}</text></para>`,
