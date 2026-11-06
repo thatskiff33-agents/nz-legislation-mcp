@@ -64,23 +64,23 @@ The key is passed as a Docker secret file, so it does not appear in environment 
 
 ### Using a published image
 
-From the first release onwards, images will be published to `ghcr.io/thatskiff33/nz-legislation-mcp` for `linux/amd64` and `linux/arm64` (each built on a native runner and scanned), signed with Sigstore cosign (keyless), with an SBOM and build provenance.
+Release images are published (from 1.0.1) to `ghcr.io/thatskiff33/nz-legislation-mcp` for `linux/amd64` and `linux/arm64` (each built on a native runner and scanned), signed with Sigstore cosign (keyless), with an SBOM and build provenance.
 
 To use one:
 
 1. Look up the digest of the version you want, then verify the signature of that digest. Releases are signed by this repository's `container.yml` workflow, run from `main` by the release workflow:
 
    ```sh
-   digest="$(docker buildx imagetools inspect ghcr.io/thatskiff33/nz-legislation-mcp:1.0.0 \
+   digest="$(docker buildx imagetools inspect ghcr.io/thatskiff33/nz-legislation-mcp:1.0.1 \
      --format '{{json .Manifest}}' | jq -r .digest)"
    cosign verify "ghcr.io/thatskiff33/nz-legislation-mcp@$digest" \
      --certificate-oidc-issuer https://token.actions.githubusercontent.com \
      --certificate-identity https://github.com/thatskiff33/nz-legislation-mcp/.github/workflows/container.yml@refs/heads/main
    ```
 
-   The identity is the workflow file and the branch it ran from (`job_workflow_ref`). It is to be confirmed against the first published image (#11): if verification fails, compare it with the certificate's subject in `cosign verify ... --certificate-identity-regexp '.*' -o json` and report it.
+   The identity is the workflow file and the branch it ran from (`job_workflow_ref`). On 1.0.1 the signing certificate's subject matched it (checked by reading the certificate; a full `cosign verify` run is still to be recorded on #11). If verification fails, compare it with the certificate's subject in `cosign verify ... --certificate-identity-regexp '.*' -o json` and report it.
 
-2. Set `NZLM_IMAGE` in `deploy/.env` to that digest, for example `ghcr.io/thatskiff33/nz-legislation-mcp:1.0.0@sha256:<digest>`. A tag can later be moved; a digest cannot. Never use an unpinned `latest`.
+2. Set `NZLM_IMAGE` in `deploy/.env` to that digest, for example `ghcr.io/thatskiff33/nz-legislation-mcp:1.0.1@sha256:<digest>`. A tag can later be moved; a digest cannot. Never use an unpinned `latest`.
 
 ### Running the container without Compose
 
