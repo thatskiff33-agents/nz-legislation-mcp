@@ -269,12 +269,14 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
     if (path !== MCP_PATH && !(isMetadata ? metadataLimiter : ipLimiter).take(ip)) {
       return rateLimited();
     }
+    // Liveness answers any Host and Origin (still rate-limited above), so a container health check
+    // on 127.0.0.1 works while the public hostname is enforced. It reveals nothing but "ok".
+    if (path === "/healthz" && request.method === "GET") return json(200, { status: "ok" });
+
     const hostRejected = hostHeaderValidationResponse(request, allowedHosts);
     if (hostRejected !== undefined) return hostRejected;
     const originRejected = originValidationResponse(request, allowedOrigins);
     if (originRejected !== undefined) return originRejected;
-
-    if (path === "/healthz" && request.method === "GET") return json(200, { status: "ok" });
 
     if (metadataOptions !== undefined) {
       const metadata = oauthMetadataResponse(request, metadataOptions);

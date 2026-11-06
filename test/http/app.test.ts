@@ -196,20 +196,36 @@ describe("HTTP app with OAuth", () => {
 
   it("rejects wrong Host headers and disallowed browser origins", async () => {
     const { app } = await oauthApp();
+    // Any path other than /healthz (here, an unknown one: 404 once the checks pass).
     expect(
       (
         await app.fetch(
-          new Request("https://mcp.example.com/healthz", { headers: { host: "evil.example" } }),
+          new Request("https://mcp.example.com/other", { headers: { host: "evil.example" } }),
         )
       ).status,
     ).toBe(403);
     expect(
-      (await app.fetch(request("/healthz", { headers: { origin: "https://evil.example" } })))
-        .status,
+      (await app.fetch(request("/other", { headers: { origin: "https://evil.example" } }))).status,
     ).toBe(403);
     expect(
-      (await app.fetch(request("/healthz", { headers: { origin: "https://chatgpt.com" } }))).status,
-    ).toBe(200);
+      (await app.fetch(request("/other", { headers: { origin: "https://chatgpt.com" } }))).status,
+    ).toBe(404);
+  });
+
+  it("answers /healthz for the container's own health check on 127.0.0.1", async () => {
+    const { app } = await oauthApp();
+    const res = await app.fetch(
+      new Request("http://127.0.0.1:8080/healthz", { headers: { host: "127.0.0.1:8080" } }),
+      { remoteAddress: "127.0.0.1" },
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ status: "ok" });
+    // Only /healthz is exempt: the same Host is refused everywhere else.
+    const other = await app.fetch(
+      new Request("http://127.0.0.1:8080/mcp", { headers: { host: "127.0.0.1:8080" } }),
+      { remoteAddress: "127.0.0.1" },
+    );
+    expect(other.status).toBe(403);
   });
 
   it("returns 404 for unknown paths", async () => {

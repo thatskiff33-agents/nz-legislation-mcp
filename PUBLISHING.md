@@ -27,9 +27,11 @@ Nothing leaves GitHub until someone approves the `release` environment.
      - npm: publishes the checked tarball with provenance, using trusted publishing (no npm
        token is stored).
      - Claude Desktop bundle: attached to the draft GitHub release with SHA-256 checksums.
-     - Container: built from the release tag (inside Docker, without access to the publishing
-       credentials), scanned, then pushed to `ghcr.io/thatskiff33/nz-legislation-mcp` with an
-       SBOM and provenance, and signed with cosign (keyless).
+     - Container: each architecture (`linux/amd64`, `linux/arm64`) is built from the release tag
+       on its own native runner (inside BuildKit, without access to the publishing credentials),
+       scanned, and pushed by digest with an SBOM and provenance. A merge job then tags the
+       multi-architecture image on `ghcr.io/thatskiff33/nz-legislation-mcp` and signs it with
+       cosign (keyless). The digests are printed in the job summaries.
 4. `publish-release` publishes the draft GitHub release once npm, the bundle and the container
    have all succeeded.
 5. After npm has the new version, publish to the MCP Registry by hand (see below).

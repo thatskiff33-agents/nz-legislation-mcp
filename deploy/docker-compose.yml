@@ -3,12 +3,11 @@ name: nz-legislation-mcp
 
 services:
   mcp:
-    # Builds from this repository by default. To use a published release instead, set NZLM_IMAGE
-    # to a pinned version or digest, e.g. ghcr.io/thatskiff33/nz-legislation-mcp:1.0.0
-    # (verify its signature first: see docs/self-hosting.md).
+    # A published release, pinned by digest (set NZLM_IMAGE in .env; verify its signature first:
+    # see docs/self-hosting.md). To build from this repository instead, add the build override:
+    #   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+    # This file has no build section, so a published image is never replaced by a local build.
     image: ${NZLM_IMAGE:-nz-legislation-mcp:local}
-    build:
-      context: ..
     restart: unless-stopped
     env_file: .env
     environment:
@@ -40,7 +39,10 @@ services:
     cap_add: [NET_BIND_SERVICE]
     security_opt: ["no-new-privileges:true"]
     networks: [internal]
-    depends_on: [mcp]
+    # Start Caddy once the server answers its health check (the image's HEALTHCHECK).
+    depends_on:
+      mcp:
+        condition: service_healthy
 
 secrets:
   legislation_api_key:
