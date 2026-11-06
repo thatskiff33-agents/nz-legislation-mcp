@@ -26,22 +26,34 @@ function io(overrides: Partial<SetupIo> = {}) {
   return { value, out, err, path: String(value.keyFilePath) };
 }
 
+/** Permission bits are POSIX only: Windows reports 0o666 whatever mode is requested. */
+const onWindows = process.platform === "win32";
+
 describe("setup", () => {
-  it("verifies and saves the key privately, then points at client setup", async () => {
-    const t = io();
+  it("verifies and saves the key, then points at client setup", async () => {
+    // Pinned to the POSIX wording so the assertion is the same on every host.
+    const t = io({ platform: "linux" });
     expect(await runSetup([], t.value)).toBe(0);
     expect(readFileSync(t.path, "utf8")).toBe(`${DUMMY_KEY}\n`);
-    expect(statSync(t.path).mode & 0o777).toBe(0o600);
-    expect(statSync(join(t.path, "..")).mode & 0o777).toBe(0o700);
     expect(t.out.join("")).toContain("Key checked with the Legislation API: OK.");
     expect(t.out.join("")).toContain("readable only by you");
     expect(t.out.join("") + t.err.join("")).not.toContain(DUMMY_KEY);
   });
 
-  it("tightens an existing folder and words the message for Windows", async () => {
+  it.skipIf(onWindows)("saves the key file and folder privately (POSIX modes)", async () => {
+    const t = io();
+    expect(await runSetup([], t.value)).toBe(0);
+    expect(statSync(t.path).mode & 0o777).toBe(0o600);
+    expect(statSync(join(t.path, "..")).mode & 0o777).toBe(0o700);
+  });
+
+  it("words the message for Windows", async () => {
     const t = io({ platform: "win32" });
     expect(await runSetup([], t.value)).toBe(0);
     expect(t.out.join("")).toContain("protected by your Windows account");
+  });
+
+  it.skipIf(onWindows)("tightens an existing folder", async () => {
     const u = io();
     mkdirSync(join(u.path, ".."), { recursive: true, mode: 0o755 });
     expect(await runSetup([], u.value)).toBe(0);

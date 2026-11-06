@@ -504,4 +504,13 @@ describe("shared helpers", () => {
     expect(todayInNewZealand(new Date("2026-11-02T12:30:00Z"))).toBe("2026-11-03");
     expect(typeof todayInNewZealand()).toBe("string");
   });
+
+  it.each([
+    // Each is 23:30 NZST (UTC+12): a fixed UTC+13 offset would give the next day.
+    ["2026-07-01T11:30:00Z", "2026-07-01"], // winter
+    ["2026-04-05T11:30:00Z", "2026-04-05"], // the day daylight saving ends
+    ["2026-09-26T11:30:00Z", "2026-09-26"], // the night before it starts
+  ])("follows New Zealand daylight saving (%s)", (instant, expected) => {
+    expect(todayInNewZealand(new Date(instant))).toBe(expected);
+  });
 });

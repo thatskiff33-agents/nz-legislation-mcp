@@ -6,9 +6,14 @@ import { join } from "node:path";
 import { inspect } from "node:util";
 import { describe, expect, it } from "vitest";
 import { chmodSync } from "node:fs";
-import { ConfigError, defaultKeyFilePath, ENV, loadConfig } from "../src/config.js";
+import { ConfigError, defaultKeyFilePath, ENV, keyFileProblem, loadConfig } from "../src/config.js";
 
 const KEY = DUMMY_KEY;
+/**
+ * Real file-system cases that need POSIX features (permission bits, /dev/null, mkfifo). They are
+ * skipped on Windows; the rules themselves are covered on every platform through keyFileProblem.
+ */
+const onWindows = process.platform === "win32";
 /** A reader with no files at all: missing when allowed, otherwise unreadable. */
 const noFile = (_path: string, options?: { allowMissing: boolean }): string | undefined => {
   if (options?.allowMissing === true) return undefined;
@@ -58,7 +63,8 @@ describe("loadConfig", () => {
       expect(loadConfig({}, undefined, path).apiKey.reveal()).toBe(KEY);
     });
 
-    it("is refused if other users can read it", () => {
+    // POSIX only: Windows ignores chmod permission bits.
+    it.skipIf(onWindows)("is refused if other users can read it", () => {
       writeFileSync(path, `${KEY}\n`);
       chmodSync(path, 0o644);
       expect(() => loadConfig({}, undefined, path)).toThrow(
@@ -118,6 +124,35 @@ describe("loadConfig", () => {
     });
   });
 
+  describe("key file rules (any platform)", () => {
+    const file = (mode: number) => ({ isFile: () => true, mode });
+
+    it("refuses anything that is not a regular file", () => {
+      expect(keyFileProblem({ isFile: () => false, mode: 0o600 }, "/k", false, "linux")).toBe(
+        "is not a regular file",
+      );
+    });
+
+    it("refuses a default key file that group or others can read, except on Windows", () => {
+      expect(keyFileProblem(file(0o644), "/k", true, "linux")).toBe(
+        "can be read by other users; run: chmod 600 /k",
+      );
+      expect(keyFileProblem(file(0o640), "/k", true, "darwin")).toContain("other users");
+      expect(keyFileProblem(file(0o600), "/k", true, "linux")).toBeUndefined();
+      expect(keyFileProblem(file(0o666), "C:\\k", true, "win32")).toBeUndefined();
+    });
+
+    it("does not apply the private-mode rule to an operator-named file", () => {
+      expect(keyFileProblem(file(0o644), "/run/secrets/key", false, "linux")).toBeUndefined();
+    });
+
+    it("uses the current platform by default", () => {
+      expect(keyFileProblem(file(0o644), "/k", true)).toBe(
+        keyFileProblem(file(0o644), "/k", true, process.platform),
+      );
+    });
+  });
+
   describe("key file safety (real file system)", () => {
     const dir = mkdtempSync(join(tmpdir(), "nzlm-config-"));
 
@@ -133,11 +168,12 @@ describe("loadConfig", () => {
       expect(() => loadConfig({ [ENV.apiKeyFile]: path })).toThrow("is not a regular file");
     });
 
-    it("refuses a device such as /dev/null", () => {
+    // POSIX only: Windows has no /dev/null path and no mkfifo.
+    it.skipIf(onWindows)("refuses a device such as /dev/null", () => {
       expect(() => loadConfig({ [ENV.apiKeyFile]: "/dev/null" })).toThrow("is not a regular file");
     });
 
-    it("refuses a FIFO without blocking", () => {
+    it.skipIf(onWindows)("refuses a FIFO without blocking", () => {
       const path = join(dir, "fifo");
       execFileSync("mkfifo", [path]);
       expect(() => loadConfig({ [ENV.apiKeyFile]: path })).toThrow("is not a regular file");

@@ -3,7 +3,11 @@
 ## Prerequisites
 
 - Node.js 22 or later (`.nvmrc` pins the minimum).
-- pnpm, via Corepack: `corepack enable` (the exact version is pinned in `package.json`).
+- pnpm, via Corepack: `corepack enable` (the exact version is pinned in `package.json`). The `pnpm` command must be on your `PATH`, because `pnpm check` calls `pnpm` for each step; `corepack pnpm check` alone is not enough.
+
+## Platforms
+
+`pnpm check` passes on Linux and Windows (macOS is expected to behave as Linux). A few tests need POSIX features (file permission bits, `/dev/null`, `mkfifo`) and are skipped on Windows. The key-file rules they exercise are also covered by platform-independent tests, so coverage stays at 100% on Windows; the non-blocking FIFO open is covered only on POSIX. The 100% coverage gate is enforced in CI, which runs on Linux.
 
 ## Commands
 
