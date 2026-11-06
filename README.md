@@ -42,6 +42,9 @@ The key is personal: PCO's terms do not allow it to be shared.
    npx -y nz-legislation-mcp setup
    ```
 
+   If your terminal can't hide typing (for example Git Bash on Windows), setup stops
+   without reading the key: use PowerShell or Windows Terminal, or pipe it from a file with `--key-stdin < keyfile`.
+
 2. Add the server to your AI client. For example, Claude Code:
 
    ```sh
@@ -54,7 +57,8 @@ The key is personal: PCO's terms do not allow it to be shared.
    codex mcp add nz-legislation -- npx -y nz-legislation-mcp
    ```
 
-3. Check it works: `npx -y nz-legislation-mcp doctor`.
+3. Check it works: `npx -y nz-legislation-mcp doctor`. It exits with code 1 if a required check
+   fails; a warning (for example about legislation.govt.nz) does not change the exit code.
 
 Steps for Claude Desktop (one-click bundle), Cursor, VS Code, Gemini CLI and others are in
 [docs/clients.md](docs/clients.md).

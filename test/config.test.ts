@@ -37,6 +37,7 @@ describe("loadConfig", () => {
   it("loads a key from the environment with safe defaults", () => {
     const c = loadConfig({ [ENV.apiKey]: `  ${KEY}\n` }, noFile);
     expect(c.apiKey.reveal()).toBe(KEY);
+    expect(c.keySource).toBe(`the environment variable ${ENV.apiKey}`);
     expect(c).toMatchObject({ timeoutMs: 15_000, cache: "off", logLevel: "info" });
   });
 
@@ -45,6 +46,7 @@ describe("loadConfig", () => {
       p === "/run/secrets/key" ? `${KEY}\r\n` : "",
     );
     expect(c.apiKey.reveal()).toBe(KEY);
+    expect(c.keySource).toBe(`the file named by ${ENV.apiKeyFile} (/run/secrets/key)`);
   });
 
   it("uses the real file system by default", () => {
@@ -60,7 +62,10 @@ describe("loadConfig", () => {
     it("is used when no key variable is set", () => {
       writeFileSync(path, `${KEY}\n`, { mode: 0o600 });
       chmodSync(path, 0o600);
-      expect(loadConfig({}, undefined, path).apiKey.reveal()).toBe(KEY);
+      const c = loadConfig({}, undefined, path);
+      expect(c.apiKey.reveal()).toBe(KEY);
+      expect(c.keySource).toBe(`the key file saved by setup (${path})`);
+      expect(c.keySource).not.toContain(KEY);
     });
 
     // POSIX only: Windows ignores chmod permission bits.

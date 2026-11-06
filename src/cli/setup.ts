@@ -19,14 +19,17 @@ import { LegislationClient } from "../api/client.js";
 import { ApiError } from "../api/errors.js";
 import { defaultKeyFilePath, validateKey } from "../config.js";
 import { Secret } from "../secret.js";
-import { InputCancelledError } from "./terminal.js";
+import { InputCancelledError, InputNotHiddenError, TerminalReadError } from "./terminal.js";
 import { CLIENT_SETUP_HINT } from "./clients.js";
 
 export interface SetupIo {
   readonly env: Readonly<Record<string, string | undefined>>;
   readonly stdout: (text: string) => void;
   readonly stderr: (text: string) => void;
-  /** Prompts and reads one line without echoing it (interactive terminals). */
+  /**
+   * Prompts and reads one line without echoing it. Rejects with InputNotHiddenError when the
+   * terminal cannot hide input, and InputCancelledError on Ctrl-C.
+   */
   readonly readSecret: (prompt: string) => Promise<string>;
   /** Reads all of standard input (for --key-stdin). */
   readonly readStdin: () => Promise<string>;
@@ -93,10 +96,17 @@ export async function runSetup(argv: readonly string[], io: SetupIo): Promise<nu
       ? await io.readStdin()
       : await io.readSecret("Paste your NZ Legislation API key (input hidden): ");
   } catch (error) {
-    io.stderr(
-      `${error instanceof InputCancelledError ? error.message : "Could not read the key."} Nothing was saved.\n`,
-    );
-    return 130;
+    if (error instanceof InputNotHiddenError) {
+      io.stderr(`${error.message}\n`);
+      return 1;
+    }
+    const message =
+      error instanceof InputCancelledError || error instanceof TerminalReadError
+        ? error.message
+        : "Could not read the key.";
+    io.stderr(`${message} Nothing was saved.\n`);
+    // 130 is the shell convention for Ctrl-C; any other read problem is an ordinary failure.
+    return error instanceof InputCancelledError ? 130 : 1;
   }
   const key = validateKey(raw, "The key");
   if (key instanceof Error) {
