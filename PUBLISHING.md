@@ -114,9 +114,10 @@ Status on 7 November 2026: steps 1 to 6 are done (#53, #11). Step 7 follows the 
    - The workflow token stays read-only for these jobs, so "Allow GitHub Actions to create and
      approve pull requests" is not needed.
 2. Repository settings, Environments: create `release`, limited to the `main` branch and `v*`
-   tags, with no required reviewers, a 30-minute wait timer and "Allow administrators to bypass
-   configured protection rules" off (owner decision, 7 November 2026). The timer is the cancel
-   window, and nobody can skip it. An agent may merge the release pull request once its CI is
+   tags, with no required reviewers and a 30-minute wait timer (owner decision, 7 November 2026).
+   "Allow administrators to bypass configured protection rules" is off (set by the agent on 7
+   November 2026 under the owner's approval for the release settings, so the timer binds
+   everyone). The timer is the cancel window. An agent may merge the release pull request once its CI is
    green and an independent review has signed off (AGENTS.md).
 3. npm: sign in to the account that will own `nz-legislation-mcp` and turn on two-factor
    authentication for authorisation and writes.
@@ -125,8 +126,8 @@ Status on 7 November 2026: steps 1 to 6 are done (#53, #11). Step 7 follows the 
    - Claim the name with a placeholder that holds a README and no code: from a folder outside
      this repository, `npm publish --access public --tag placeholder` for version
      `0.0.0-placeholder.0`, approving the two-factor prompt in the browser. On 6 November 2026
-     the registry also showed a `0.0.0-stage` holding version while it processed that first
-     publish (observed; cause to confirm). Deprecate both (`npm deprecate`), saying they have no
+     the registry also showed a `0.0.0-stage` holding version, created a few minutes before the
+     placeholder appeared (observed; cause to confirm). Deprecate both (`npm deprecate`), saying they have no
      code.
    - Add the trusted publisher (npm 11.15.0 or later), or use the package's settings page on
      npmjs.com with the same owner, repository, workflow and environment:
