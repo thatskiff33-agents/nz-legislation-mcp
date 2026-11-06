@@ -283,7 +283,7 @@ jobs:
       tag: ${{ needs.release-please.outputs.tag }}
 
   # Publish the draft GitHub release only once npm, the bundle and the container are all out, so
-  # a failed or unapproved release never shows up as an empty public release.
+  # a failed or cancelled release never shows up as an empty public release.
   publish-release:
     needs: [release-please, npm, bundle, container]
     runs-on: ubuntu-latest

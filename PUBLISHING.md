@@ -93,8 +93,7 @@ cancelled.
 Do these in order. Each one is an outward-facing change, made by a maintainer or with the
 owner's approval.
 
-Status on 7 November 2026: steps 1 to 5 are done (#53, #11). Step 6 is set just before the
-first release. Step 7 follows it.
+Status on 7 November 2026: steps 1 to 6 are done (#53, #11). Step 7 follows the first release.
 
 1. Release App: release-please and the plugin-pin job write with a dedicated GitHub App, not
    the workflow's own token. Only the App may then create release tags (step 5), and the release
@@ -115,21 +114,29 @@ first release. Step 7 follows it.
    - The workflow token stays read-only for these jobs, so "Allow GitHub Actions to create and
      approve pull requests" is not needed.
 2. Repository settings, Environments: create `release`, limited to the `main` branch and `v*`
-   tags, with no required reviewers and a 30-minute wait timer (owner decision, 7 November
-   2026). The timer is the cancel window. An agent may merge the release pull request once its
-   CI is green and its own review is done (AGENTS.md).
+   tags, with no required reviewers, a 30-minute wait timer and "Allow administrators to bypass
+   configured protection rules" off (owner decision, 7 November 2026). The timer is the cancel
+   window, and nobody can skip it. An agent may merge the release pull request once its CI is
+   green and an independent review has signed off (AGENTS.md).
 3. npm: sign in to the account that will own `nz-legislation-mcp` and turn on two-factor
    authentication for authorisation and writes.
 4. npm trusted publisher. npm only accepts one for a package that already exists ("The package
    you're configuring must already exist on the npm registry", `npm trust` documentation), so:
    - Claim the name with a placeholder that holds a README and no code: from a folder outside
      this repository, `npm publish --access public --tag placeholder` for version
-     `0.0.0-placeholder.0`, approving the two-factor prompt in the browser. npm may add its own
-     `0.0.0-stage` holding version. Deprecate both (`npm deprecate`), saying they have no code.
-   - Add the trusted publisher: `npm trust github nz-legislation-mcp --file release.yml --repo
-thatskiff33/nz-legislation-mcp --env release --allow-publish` (npm 11.15.0 or later), or
-     the package's settings page on npmjs.com with the same owner, repository, workflow and
-     environment. Then `npm logout`, so no npm credential stays on the computer.
+     `0.0.0-placeholder.0`, approving the two-factor prompt in the browser. On 6 November 2026
+     the registry also showed a `0.0.0-stage` holding version while it processed that first
+     publish (observed; cause to confirm). Deprecate both (`npm deprecate`), saying they have no
+     code.
+   - Add the trusted publisher (npm 11.15.0 or later), or use the package's settings page on
+     npmjs.com with the same owner, repository, workflow and environment:
+
+     ```sh
+     npm trust github nz-legislation-mcp --file release.yml --repo thatskiff33/nz-legislation-mcp --env release --allow-publish
+     ```
+
+     Then `npm logout`, so no npm credential stays on the computer.
+
    - A new trusted publisher must complete a successful publish within 2 days or it expires,
      so add it shortly before releasing. If it expires, remove it (`npm trust list`, then
      `npm trust revoke --id <id>`) and add it again.
