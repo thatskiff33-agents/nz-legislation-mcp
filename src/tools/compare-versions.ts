@@ -49,6 +49,17 @@ const InputSchema = z
       });
     }
     if (
+      args.from_version_id !== undefined &&
+      args.to_version_id !== undefined &&
+      compareVersionIds(args.from_version_id, args.to_version_id) > 0
+    ) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["from_version_id"],
+        message: `from_version_id (${args.from_version_id}) is later than to_version_id (${args.to_version_id}); swap them: "from" is the earlier version.`,
+      });
+    }
+    if (
       args.from_as_at !== undefined &&
       args.to_as_at !== undefined &&
       args.from_as_at > args.to_as_at
@@ -80,8 +91,16 @@ const OutputSchema = z.object({
   to: SideSchema,
   same_version: z.boolean(),
   changed: z.boolean(),
-  lines_added: z.number().int(),
-  lines_removed: z.number().int(),
+  lines_added: z
+    .number()
+    .int()
+    .describe("Lines added in the full comparison, including lines omitted from a truncated diff."),
+  lines_removed: z
+    .number()
+    .int()
+    .describe(
+      "Lines removed in the full comparison, including lines omitted from a truncated diff.",
+    ),
   diff: z
     .string()
     .describe(
@@ -202,6 +221,7 @@ export const compareVersions = defineTool({
       const total = full.split("\n").length;
       notes.push(
         `The diff was cut to keep the result small: ${String(whole)} of ${String(total)} diff lines are shown in full${midLine ? ", and the last line shown is cut part-way (marked [line cut])" : ""}. Compare a smaller provision (a clause rather than a whole schedule), or read each version with get_provision_text.`,
+        "lines_added and lines_removed count changes in the full comparison, including lines omitted from this diff.",
       );
     }
     return {

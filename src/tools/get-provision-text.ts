@@ -161,6 +161,7 @@ const OutputSchema = z.object({
     .object({
       version_id: z.string(),
       offset: z.number().int(),
+      max_chars: z.number().int(),
       section: z.string().optional(),
       schedule: z.string().optional(),
       part: z.string().optional(),
@@ -220,6 +221,7 @@ export const getProvisionText = defineTool({
           ? {
               version_id: record.version_id,
               offset: end,
+              max_chars: maxChars,
               ...(args.section === undefined ? {} : { section: args.section }),
               ...(args.schedule === undefined ? {} : { schedule: args.schedule }),
               ...(args.part === undefined ? {} : { part: args.part }),

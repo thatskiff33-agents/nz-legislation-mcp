@@ -543,12 +543,22 @@ describe("version safety and truncation (issue #40)", () => {
         signal,
       );
     const first = await page({ work_id: WORK });
-    expect(first.continue_with).toEqual({ version_id: V2014, offset: 1000, section: "4" });
+    expect(first.continue_with).toEqual({
+      version_id: V2014,
+      offset: 1000,
+      max_chars: 1000,
+      section: "4",
+    });
     expect(first.notes.join(" ")).not.toContain("chosen by date");
     // A middle page chosen by date: told to pin the version.
     const middle = await page({ work_id: WORK, offset: 1000 });
     expect(middle.notes.join(" ")).toContain(`continue with version_id ${V2014}`);
-    expect(middle.continue_with).toEqual({ version_id: V2014, offset: 2000, section: "4" });
+    expect(middle.continue_with).toEqual({
+      version_id: V2014,
+      offset: 2000,
+      max_chars: 1000,
+      section: "4",
+    });
     // The last page chosen by date: nothing to continue, just a check.
     const last = await page({ work_id: WORK, offset: 2000 });
     expect(last.continue_with).toBeNull();
@@ -583,6 +593,54 @@ describe("version safety and truncation (issue #40)", () => {
     expect(JSON.stringify(dates.error?.issues)).toContain(
       "from_as_at (2026-01-01) is later than to_as_at (2021-01-01)",
     );
+  });
+
+  it("keeps continuation on the first version after midnight and a new publication", async () => {
+    const oldXml = WAITANGI.replace("Observance of Waitangi Day", `Observance ${"x".repeat(3200)}`);
+    const newXml = oldXml.replace("x".repeat(3200), "y".repeat(3200));
+    const first = await getProvisionText.run(
+      { work_id: WORK, section: "4", max_chars: 1000 },
+      deps([json(versionsPage(WORK, ["2007-09-18"]))], "2013-12-31", { [V2007]: oldXml }).deps,
+      signal,
+    );
+    const afterMidnight = deps(
+      [json(versionsPage(WORK, ["2014-01-01", "2007-09-18"])), versionRecord(V2007)],
+      "2014-01-01",
+      { [V2007]: oldXml, [V2014]: newXml },
+    );
+    const latest = await getProvisionText.run(
+      { work_id: WORK, section: "4", max_chars: 1000 },
+      afterMidnight.deps,
+      signal,
+    );
+    expect(latest.version_id).toBe(V2014);
+    const next = await getProvisionText.run(
+      getProvisionText.inputSchema.parse(first.continue_with),
+      afterMidnight.deps,
+      signal,
+    );
+    expect(next.version_id).toBe(V2007);
+    expect(next.offset).toBe(first.next_offset);
+    expect(next.text).toBe("x".repeat(1000));
+    expect(next.next_offset).toBe(2000);
+    expect(getProvisionText.outputSchema.parse(next)).toEqual(next);
+    expect(afterMidnight.fake.calls[1]?.url).toContain(V2007);
+  });
+
+  it.each([
+    [V2014, V2007, false],
+    [`${V2014}AA`, `${V2014}Z`, false],
+    [V2014, V2014, true],
+    [V2007, V2014, true],
+  ])("validates explicit version ordering before fetching: %s to %s", (from, to, valid) => {
+    const result = compareVersions.inputSchema.safeParse({
+      work_id: WORK,
+      section: "4",
+      from_version_id: from,
+      to_version_id: to,
+    });
+    expect(result.success).toBe(valid);
+    if (!valid) expect(JSON.stringify(result.error?.issues)).toContain("swap them");
   });
 
   it("says when a defaulted 'to' (today) is earlier than 'from', and accepts equal dates", async () => {
@@ -688,6 +746,11 @@ describe("version safety and truncation (issue #40)", () => {
       expect(line).toMatch(/^(?:[-+] (?:old|new) \d+ x{20}| {2}.*|…)$/u);
     }
     expect(many.notes.join(" ")).toMatch(/The diff was cut .*: \d+ of \d+ diff lines are shown/u);
+    expect(many.notes).toContain(
+      "lines_added and lines_removed count changes in the full comparison, including lines omitted from this diff.",
+    );
+    expect(many.lines_added).toBe(1500);
+    expect(many.lines_removed).toBe(1500);
     const long = await run(
       `<para><text>${"a".repeat(40_000)}</text></para>`,
       `<para><text>${"b".repeat(40_000)}</text></para>`,
