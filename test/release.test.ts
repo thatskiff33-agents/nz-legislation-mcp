@@ -148,6 +148,26 @@ describe("release workflow", () => {
     );
   });
 
+  it("dry-runs a version npm has not published, so CI passes between releases (#82)", () => {
+    // npm refuses even a dry run of a published version; the CI job moves to the next patch
+    // version (without a git tag or scripts) before packing, and only there.
+    const ciText = readFileSync(join(ROOT, ".github/workflows/ci.yml"), "utf8");
+    // The publish-dry-run job: from its key to the next top-level job, or the end of the file.
+    const start = ciText.indexOf("\n  publish-dry-run:\n");
+    expect(start).toBeGreaterThanOrEqual(0);
+    const next = ciText.slice(start + 1).search(/\n {2}[a-z][a-z0-9-]*:\n/u);
+    const job = runLines(next < 0 ? ciText.slice(start) : ciText.slice(start, start + 1 + next));
+    const lines = job.map(({ text }) => text.trim());
+    const at = (prefix: string): number => lines.findIndex((line) => line.startsWith(prefix));
+    expect(lines).toContain("npm version patch --no-git-tag-version --ignore-scripts");
+    expect(at("npm version patch")).toBeLessThan(at("pnpm pack"));
+    expect(at("pnpm pack")).toBeLessThan(at("npm publish "));
+    // The bump happens once in CI, and the release workflow never changes the version.
+    const bump = /\bp?npm (?:version|pkg set)\b/u;
+    expect(runLines(ciText).filter(({ text }) => bump.test(text))).toHaveLength(1);
+    expect(workflow).not.toMatch(bump);
+  });
+
   it("publishes npm with no install, no scripts and provenance", () => {
     const npm = job("npm");
     expect(npm).toContain("environment: release");
