@@ -77,6 +77,42 @@ describe("MemoryCache with a size budget", () => {
     expect(cache.weight).toBe(0);
   });
 
+  it("keeps a value weighing exactly the budget, and totals landing exactly on it", () => {
+    const exact = new MemoryCache(1000, Date.now, budget);
+    exact.set("a", "a".repeat(30), 1000);
+    exact.set("b", "b".repeat(100), 1000);
+    expect([exact.get("a"), exact.get("b"), exact.weight]).toEqual([
+      undefined,
+      "b".repeat(100),
+      100,
+    ]);
+    const halves = new MemoryCache(1000, Date.now, budget);
+    halves.set("a", "a".repeat(50), 1000);
+    halves.set("b", "b".repeat(50), 1000);
+    expect([halves.size, halves.weight]).toEqual([2, 100]);
+  });
+
+  it("drops expired entries before evicting live ones", () => {
+    let now = 0;
+    const cache = new MemoryCache(1000, () => now, budget);
+    cache.set("old", "o".repeat(40), 5);
+    cache.set("live", "l".repeat(40), 1000);
+    cache.get("old"); // most recently used, but about to expire
+    now = 10;
+    cache.set("new", "n".repeat(40), 1000);
+    expect(cache.get("live")).toBe("l".repeat(40));
+    expect(cache.get("new")).toBe("n".repeat(40));
+    expect(cache.weight).toBe(80);
+  });
+
+  it.each([Number.NaN, -1, Infinity])("refuses a weight of %s", (weight) => {
+    const cache = new MemoryCache(10, Date.now, { maxWeight: 100, weigh: () => weight });
+    expect(() => {
+      cache.set("a", "x", 1000);
+    }).toThrow(RangeError);
+    expect([cache.size, cache.weight]).toEqual([0, 0]);
+  });
+
   it("weighs nothing without a budget", () => {
     const cache = new MemoryCache(2);
     cache.set("a", "x".repeat(1000), 1000);

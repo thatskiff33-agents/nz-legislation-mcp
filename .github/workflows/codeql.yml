@@ -10,9 +10,10 @@ on:
 permissions:
   contents: read
 
-# Cancel superseded pull request runs; runs on main always finish.
+# Cancel superseded pull request runs. Other runs (main, schedule) get a group of their own, so
+# a newer run on main never drops a pending one.
 concurrency:
-  group: codeql-${{ github.ref }}
+  group: codeql-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:

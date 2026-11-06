@@ -1,6 +1,6 @@
 /** get_provision_text: the text of one section, schedule clause or schedule. */
-import { MemoryCache } from "../api/cache.js";
 import { z } from "zod";
+import { MemoryCache } from "../api/cache.js";
 import { readLegislation, type ReadResult } from "../text/document.js";
 import { pageBounds } from "../text/slice.js";
 import {
@@ -32,9 +32,12 @@ const TEXT_CACHE_TTL_MS = 60 * 60 * 1000;
 const TEXT_CACHE_MAX_ENTRIES = 50;
 /**
  * Total size budget for the optional text cache, in UTF-16 code units (about 2 bytes each, so
- * roughly 64 MB of text). One rendered document can be up to 2,000,000 characters.
+ * at most about 64 MB of text, less for plain ASCII). One rendered document can be up to
+ * 2,000,000 characters.
+ *
+ * @internal Exported for tests.
  */
-const TEXT_CACHE_MAX_CHARS = 32_000_000;
+export const TEXT_CACHE_MAX_CHARS = 32_000_000;
 
 /** Approximate size of a cached rendering: its text and title, plus a little per match. */
 function renderedWeight(value: unknown): number {
