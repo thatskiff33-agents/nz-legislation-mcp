@@ -12,7 +12,9 @@ import {
   type ToolDeps,
 } from "./shared.js";
 import {
+  describeScope,
   describeTarget,
+  scopeHint,
   duplicatesNote,
   provisionInfo,
   ProvisionInfoSchema,
@@ -47,6 +49,7 @@ async function readCached(
     section?: string | undefined;
     schedule?: string | undefined;
     part?: string | undefined;
+    subpart?: string | undefined;
     include_history?: boolean | undefined;
   },
   signal: AbortSignal,
@@ -56,12 +59,18 @@ async function readCached(
     args.section,
     args.schedule,
     args.part,
+    args.subpart,
     args.include_history === true,
   ]);
   const cached = deps.textCache?.get(key) as Rendered | undefined;
   if (cached !== undefined) return cached;
   const doc = await readLegislation(deps.xml(versionId, signal), {
-    target: { section: args.section, schedule: args.schedule, part: args.part },
+    target: {
+      section: args.section,
+      schedule: args.schedule,
+      part: args.part,
+      subpart: args.subpart,
+    },
     includeHistory: args.include_history === true,
   });
   // Keep only what later pages need (not the outline of a successful read).
@@ -100,7 +109,7 @@ const InputSchema = z
       .min(0)
       .optional()
       .describe(
-        "Character offset to continue from. To continue, pass continue_with from the previous page (its version_id and offset), so every page comes from the same version.",
+        "Character offset to continue from. To continue, pass the continue_with arguments from the previous page, so every page comes from the same version and provision.",
       ),
   })
   .superRefine((args, ctx) => {
@@ -123,10 +132,18 @@ const OutputSchema = z.object({
     .nullable()
     .describe("Offset of the next page, or null if this is the end."),
   continue_with: z
-    .object({ version_id: z.string(), offset: z.number().int() })
+    .object({
+      version_id: z.string(),
+      offset: z.number().int(),
+      section: z.string().optional(),
+      schedule: z.string().optional(),
+      part: z.string().optional(),
+      subpart: z.string().optional(),
+      include_history: z.boolean().optional(),
+    })
     .nullable()
     .describe(
-      "Arguments for the next page: pass this version_id (in place of work_id and as_at) and offset, with the same section, schedule, part and include_history. Null at the end. Using version_id keeps every page on the same version.",
+      "Arguments for the next page: pass exactly these (version_id in place of work_id and as_at), so every page comes from the same version and the same provision. Null at the end.",
     ),
   total_chars: z.number().int(),
   notes: z.array(z.string()),
@@ -138,7 +155,7 @@ export const getProvisionText = defineTool({
   description: [
     "Get the text of one section, a clause in a schedule, or a whole schedule, from the official XML.",
     "Choose the version with work_id (+ as_at, default today in New Zealand) or version_id. Labels come from get_table_of_contents.",
-    "Long text is paged: continue with the continue_with version_id and offset from the previous page, so all pages come from one version (or raise max_chars for very long provisions such as definitions sections).",
+    "Long text is paged: continue with the continue_with arguments from the previous page, so all pages come from one version and provision (or raise max_chars for very long provisions such as definitions sections).",
     "Repealed provisions are marked [Repealed]; quoted words appear in quotation marks.",
   ].join(" "),
   inputSchema: InputSchema,
@@ -150,12 +167,14 @@ export const getProvisionText = defineTool({
     const doc = await readCached(deps, record.version_id, args, signal);
     if (doc.found === null || doc.text === null) {
       const what = describeTarget(args.section, args.schedule);
+      const scoped = args.part !== undefined || args.subpart !== undefined;
+      const where = scoped ? ` within ${describeScope(args.part, args.subpart)}` : "";
       const hint =
         args.section === undefined
           ? ""
-          : ` Labels near "${args.section}": ${suggestLabels(doc.outline, args.section).join(", ") || "none"}.`;
+          : ` Labels near "${args.section}"${scoped ? " anywhere in the document" : ""}: ${suggestLabels(doc.outline, args.section).join(", ") || "none"}.`;
       throw new ToolInputError(
-        `${what} was not found in ${record.version_id}.${hint} Use get_table_of_contents to see the labels.`,
+        `${what} was not found${where} in ${record.version_id}.${scopeHint(doc.outline, args.part, args.subpart)}${hint} Use get_table_of_contents to see the labels.`,
       );
     }
 
@@ -170,7 +189,18 @@ export const getProvisionText = defineTool({
       text: doc.text.slice(offset, end),
       offset,
       next_offset: end < doc.text.length ? end : null,
-      continue_with: end < doc.text.length ? { version_id: record.version_id, offset: end } : null,
+      continue_with:
+        end < doc.text.length
+          ? {
+              version_id: record.version_id,
+              offset: end,
+              ...(args.section === undefined ? {} : { section: args.section }),
+              ...(args.schedule === undefined ? {} : { schedule: args.schedule }),
+              ...(args.part === undefined ? {} : { part: args.part }),
+              ...(args.subpart === undefined ? {} : { subpart: args.subpart }),
+              ...(args.include_history === true ? { include_history: true } : {}),
+            }
+          : null,
       total_chars: doc.text.length,
       notes: [
         TEXT_SOURCE_NOTE,

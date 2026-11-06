@@ -178,8 +178,8 @@ describe("resource formatting", () => {
     const { client: c } = await connect([record(id, "act_public_2099_3")], { [id]: xml });
     const text = textOf(await c.readResource({ uri: `legislation://version/${id}/section/1` }));
     expect(text).toContain("This label appears 2 times");
-    expect(text).toContain("use the get_provision_text tool with part");
-    expect(text).not.toContain("Pass part to choose another.");
+    expect(text).toContain("use the get_provision_text tool with part and subpart");
+    expect(text).not.toContain("Pass part (and subpart) to choose another.");
   });
 
   it("omits the permalink for agency-published records", async () => {
