@@ -69,8 +69,7 @@ describe("the repository URL is defined once (issue #42)", () => {
         .split("\n")
         .filter((line) => !/^\s*(?:\*|\/\/|\/\*)/u.test(line)) // comments may show examples
         .join("\n");
-      expect(code, file).not.toContain("github.com/thatskiff33");
-      expect(code, file).not.toContain('"thatskiff33');
+      expect(code, file).not.toContain(REPOSITORY_SLUG);
     }
   });
 

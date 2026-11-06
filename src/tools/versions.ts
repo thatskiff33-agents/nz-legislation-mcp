@@ -131,7 +131,8 @@ export async function selectVersion(
       }
     }
     const lastPage =
-      response.results.length === 0 || page * (response.per_page ?? MAX_PER_PAGE) >= response.total;
+      response.results.length === 0 ||
+      page * (response.per_page ?? response.results.length) >= response.total;
     if (lastPage) exhausted = true;
     if (leftDate || lastPage) break;
   }

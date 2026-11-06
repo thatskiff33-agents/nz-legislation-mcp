@@ -28,7 +28,9 @@ import {
   SORT_ORDERS,
   TYPE_SPECIFIC_FILTERS,
   VERSION_SORTS,
+  AGENCY_PUBLISHER,
   API_LIMITS,
+  orList,
 } from "./vocabulary.js";
 
 // ---------------------------------------------------------------------------
@@ -101,7 +103,7 @@ const MAX_AGENCY_LENGTH = 200;
 /** API maximum page size (used for version lists, whose items are small). */
 export const MAX_PER_PAGE = API_LIMITS.maxPerPage;
 /** Search page cap: search results are large, so 50 keeps a page within client output limits. */
-const MAX_SEARCH_PER_PAGE = 50;
+export const MAX_SEARCH_PER_PAGE = 50;
 /** Sanity bound on page numbers (the whole corpus is under 50,000 works, so under 500 pages of 100). */
 const MAX_PAGE = 10_000;
 
@@ -142,7 +144,7 @@ export const SearchParamsSchema = strictParams({
   legislation_status: z
     .enum(LEGISLATION_STATUSES)
     .optional()
-    .describe(`${LEGISLATION_STATUSES.join(", ")} (no_value: status not recorded, e.g. bills).`),
+    .describe(`${orList(LEGISLATION_STATUSES)} (no_value: status not recorded, e.g. bills).`),
   act_type: z.enum(ACT_TYPES).optional().describe(onlyWith("act")),
   act_status: z.enum(ACT_STATUSES).optional().describe(onlyWith("act")),
   act_classification: z.enum(CLASSIFICATIONS).optional().describe(onlyWith("act")),
@@ -202,7 +204,7 @@ export const SearchParamsSchema = strictParams({
   // returns zero results rather than an error).
   const type = params.legislation_type;
   if (
-    params.publisher === "Agency" &&
+    params.publisher === AGENCY_PUBLISHER &&
     type !== undefined &&
     !(AGENCY_PUBLISHED_TYPES as readonly string[]).includes(type)
   ) {

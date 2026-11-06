@@ -534,12 +534,14 @@ describe("compareVersionIds", () => {
 
 describe("single source of truth (issue #42)", () => {
   it("builds descriptions and limits from src/domain", async () => {
-    const { orList } = await import("../../src/tools/shared.js");
+    const { orList } = await import("../../src/domain/vocabulary.js");
+    const { apiErrors } = await import("../../src/api/errors.js");
     expect(orList(["a", "b", "c"])).toBe("a, b or c");
     expect(orList(["a"])).toBe("a");
     expect(orList([])).toBe("");
     expect(getApiQuota.description).toContain("10,000 per day");
-    expect(new ApiError("burst_limit_exceeded", "", true).kind).toBe("burst_limit_exceeded");
+    expect(apiErrors.burstLimit().message).toContain("5 minutes (403, limit 2,000 per IP)");
+    expect(searchLegislation.description).toContain("per_page up to 50 (default 20)");
   });
 
   it("tolerates a versions page without per_page (not required by the spec)", async () => {

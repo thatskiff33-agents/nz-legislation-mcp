@@ -59,6 +59,17 @@ export const INSTRUMENT_STATUSES = [
 export const BILL_TYPES = ["government", "local", "member", "private"] as const;
 export const BILL_STATUSES = ["current", "enacted", "terminated"] as const;
 
+/**
+ * "a, b, c or d", for descriptions built from a vocabulary.
+ *
+ * Used by descriptions in src/domain and src/tools.
+ */
+export function orList(values: readonly string[]): string {
+  return values.length < 2
+    ? values.join("")
+    : `${values.slice(0, -1).join(", ")} or ${String(values.at(-1))}`;
+}
+
 // ---------------------------------------------------------------------------
 // Groups derived from the vocabularies above (`satisfies` makes a typo a compile error)
 // ---------------------------------------------------------------------------

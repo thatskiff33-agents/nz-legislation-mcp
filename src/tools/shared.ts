@@ -15,20 +15,10 @@ import { REPOSITORY_URL } from "../version.js";
 import {
   AGENCY_PUBLISHER,
   CLASSIFICATIONS,
+  orList,
   LEGISLATION_STATUSES,
   LEGISLATION_TYPES,
 } from "../domain/vocabulary.js";
-
-/**
- * "a, b, c or d", for descriptions built from a vocabulary.
- *
- * @internal Exported for tests.
- */
-export function orList(values: readonly string[]): string {
-  return values.length < 2
-    ? values.join("")
-    : `${values.slice(0, -1).join(", ")} or ${String(values.at(-1))}`;
-}
 
 /** Dependencies every tool handler receives. */
 export interface ToolDeps {
