@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.1](https://github.com/thatskiff33/nz-legislation-mcp/compare/v1.0.0...v1.0.1) (2026-11-06)
+
+
+### Bug Fixes
+
+* **release:** publish the npm tarball by local path; dry-run it in CI ([#78](https://github.com/thatskiff33/nz-legislation-mcp/issues/78)) ([e71ab6c](https://github.com/thatskiff33/nz-legislation-mcp/commit/e71ab6c682116628d733b07b82d9956ecd29e620)), closes [#77](https://github.com/thatskiff33/nz-legislation-mcp/issues/77)
+
 ## 1.0.0 (2026-11-06)
 
 
