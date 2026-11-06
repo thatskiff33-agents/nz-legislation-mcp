@@ -269,12 +269,19 @@ export function createHttpApp(options: HttpAppOptions): HttpApp {
     if (path !== MCP_PATH && !(isMetadata ? metadataLimiter : ipLimiter).take(ip)) {
       return rateLimited();
     }
+    // With OAuth, liveness answers any Host and Origin (still rate-limited above), so a container
+    // health check on 127.0.0.1 works while the public hostname is enforced; it reveals nothing
+    // but "ok". Without OAuth the localhost names are already allowed, so nothing is exempted and
+    // a DNS-rebinding page cannot even learn that the local server is running.
+    const healthz = path === "/healthz" && request.method === "GET";
+    if (healthz && config.oauth !== undefined) return json(200, { status: "ok" });
+
     const hostRejected = hostHeaderValidationResponse(request, allowedHosts);
     if (hostRejected !== undefined) return hostRejected;
     const originRejected = originValidationResponse(request, allowedOrigins);
     if (originRejected !== undefined) return originRejected;
 
-    if (path === "/healthz" && request.method === "GET") return json(200, { status: "ok" });
+    if (healthz) return json(200, { status: "ok" });
 
     if (metadataOptions !== undefined) {
       const metadata = oauthMetadataResponse(request, metadataOptions);

@@ -39,9 +39,9 @@ sequenceDiagram
 
 ## Quick start with Docker Compose and Caddy
 
-`deploy/docker-compose.yml` runs the server behind [Caddy](https://caddyserver.com), which terminates TLS with automatic certificates. By default it builds the image from this repository.
+`deploy/docker-compose.yml` runs the server behind [Caddy](https://caddyserver.com), which terminates TLS with automatic certificates. It runs a published image pinned by digest (see [Using a published image](#using-a-published-image)). To build from this repository instead, add the build override `deploy/docker-compose.build.yml`; the main file has no build section, so a verified image is never replaced by a local build.
 
-1. Copy the repository (or at least `deploy/`, `Dockerfile` and the source) to your server.
+1. Copy the repository (or at least `deploy/`, and for a source build also `Dockerfile` and the source) to your server.
 2. Put your API key in `deploy/secrets/legislation_api_key` (one line), then make it readable only by the container's user (uid 65532):
 
    ```sh
@@ -52,20 +52,35 @@ sequenceDiagram
    Do not use `chmod 644` to get around a "cannot be read" error: that makes your key readable by every account on the machine.
 
 3. Copy `deploy/.env.example` to `deploy/.env` and fill in your domain and provider values (see [Configuration](#configuration)).
-4. Point your domain's DNS at the server, then run `docker compose up -d --build` in `deploy/`.
+4. Point your domain's DNS at the server, then, in `deploy/`, start it:
+   - Published image (set `NZLM_IMAGE` in `deploy/.env` to a verified digest first): `docker compose pull && docker compose up -d`
+   - Built from source: `docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build`
+
+   Caddy starts once the server passes its container health check, which connects to `127.0.0.1` inside the container. If you set `LEGISLATION_NZ_HTTP_HOST` to a specific address instead of the default `0.0.0.0`, the check cannot connect and Caddy will not start: keep the default in the container.
+
 5. Check that `https://mcp.example.com/healthz` returns `{"status":"ok"}`, and that `https://mcp.example.com/.well-known/oauth-protected-resource/mcp` names your provider.
 
 The key is passed as a Docker secret file, so it does not appear in environment variables or `docker inspect`.
 
 ### Using a published image
 
-From the first release onwards, images will be published to `ghcr.io/thatskiff33/nz-legislation-mcp`, signed with Sigstore cosign (keyless), with an SBOM and build provenance. To use one, set `NZLM_IMAGE` in `deploy/.env` to a specific version (never an unpinned `latest`), and verify the signature first:
+From the first release onwards, images will be published to `ghcr.io/thatskiff33/nz-legislation-mcp` for `linux/amd64` and `linux/arm64` (each built on a native runner and scanned), signed with Sigstore cosign (keyless), with an SBOM and build provenance.
 
-```sh
-cosign verify ghcr.io/thatskiff33/nz-legislation-mcp:1.0.0 \
-  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-  --certificate-identity-regexp '^https://github.com/thatskiff33/nz-legislation-mcp/\.github/workflows/container\.yml@refs/tags/v'
-```
+To use one:
+
+1. Look up the digest of the version you want, then verify the signature of that digest. Releases are signed by this repository's `container.yml` workflow, run from `main` by the release workflow:
+
+   ```sh
+   digest="$(docker buildx imagetools inspect ghcr.io/thatskiff33/nz-legislation-mcp:1.0.0 \
+     --format '{{json .Manifest}}' | jq -r .digest)"
+   cosign verify "ghcr.io/thatskiff33/nz-legislation-mcp@$digest" \
+     --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+     --certificate-identity https://github.com/thatskiff33/nz-legislation-mcp/.github/workflows/container.yml@refs/heads/main
+   ```
+
+   The identity is the workflow file and the branch it ran from (`job_workflow_ref`). It is to be confirmed against the first published image (#11): if verification fails, compare it with the certificate's subject in `cosign verify ... --certificate-identity-regexp '.*' -o json` and report it.
+
+2. Set `NZLM_IMAGE` in `deploy/.env` to that digest, for example `ghcr.io/thatskiff33/nz-legislation-mcp:1.0.0@sha256:<digest>`. A tag can later be moved; a digest cannot. Never use an unpinned `latest`.
 
 ### Running the container without Compose
 
