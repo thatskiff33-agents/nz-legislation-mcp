@@ -39,7 +39,8 @@
     "test": "vitest run --coverage",
     "test:watch": "vitest",
     "generate": "vitest run test/generated.test.ts --update",
-    "check": "pnpm run typecheck && pnpm run lint && pnpm run format:check && pnpm run knip && pnpm run test && pnpm run build",
+    "check:static": "pnpm run typecheck && pnpm run lint && pnpm run format:check && pnpm run knip",
+    "check": "pnpm run check:static && pnpm run test && pnpm run build",
     "clean": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\"",
     "start": "node dist/cli.js"
   },

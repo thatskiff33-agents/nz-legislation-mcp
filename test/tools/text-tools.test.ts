@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { MemoryCache } from "../../src/api/cache.js";
 import { compareVersions } from "../../src/tools/compare-versions.js";
-import { getProvisionText } from "../../src/tools/get-provision-text.js";
+import {
+  createTextCache,
+  getProvisionText,
+  TEXT_CACHE_MAX_CHARS,
+} from "../../src/tools/get-provision-text.js";
 import { getTableOfContents } from "../../src/tools/get-table-of-contents.js";
 import { ToolInputError } from "../../src/tools/shared.js";
 import { json } from "../api/fake-fetch.js";
@@ -280,7 +283,7 @@ describe("get_provision_text", () => {
       downloads += 1;
       return base.deps.xml(versionId, s);
     };
-    const d = { ...base.deps, xml: counting, textCache: new MemoryCache(10) };
+    const d = { ...base.deps, xml: counting, textCache: createTextCache() };
     const first = await getProvisionText.run(
       { version_id: V2014, schedule: "", max_chars: 1000 },
       d,
@@ -696,5 +699,25 @@ describe("version safety and truncation (issue #40)", () => {
     expect(long.notes.join(" ")).toContain(
       "1 of 3 diff lines are shown in full, and the last line shown is cut part-way",
     );
+  });
+});
+
+describe("the rendered-text cache", () => {
+  it("stays within its size budget when filled with the largest renderings", () => {
+    const cache = createTextCache();
+    const rendering = (i: number) => ({
+      title: `Act ${String(i)}`,
+      matches: [],
+      found: null,
+      text: "x".repeat(2_000_000),
+      outline: [],
+    });
+    for (let i = 0; i < 40; i += 1) {
+      cache.set(String(i), rendering(i), 60_000);
+      expect(cache.weight).toBeLessThanOrEqual(TEXT_CACHE_MAX_CHARS);
+    }
+    expect(cache.size).toBe(15);
+    expect(cache.get("39")).toBeDefined();
+    expect(cache.get("0")).toBeUndefined();
   });
 });
