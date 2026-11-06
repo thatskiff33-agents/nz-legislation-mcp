@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-Security fixes go into the latest release of the current major version, 1.x. The first published release is 1.0.1 (1.0.0 was tagged but never published).
+Security fixes go into the latest release of the current major version (now 1.x). The first published release is 1.0.1 (1.0.0 was tagged but never published).
 
 ## Reporting a vulnerability
 

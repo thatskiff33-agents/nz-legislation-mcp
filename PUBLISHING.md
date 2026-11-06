@@ -52,8 +52,8 @@ version is on npm. release-please cannot edit part of a string, so a small job
   dependency tree has open audit findings and is resolved fresh by `npx`. It runs only in CI's
   `claude desktop bundle` job, which publishes nothing: `scripts/check-mcpb.sh` validates the
   manifest with it and checks that our bundle has the same files and permissions as `mcpb pack`
-  would produce (#37). Before the first release, install the bundle in Claude Desktop by hand
-  (#11) to confirm it end to end.
+  would produce (#37). Install the 1.0.1 bundle in Claude Desktop by hand (#11) to confirm it
+  end to end; no result is recorded yet.
 
 ## If a release fails part-way
 
@@ -63,7 +63,8 @@ failed build or bundle stops everything before anything is published.
 
 **Keep the tag.** release-please finds the previous release by its tag. Deleting the tag makes it
 rebuild the changelog from the whole history. (This, and the skipped version number below, come
-from reading release-please 17.6.0's code; to confirm on the first real release.)
+from reading release-please 17.6.0's code, and were confirmed on 1.0.1: the v1.0.0 tag was
+kept, the next release was 1.0.1, and its changelog listed only the changes since v1.0.0 (#77).)
 
 Each publishing job waits on its own timer, so a cancelled run may have published some jobs
 already. Use the second case below if npm published, even if another job failed or was
@@ -93,8 +94,9 @@ cancelled.
 Do these in order. Each one is an outward-facing change, made by a maintainer or with the
 owner's approval.
 
-Status on 7 November 2026: steps 1 to 7 are done (#53, #11). 1.0.1 is the first published
-release. Still to do: the npm "disallow tokens" setting (step 4).
+Status on 7 November 2026: steps 1 to 3 and 5 to 7 are done (#53, #11), and 1.0.1 is the first
+published release. Still to do, in step 4: unpublish the placeholders and turn on "disallow
+tokens".
 
 1. Release App: release-please and the plugin-pin job write with a dedicated GitHub App, not
    the workflow's own token. Only the App may then create release tags (step 5), and the release
@@ -129,9 +131,12 @@ release. Still to do: the npm "disallow tokens" setting (step 4).
      `0.0.0-placeholder.0`, approving the two-factor prompt in the browser. On 6 November 2026
      the registry also showed a `0.0.0-stage` holding version, created a few minutes before the
      placeholder appeared (observed; cause to confirm). Deprecate both (`npm deprecate`), saying they have no
-     code. Once the first release is live from CI, unpublish both
-     (`npm unpublish nz-legislation-mcp@<version>`, naming each version) and remove the
-     `placeholder` dist-tag, so only real releases remain.
+     code. Once the first release is live from CI, remove the `placeholder` dist-tag
+     (`npm dist-tag rm nz-legislation-mcp placeholder`), then unpublish both versions
+     (`npm unpublish nz-legislation-mcp@<version>`, naming each version), so only real releases
+     remain. Unpublishing is limited by npm's
+     [unpublish policy](https://docs.npmjs.com/policies/unpublish), which adds conditions once a
+     package is more than 72 hours old.
    - Add the trusted publisher (npm 11.15.0 or later), or use the package's settings page on
      npmjs.com with the same owner, repository, workflow and environment:
 
@@ -158,8 +163,8 @@ release. Still to do: the npm "disallow tokens" setting (step 4).
    This matters because GitHub creates a missing environment automatically, with no
    protection, the first time a job uses it.
 7. GitHub Container Registry: after the first image is pushed, set the package's visibility to
-   public and link it to this repository. After the 1.0.1 release (7 November 2026) the package
-   was already public and linked to this repository; no change was needed.
+   public and link it to this repository. After the 1.0.1 release (7 November 2026 NZ time; 6 November UTC)
+   the package was already public and linked to this repository; no change was needed.
 
 ## MCP Registry (manual, after npm)
 

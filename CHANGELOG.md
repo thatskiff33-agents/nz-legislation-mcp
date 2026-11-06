@@ -9,7 +9,7 @@
 
 ## 1.0.0 (2026-11-06)
 
-Not published. The release run was cancelled after its npm publish step failed ([#77](https://github.com/thatskiff33/nz-legislation-mcp/issues/77)), so 1.0.0 is on no registry. 1.0.1 is the first published release and includes everything below.
+Not published. The tagged release run was cancelled after its npm publish step failed ([#77](https://github.com/thatskiff33/nz-legislation-mcp/issues/77)), so 1.0.0 was not published to npm, GHCR or GitHub releases. 1.0.1 is the first published release and includes everything below.
 
 
 ### Features
