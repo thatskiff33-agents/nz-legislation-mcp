@@ -99,7 +99,9 @@ export async function serveHttp(io: HttpIo): Promise<number | undefined> {
     oauth: auth !== undefined,
   });
   if (auth === undefined) {
-    logger.warn("no authentication: HTTP mode is bound to loopback only and must not be exposed");
+    logger.warn(
+      "no authentication: HTTP mode is bound to loopback only and must not be exposed. Anyone else signed in to this computer can use it, and through it your API key, so do not use it on a shared machine.",
+    );
   }
 
   io.onUnhandledRejection((reason) => {

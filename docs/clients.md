@@ -1,4 +1,4 @@
-<!-- Generated from src/cli/clients.ts by "pnpm docs:clients". Do not edit by hand. -->
+<!-- Generated from src/cli/clients.ts by "pnpm generate". Do not edit by hand. -->
 
 # Adding the server to your AI client
 
@@ -94,11 +94,19 @@ Vendor documentation: https://cursor.com/docs/mcp
 
 One click: [Install in VS Code](vscode:mcp/install?%7B%22name%22%3A%22nz-legislation%22%2C%22type%22%3A%22stdio%22%2C%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22nz-legislation-mcp%22%5D%7D).
 
-Or from a terminal:
+Or from a terminal on macOS or Linux:
 
 ```sh
 code --add-mcp '{"name":"nz-legislation","type":"stdio","command":"npx","args":["-y","nz-legislation-mcp"]}'
 ```
+
+In Windows PowerShell 5.1, escape the inner quotes (single-quoted JSON loses its quotes when passed to `code`). In PowerShell 7 or later, use the one-click link or the file below if this form does not work:
+
+```powershell
+code --add-mcp '{\"name\":\"nz-legislation\",\"type\":\"stdio\",\"command\":\"npx\",\"args\":[\"-y\",\"nz-legislation-mcp\"]}'
+```
+
+In Command Prompt, use the one-click link or the file below.
 
 Or add to `.vscode/mcp.json`:
 

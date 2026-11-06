@@ -11,26 +11,30 @@
 
 ## Commands
 
-| Command           | What it does                                                                                                |
-| ----------------- | ----------------------------------------------------------------------------------------------------------- |
-| `pnpm install`    | Install dependencies. Refuses packages younger than 14 days and blocks install scripts.                     |
-| `pnpm check`      | Everything CI runs: typecheck, lint, format check, dead-code check (knip), tests with 100% coverage, build. |
-| `pnpm test`       | Tests with coverage.                                                                                        |
-| `pnpm test:watch` | Tests in watch mode.                                                                                        |
-| `pnpm format`     | Format all files with Prettier.                                                                             |
-| `pnpm build`      | Compile `src/` to `dist/`.                                                                                  |
+| Command             | What it does                                                                                                      |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `pnpm install`      | Install dependencies. Refuses packages younger than 14 days and blocks install scripts.                           |
+| `pnpm check`        | The main CI check: typecheck, lint, format check, dead-code check (knip), tests with 100% coverage, build.        |
+| `pnpm check:static` | The static part of `pnpm check`: typecheck, lint, format check and dead-code check (knip).                        |
+| `pnpm test`         | Tests with coverage.                                                                                              |
+| `pnpm test:watch`   | Tests in watch mode.                                                                                              |
+| `pnpm format`       | Format all files with Prettier.                                                                                   |
+| `pnpm build`        | Compile `src/` to `dist/`.                                                                                        |
+| `pnpm generate`     | Regenerate the generated files (client docs, plugin, bundle and registry manifests) after changing their sources. |
 
 ## Toolchain notes
 
-- TypeScript is pinned to 6.0.x because `typescript-eslint` type-aware rules do not yet support TypeScript 7.
+- TypeScript is pinned to 6.0.x (`~6.0.3`) because `typescript-eslint` supports TypeScript below 6.1 only (its peer range is `>=4.8.4 <6.1.0`). Dependabot ignores TypeScript major updates.
 - `@types/node` tracks the minimum supported Node line (22).
-- Supply-chain settings live in `pnpm-workspace.yaml` (`minimumReleaseAge`, `onlyBuiltDependencies`, `strictDepBuilds`).
+- Supply-chain settings live in `pnpm-workspace.yaml`: `minimumReleaseAge` (14 days), `strictDepBuilds` (install scripts fail unless allowed per package), and a time-boxed `audit.ignore` entry tracked in issue #15.
 
 ## Continuous integration
 
 All workflows pin actions to full commit SHAs and default to read-only permissions.
 
-- `ci.yml`: `pnpm check` on Node 22 and 24, plus `pnpm audit`.
+- `ci.yml`: the tests (with the 100% coverage gate) on Node 22 and 24, plus `pnpm check:static` and the build on Node 22 (together, `pnpm check`); `pnpm audit` from the lockfile; and a Claude Desktop bundle build.
+- `container.yml`: on pull requests that touch the image, builds and scans it with Trivy; when called by `release.yml`, publishes the signed image.
+- `release.yml`: release-please and publishing (npm, bundle, container). Off until the owner sets `RELEASE_ENABLED`; see PUBLISHING.md.
 - `codeql.yml`: CodeQL security-extended queries for TypeScript and workflow files.
 - `scorecard.yml`: OpenSSF Scorecard.
 - `dependency-review.yml`: blocks vulnerable or non-permissively licensed new dependencies.

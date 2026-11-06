@@ -32,7 +32,7 @@ sequenceDiagram
 
 ## What you need
 
-1. A Legislation API key (request one from contact@pco.govt.nz).
+1. A Legislation API key (request one by email to contact@pco.govt.nz; see https://www.legislation.govt.nz/developer-api/).
 2. A domain name for the server, for example `mcp.example.com`. The Caddy example below obtains HTTPS certificates automatically.
 3. Somewhere to run containers (a small virtual machine or container host).
 4. An identity provider account. See [Choosing a provider](#choosing-a-provider).
@@ -208,7 +208,7 @@ Privacy: the hash is pseudonymous, not anonymous. It is unsalted so that you can
 
 ## Local HTTP mode (no sign-in)
 
-`nz-legislation-mcp http` with no OAuth settings listens on `127.0.0.1` only and answers only `localhost` host names. It is for a single user on their own computer (for example a client that prefers HTTP to stdio). Anyone else with access to that computer could use it. Never expose it through a tunnel or proxy (see the warning above).
+`nz-legislation-mcp http` with no OAuth settings listens on `127.0.0.1` only and answers only `localhost` host names. It is for a single user on their own computer (for example a client that prefers HTTP to stdio). Anyone else with access to that computer could use it. Do not use it on a shared machine. Never expose it through a tunnel or proxy (see the warning above).
 
 ## Sources
 

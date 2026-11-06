@@ -37,7 +37,7 @@ const SHORT_DESCRIPTION =
   "Search and read New Zealand legislation via the official PCO Legislation API.";
 
 const KEY_DESCRIPTION =
-  "Your own API key for api.legislation.govt.nz (request one at https://www.legislation.govt.nz/developer-api/). It is sent only to that API.";
+  "Your own API key for api.legislation.govt.nz (request one by email to contact@pco.govt.nz; see https://www.legislation.govt.nz/developer-api/). It is sent only to that API.";
 
 /** Directory of the Claude Code plugin (a subfolder, so it is not confused with the npm package). */
 const PLUGIN_DIR = "plugins/nz-legislation-mcp";

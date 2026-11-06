@@ -1,6 +1,6 @@
 /**
  * How to add this server to each AI client: the single source of truth for client setup.
- * docs/clients.md is generated from here (`pnpm docs:clients`) and checked by a test.
+ * docs/clients.md is generated from here (`pnpm generate`) and checked by a test.
  *
  * Formats were taken from each vendor's documentation on 2 November 2026 (links below). The key
  * is not put in client configs: `nz-legislation-mcp setup` stores it in a private file that the
@@ -39,10 +39,14 @@ function cursorInstallLink(): string {
   return `cursor://anysphere.cursor-deeplink/mcp/install?name=${SERVER_ID}&config=${encodeURIComponent(config)}`;
 }
 
-/** VS Code install link: URL-encoded JSON including the server name. */
+/** The server entry VS Code's `--add-mcp` and install link take: JSON including the name. */
+function vscodeServerJson(): string {
+  return JSON.stringify({ name: SERVER_ID, type: "stdio", ...CLIENT_LAUNCH });
+}
+
+/** VS Code install link: the URL-encoded server entry. */
 function vscodeInstallLink(): string {
-  const config = { name: SERVER_ID, type: "stdio", ...CLIENT_LAUNCH };
-  return `vscode:mcp/install?${encodeURIComponent(JSON.stringify(config))}`;
+  return `vscode:mcp/install?${encodeURIComponent(vscodeServerJson())}`;
 }
 
 const stdioServers = { mcpServers: { [SERVER_ID]: { ...CLIENT_LAUNCH } } };
@@ -102,11 +106,11 @@ const CLIENTS: readonly ClientGuide[] = [
     docs: "https://code.visualstudio.com/docs/agents/reference/mcp-configuration",
     body: [
       `One click: [Install in VS Code](${vscodeInstallLink()}).`,
-      "Or from a terminal:",
-      block(
-        "sh",
-        `code --add-mcp '${JSON.stringify({ name: SERVER_ID, type: "stdio", ...CLIENT_LAUNCH })}'`,
-      ),
+      "Or from a terminal on macOS or Linux:",
+      block("sh", `code --add-mcp '${vscodeServerJson()}'`),
+      "In Windows PowerShell 5.1, escape the inner quotes (single-quoted JSON loses its quotes when passed to `code`). In PowerShell 7 or later, use the one-click link or the file below if this form does not work:",
+      block("powershell", `code --add-mcp '${vscodeServerJson().replaceAll('"', '\\"')}'`),
+      "In Command Prompt, use the one-click link or the file below.",
       "Or add to `.vscode/mcp.json`:",
       block("json", json({ servers: { [SERVER_ID]: { type: "stdio", ...CLIENT_LAUNCH } } })),
     ],
@@ -140,7 +144,7 @@ export function renderClientsMarkdown(): string {
     (client) =>
       `## ${client.name}\n\n${client.body.join("\n\n")}\n\nVendor documentation: ${client.docs}`,
   );
-  return `<!-- Generated from src/cli/clients.ts by "pnpm docs:clients". Do not edit by hand. -->
+  return `<!-- Generated from src/cli/clients.ts by "pnpm generate". Do not edit by hand. -->
 
 # Adding the server to your AI client
 
