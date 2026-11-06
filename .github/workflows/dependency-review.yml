@@ -6,6 +6,11 @@ on:
 permissions:
   contents: read
 
+# Cancel superseded pull request runs; runs on main always finish.
+concurrency:
+  group: dependency-review-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   review:
     runs-on: ubuntu-latest

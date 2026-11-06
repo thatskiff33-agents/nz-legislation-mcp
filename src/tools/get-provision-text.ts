@@ -1,4 +1,5 @@
 /** get_provision_text: the text of one section, schedule clause or schedule. */
+import { MemoryCache } from "../api/cache.js";
 import { z } from "zod";
 import { readLegislation, type ReadResult } from "../text/document.js";
 import { pageBounds } from "../text/slice.js";
@@ -27,6 +28,28 @@ import { refineSelector, selectVersion, VersionSelectorShape } from "./versions.
 const DEFAULT_MAX_CHARS = 15_000;
 /** How long rendered text is kept when the optional cache is enabled. */
 const TEXT_CACHE_TTL_MS = 60 * 60 * 1000;
+/** Most rendered documents kept when the optional cache is enabled. */
+const TEXT_CACHE_MAX_ENTRIES = 50;
+/**
+ * Total size budget for the optional text cache, in UTF-16 code units (about 2 bytes each, so
+ * roughly 64 MB of text). One rendered document can be up to 2,000,000 characters.
+ */
+const TEXT_CACHE_MAX_CHARS = 32_000_000;
+
+/** Approximate size of a cached rendering: its text and title, plus a little per match. */
+function renderedWeight(value: unknown): number {
+  const rendered = value as Rendered;
+  // Only renderings with text are cached; String() keeps this branch-free for a null.
+  return String(rendered.text).length + rendered.title.length + rendered.matches.length * 256;
+}
+
+/** The optional rendered-text cache, bounded by entry count and by total size. */
+export function createTextCache(): MemoryCache {
+  return new MemoryCache(TEXT_CACHE_MAX_ENTRIES, Date.now, {
+    maxWeight: TEXT_CACHE_MAX_CHARS,
+    weigh: renderedWeight,
+  });
+}
 
 interface Rendered {
   readonly title: string;

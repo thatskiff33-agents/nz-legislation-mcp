@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { MemoryCache } from "../../src/api/cache.js";
 import { compareVersions } from "../../src/tools/compare-versions.js";
-import { getProvisionText } from "../../src/tools/get-provision-text.js";
+import { createTextCache, getProvisionText } from "../../src/tools/get-provision-text.js";
 import { getTableOfContents } from "../../src/tools/get-table-of-contents.js";
 import { ToolInputError } from "../../src/tools/shared.js";
 import { json } from "../api/fake-fetch.js";
@@ -275,7 +274,7 @@ describe("get_provision_text", () => {
       downloads += 1;
       return base.deps.xml(versionId, s);
     };
-    const d = { ...base.deps, xml: counting, textCache: new MemoryCache(10) };
+    const d = { ...base.deps, xml: counting, textCache: createTextCache() };
     const first = await getProvisionText.run(
       { version_id: V2014, schedule: "", max_chars: 1000 },
       d,
