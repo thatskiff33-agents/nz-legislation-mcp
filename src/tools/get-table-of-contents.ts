@@ -1,6 +1,11 @@
 /** get_table_of_contents: the structure of one version (parts, subparts, sections, schedules). */
 import { z } from "zod";
-import { normalisePartLabel, readLegislation, type OutlineEntry } from "../text/document.js";
+import {
+  normaliseLabel,
+  normalisePartLabel,
+  readLegislation,
+  type OutlineEntry,
+} from "../text/document.js";
 import { cleanText, defineTool, permalink, PermalinkSchema, READ_ONLY_API_TOOL } from "./shared.js";
 import { LabelSchema, versionInfo, VersionInfoShape } from "./text-common.js";
 import { refineSelector, selectVersion, VersionSelectorShape } from "./versions.js";
@@ -18,8 +23,16 @@ const InputSchema = z
       .describe(
         'Only list what is inside this part or subpart (label, e.g. "C" or "CB"). Large Acts list parts and subparts only unless you give one.',
       ),
+    schedule: LabelSchema.optional().describe(
+      'Only list what is inside this schedule (label, e.g. "1"; "" for an unnumbered schedule), including its clauses. Use it to find clause labels in large Acts.',
+    ),
   })
-  .superRefine(refineSelector);
+  .superRefine((args, ctx) => {
+    refineSelector(args, ctx);
+    if (args.part !== undefined && args.schedule !== undefined) {
+      ctx.addIssue({ code: "custom", message: "Give part or schedule, not both." });
+    }
+  });
 
 const EntrySchema = z.object({
   kind: z.enum(["part", "subpart", "crosshead", "section", "schedule"]),
@@ -36,7 +49,11 @@ const OutputSchema = z.object({
   permalink: PermalinkSchema,
   scope: z.string().describe("What the entries cover."),
   total_entries: z.number().int().describe("Entries in the whole document."),
-  truncated: z.boolean(),
+  truncated: z
+    .boolean()
+    .describe(
+      "True if more entries matched than are listed (at most 500); see notes for how to narrow.",
+    ),
   entries: z.array(EntrySchema),
   notes: z.array(z.string()),
 });
@@ -57,7 +74,7 @@ export const getTableOfContents = defineTool({
   title: "Table of contents",
   description: [
     "List the structure of a version of NZ legislation: parts, subparts, cross-headings, sections and schedules, with labels to pass to get_provision_text.",
-    "Choose the version with work_id (+ as_at) or version_id. For large Acts, pass part to list the sections inside one part or subpart.",
+    "Choose the version with work_id (+ as_at) or version_id. For large Acts, pass part to list the sections inside one part or subpart, or schedule to list one schedule's clauses.",
   ].join(" "),
   inputSchema: InputSchema,
   outputSchema: OutputSchema,
@@ -70,7 +87,20 @@ export const getTableOfContents = defineTool({
 
     let chosen: OutlineEntry[];
     let scope: string;
-    if (args.part !== undefined) {
+    if (args.schedule !== undefined) {
+      const wanted = normaliseLabel(args.schedule);
+      chosen = doc.outline.filter((e) =>
+        e.kind === "schedule"
+          ? normaliseLabel(e.label) === wanted
+          : e.schedule !== null && normaliseLabel(e.schedule) === wanted,
+      );
+      scope = `Everything in schedule ${args.schedule === "" ? "(unnumbered)" : args.schedule}.`;
+      if (chosen.length === 0) {
+        notes.push(
+          `No schedule labelled "${args.schedule}" was found. Omit schedule to see the schedules.`,
+        );
+      }
+    } else if (args.part !== undefined) {
       const wanted = normalisePartLabel(args.part);
       // Body parts only: schedules have their own parts, often reusing labels such as "A".
       chosen = doc.outline.filter(
@@ -110,7 +140,13 @@ export const getTableOfContents = defineTool({
       );
       scope = "Body parts and subparts, schedules, and sections outside any part.";
       notes.push(
-        `This document has ${String(doc.outline.length)} entries. Pass part (e.g. a part or subpart label above) to list its sections.`,
+        `This document has ${String(doc.outline.length)} entries. Pass part (a part or subpart label above) to list its sections, or schedule (a schedule label above) to list its clauses.`,
+      );
+    }
+
+    if (chosen.length > MAX_ENTRIES) {
+      notes.push(
+        `Only the first ${String(MAX_ENTRIES)} of ${String(chosen.length)} matching entries are listed. Pass a narrower part or subpart, or a schedule, to see the rest.`,
       );
     }
 

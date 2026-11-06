@@ -517,3 +517,17 @@ describe("shared helpers", () => {
     expect(todayInNewZealand(new Date(instant))).toBe(expected);
   });
 });
+
+describe("compareVersionIds", () => {
+  it("orders by date, then by same-day suffix", async () => {
+    const { compareVersionIds } = await import("../../src/tools/versions.js");
+    const w = "act_public_2007_97_en_";
+    expect(compareVersionIds(`${w}2020-01-01`, `${w}2021-01-01`)).toBe(-1);
+    expect(compareVersionIds(`${w}2021-01-01`, `${w}2020-01-01`)).toBe(1);
+    expect(compareVersionIds(`${w}2020-01-01`, `${w}2020-01-01B`)).toBe(-1);
+    expect(compareVersionIds(`${w}2020-01-01Z`, `${w}2020-01-01AA`)).toBe(-1);
+    expect(compareVersionIds(`${w}2020-01-01B`, `${w}2020-01-01A`)).toBe(1);
+    expect(compareVersionIds(`${w}2020-01-01`, `${w}2020-01-01`)).toBe(0);
+    expect(compareVersionIds("not-an-id", "also-not")).toBe(0);
+  });
+});
