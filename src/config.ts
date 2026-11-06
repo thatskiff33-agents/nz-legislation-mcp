@@ -5,7 +5,7 @@
  */
 import { closeSync, constants, fstatSync, openSync, readSync } from "node:fs";
 import { homedir } from "node:os";
-import { join, posix, win32 } from "node:path";
+import { posix, win32 } from "node:path";
 import { z } from "zod";
 import { Secret } from "./secret.js";
 
@@ -127,14 +127,36 @@ export function defaultKeyFilePath(
 ): string {
   // Empty or relative values are ignored (as the XDG spec requires), so the key file is never
   // resolved against the current directory, where it could be committed or supplied by a repo.
+  // Path rules come from the target platform, not the host, so the result is the same wherever
+  // this runs (and tests for one platform pass on another).
   const paths = platform === "win32" ? win32 : posix;
   const absolute = (value: string | undefined): string | undefined =>
     value !== undefined && paths.isAbsolute(value) ? value : undefined;
   const base =
     platform === "win32"
-      ? (absolute(env["APPDATA"]) ?? join(home, "AppData", "Roaming"))
-      : (absolute(env["XDG_CONFIG_HOME"]) ?? join(home, ".config"));
-  return join(base, "nz-legislation-mcp", "key");
+      ? (absolute(env["APPDATA"]) ?? paths.join(home, "AppData", "Roaming"))
+      : (absolute(env["XDG_CONFIG_HOME"]) ?? paths.join(home, ".config"));
+  return paths.join(base, "nz-legislation-mcp", "key");
+}
+
+/**
+ * Why a key file must not be read, or undefined if it is acceptable. Pure, so every rule can be
+ * tested on any platform; the private-mode rule applies only off Windows, where the user
+ * profile's permissions protect the file instead.
+ *
+ * @internal Exported for tests.
+ */
+export function keyFileProblem(
+  stats: { isFile(): boolean; readonly mode: number },
+  path: string,
+  requirePrivate: boolean,
+  platform: NodeJS.Platform = process.platform,
+): string | undefined {
+  if (!stats.isFile()) return "is not a regular file";
+  if (requirePrivate && platform !== "win32" && (stats.mode & 0o077) !== 0) {
+    return `can be read by other users; run: chmod 600 ${path}`;
+  }
+  return undefined;
 }
 
 /**
@@ -153,11 +175,8 @@ const defaultReader: FileReader = (path, options) => {
     throw new KeyFileError("cannot be read");
   }
   try {
-    const stats = fstatSync(fd);
-    if (!stats.isFile()) throw new KeyFileError("is not a regular file");
-    if (options.requirePrivate && process.platform !== "win32" && (stats.mode & 0o077) !== 0) {
-      throw new KeyFileError(`can be read by other users; run: chmod 600 ${path}`);
-    }
+    const problem = keyFileProblem(fstatSync(fd), path, options.requirePrivate);
+    if (problem !== undefined) throw new KeyFileError(problem);
     // Read at most one byte more than the limit, so oversized files are detected without
     // trusting the size reported by stat.
     const buffer = Buffer.alloc(MAX_KEY_FILE_BYTES + 1);
