@@ -137,6 +137,50 @@ describe("release workflow", () => {
     expect(npm).not.toMatch(/pnpm|npm (?:install|ci)|npx/u);
   });
 
+  it("writes release branches, pull requests and tags with the release App, not GITHUB_TOKEN (#53)", () => {
+    const appStep =
+      "uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0";
+    const rp = job("release-please");
+    expect(rp).toContain(appStep);
+    expect(rp).toContain("client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}");
+    expect(rp).toContain("private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}");
+    expect(rp).toContain("token: ${{ steps.app-token.outputs.token }}");
+    expect(rp).toMatch(/permissions:\n {6}contents: read\n/u);
+    // No job-level write permission (the App's own permission-* inputs are indented further).
+    expect(rp).not.toMatch(/^ {6}(?:contents|pull-requests): write$/mu);
+    // The App token is narrowed to what release-please needs.
+    expect(rp).toContain("permission-contents: write");
+    expect(rp).toContain("permission-pull-requests: write");
+
+    const sync = job("sync-release-pr");
+    expect(sync).toContain(appStep);
+    expect(sync).toContain("client-id: ${{ vars.RELEASE_APP_CLIENT_ID }}");
+    expect(sync).toContain("private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}");
+    expect(sync).toContain("token: ${{ steps.app-token.outputs.token }}");
+    expect(sync).toMatch(/permissions:\n {6}contents: read\n/u);
+    expect(sync).not.toContain("permission-pull-requests");
+    expect(sync).not.toContain("github-actions[bot]");
+    // The commit is attributed to the App's bot account: <id>+<slug>[bot]@users.noreply.github.com.
+    expect(sync).toContain(
+      'git config user.email "${bot_id}+${APP_SLUG}[bot]@users.noreply.github.com"',
+    );
+  });
+
+  it("keeps the App key in a main-only environment and never in a shell step (#53)", () => {
+    for (const name of ["release-please", "sync-release-pr"]) {
+      expect(job(name), name).toContain("    environment: release-pr\n");
+    }
+    // The key appears exactly twice, each as the private-key input of an app-token step.
+    const uses = workflow.split("secrets.RELEASE_APP_PRIVATE_KEY").length - 1;
+    expect(uses).toBe(2);
+    expect(workflow.split("private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}").length - 1).toBe(
+      2,
+    );
+    for (const { line, text } of runLines(workflow)) {
+      expect(text, `line ${String(line)}`).not.toContain("RELEASE_APP_PRIVATE_KEY");
+    }
+  });
+
   it("publishes the draft GitHub release only after every artefact is out", () => {
     const publish = job("publish-release");
     expect(publish).toContain("needs: [release-please, npm, bundle, container]");

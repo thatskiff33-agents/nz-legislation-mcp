@@ -88,8 +88,24 @@ if another job was declined.
 
 Do these in order. Each one is an outward-facing change, so a maintainer does them by hand.
 
-1. Repository settings, Actions, General: allow GitHub Actions to create and approve pull
-   requests (release-please needs this).
+1. Release App: release-please and the plugin-pin job write with a dedicated GitHub App, not
+   the workflow's own token. Only the App may then create release tags (step 5), and the release
+   pull requests and commits it makes start CI like any other.
+   - Your GitHub settings, Developer settings, GitHub Apps, New GitHub App: any name (for
+     example `nz-legislation-mcp-release`), the repository URL as the homepage, Webhook
+     "Active" unticked, repository permissions Contents read and write and Pull requests read
+     and write (Metadata read-only is added automatically), installable only on this account.
+   - Install it on this repository only.
+   - Repository settings, Environments: create `release-pr` with no reviewers, limited to the
+     `main` branch. In it, add the App's client ID as the environment variable
+     `RELEASE_APP_CLIENT_ID` and a newly generated private key as the environment secret
+     `RELEASE_APP_PRIVATE_KEY`. Keeping the key in this environment (not as a repository
+     secret) means only the release jobs on `main` can read it, never a branch or pull request.
+     Delete the downloaded `.pem` file once it is stored.
+   - To rotate the key: generate a new one on the App's page, replace the environment secret,
+     then delete the old key on the App's page.
+   - The workflow token stays read-only for these jobs, so "Allow GitHub Actions to create and
+     approve pull requests" is not needed.
 2. Repository settings, Environments: create `release`, add required reviewers (the
    maintainers), and limit it to the `main` branch and `v*` tags.
 3. npm: sign in to the account that will own `nz-legislation-mcp` and turn on two-factor
@@ -104,8 +120,12 @@ Do these in order. Each one is an outward-facing change, so a maintainer does th
      first version by hand from a clean checkout of the release tag
      (`pnpm install --frozen-lockfile && pnpm check && npm publish --access public`), then add
      the trusted publisher, and from then on disallow token publishing in the package settings.
-5. Repository settings, Rules: add a tag ruleset for `v*` that only maintainers can bypass,
-   so release tags cannot be created or moved by anyone else.
+5. Repository settings, Rules, New tag ruleset: target tags matching `v*`, enforcement
+   active, rules "Restrict creations", "Restrict updates" and "Restrict deletions", and add the
+   release App (step 1) as the only bypass actor, with bypass mode "Always allow" ("For pull requests only" would block tag creation). Release tags can then only be created with the
+   App's key (held only by the release jobs on `main`) and never moved or deleted. GitHub Actions itself cannot be a bypass actor,
+   which is why the App is needed (#53). On the first release, check that the tag appears
+   before the draft release and that the `pack` job checks it out; record the result on #53.
 6. Only when steps 1 to 5 are done: Repository settings, Secrets and variables, Actions,
    Variables: set `RELEASE_ENABLED` to `true`. Until then the release workflow does nothing.
    This matters because GitHub creates a missing environment automatically, with no
@@ -128,9 +148,8 @@ The registry checks that the npm package belongs to this server through the `mcp
 ## Checks before approving
 
 - The release pull request's changelog reads correctly.
-- CI is green on the release commit. Pull requests opened by release-please with the default
-  token do not start CI, so there is no run to rerun: push an empty commit to the release
-  branch to start one.
+- CI is green on the release commit, including the "pin the Claude Code plugin" commit. Both
+  are pushed by the release App, so CI starts on its own and `main`'s required checks apply.
 - `docs/clients.md` and the README quick start still match the release.
 - The release pull request includes the "pin the Claude Code plugin" commit (the
   `sync-release-pr` job adds it a minute or so after release-please updates the pull request).
