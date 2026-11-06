@@ -214,7 +214,7 @@ export function loadConfig(
   const file = env[ENV.apiKeyFile];
 
   let key: string | undefined;
-  let keySource = "";
+  let keySource: string | undefined;
   if (direct !== undefined && direct !== "" && file !== undefined && file !== "") {
     problems.push(`Set only one of ${ENV.apiKey} or ${ENV.apiKeyFile}, not both.`);
   } else if (file !== undefined && file !== "") {
@@ -272,6 +272,8 @@ export function loadConfig(
   const cache = parseOption(env, ENV.cache, z.enum(CACHE_MODES), "off", problems);
   const logLevel = parseOption(env, ENV.logLevel, z.enum(LOG_LEVELS), "info", problems);
 
-  if (key === undefined || problems.length > 0) throw new ConfigError(problems);
+  if (key === undefined || keySource === undefined || problems.length > 0) {
+    throw new ConfigError(problems);
+  }
   return { apiKey: new Secret(key), keySource, timeoutMs, cache, logLevel };
 }

@@ -1,3 +1,6 @@
+import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { runDoctor } from "../../src/cli/doctor.js";
 import { DUMMY_KEY } from "../dummy-key.js";
@@ -24,7 +27,7 @@ async function doctor(
 
 describe("doctor", () => {
   it("passes when everything is reachable, showing the quota", async () => {
-    const r = await doctor({ LEGISLATION_NZ_API_KEY: DUMMY_KEY }, [
+    const r = await doctor({ ...NO_KEY, LEGISLATION_NZ_API_KEY: DUMMY_KEY }, [
       json(fixture("search-works")),
       ok(),
     ]);
@@ -48,7 +51,7 @@ describe("doctor", () => {
   });
 
   it("reports an API rejection and website problems", async () => {
-    const rejected = await doctor({ LEGISLATION_NZ_API_KEY: DUMMY_KEY }, [
+    const rejected = await doctor({ ...NO_KEY, LEGISLATION_NZ_API_KEY: DUMMY_KEY }, [
       status(401),
       () => new Response(null, { status: 503 }),
     ]);
@@ -58,7 +61,7 @@ describe("doctor", () => {
     );
     expect(rejected.text).toContain("[warn] legislation.govt.nz (for text): HTTP 503");
     expect(rejected.text).toContain("\nSome required checks failed.\n");
-    const offline = await doctor({ LEGISLATION_NZ_API_KEY: DUMMY_KEY }, [
+    const offline = await doctor({ ...NO_KEY, LEGISLATION_NZ_API_KEY: DUMMY_KEY }, [
       json(fixture("search-works"), 200, {}),
       new TypeError("offline"),
     ]);
@@ -71,11 +74,53 @@ describe("doctor", () => {
 
   it("handles a network failure and an unparseable Node version", async () => {
     const r = await doctor(
-      { LEGISLATION_NZ_API_KEY: DUMMY_KEY },
+      { ...NO_KEY, LEGISLATION_NZ_API_KEY: DUMMY_KEY },
       [new TypeError("offline"), ok()],
       "unknown",
     );
     expect(r.text).toContain("[fail] Node.js: unknown");
     expect(r.text).toContain("[fail] Legislation API: Could not reach the Legislation API");
+  });
+
+  it("warns when only the website is unavailable, and still exits 0", async () => {
+    const r = await doctor({ ...NO_KEY, LEGISLATION_NZ_API_KEY: DUMMY_KEY }, [
+      json(fixture("search-works")),
+      () => new Response(null, { status: 503 }),
+    ]);
+    expect(r.code).toBe(0);
+    expect(r.text).toContain("\nAll required checks passed, with warnings.\n");
+  });
+
+  it("names a key file as the key source", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "nzlm-doctor-"));
+    const file = join(dir, "secret");
+    writeFileSync(file, `${DUMMY_KEY}\n`);
+    const r = await doctor({ ...NO_KEY, LEGISLATION_NZ_API_KEY_FILE: file }, [
+      json(fixture("search-works")),
+      ok(),
+    ]);
+    expect(r.text).toContain(
+      `[ok] API key: found and well-formed, from the file named by LEGISLATION_NZ_API_KEY_FILE (${file})`,
+    );
+    expect(r.text).not.toContain(DUMMY_KEY);
+  });
+
+  it("warns that a key saved by setup is being overridden by the environment", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "nzlm-doctor-"));
+    mkdirSync(join(dir, "nz-legislation-mcp"), { mode: 0o700 });
+    const saved = join(dir, "nz-legislation-mcp", "key");
+    writeFileSync(saved, `${DUMMY_KEY}\n`, { mode: 0o600 });
+    const env = { XDG_CONFIG_HOME: dir, APPDATA: dir };
+    const overridden = await doctor({ ...env, LEGISLATION_NZ_API_KEY: DUMMY_KEY }, [
+      json(fixture("search-works")),
+      ok(),
+    ]);
+    expect(overridden.text).toContain(
+      `[warn] Saved key: the key saved by setup at ${saved} is not being used`,
+    );
+    expect(overridden.code).toBe(0);
+    const used = await doctor(env, [json(fixture("search-works")), ok()]);
+    expect(used.text).toContain(`from the key file saved by setup (${saved})`);
+    expect(used.text).not.toContain("[warn] Saved key");
   });
 });

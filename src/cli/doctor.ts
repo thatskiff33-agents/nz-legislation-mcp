@@ -8,7 +8,8 @@
  */
 import { LegislationClient } from "../api/client.js";
 import type { ApiError } from "../api/errors.js";
-import { loadConfig, type ConfigError } from "../config.js";
+import { existsSync } from "node:fs";
+import { defaultKeyFilePath, loadConfig, type ConfigError } from "../config.js";
 import { WEBSITE_ORIGIN } from "../domain/vocabulary.js";
 import { USER_AGENT, VERSION } from "../version.js";
 
@@ -37,6 +38,11 @@ export async function runDoctor(io: DoctorIo): Promise<number> {
   try {
     config = loadConfig(io.env);
     report("ok", "API key", `found and well-formed, from ${config.keySource}`);
+    // A stale environment setting silently overrides the key saved by setup; say so.
+    const saved = defaultKeyFilePath(io.env);
+    if (!config.keySource.includes(saved) && existsSync(saved)) {
+      report("warn", "Saved key", `the key saved by setup at ${saved} is not being used`);
+    }
   } catch (error) {
     // loadConfig only throws ConfigError.
     report("fail", "Configuration", (error as ConfigError).problems.join(" "));

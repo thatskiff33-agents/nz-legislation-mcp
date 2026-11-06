@@ -89,7 +89,7 @@ async function runSetupCommand(argv: readonly string[], io: MainIo): Promise<num
     stdout: io.stdout,
     stderr: io.stderr,
     readSecret: (prompt) => terminal.readSecret(prompt, io.stdin, io.stderr),
-    readStdin: () => terminal.readAll(io.stdin),
+    readStdin: () => terminal.readPiped(io.stdin),
     verify: verifyWithApi,
   });
 }

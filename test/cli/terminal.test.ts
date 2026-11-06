@@ -4,7 +4,7 @@ import {
   InputCancelledError,
   InputNotHiddenError,
   TerminalReadError,
-  readAll,
+  readPiped,
   readSecret,
   type Input,
 } from "../../src/cli/terminal.js";
@@ -75,6 +75,20 @@ describe("readSecret", () => {
     expect(await result).toBe("typed-key");
   });
 
+  it("refuses, without prompting, when the terminal will not enter raw mode", async () => {
+    const input = Object.assign(fakeInput(true), {
+      setRawMode: () => {
+        throw new Error("EINVAL");
+      },
+    });
+    const out: string[] = [];
+    await expect(readSecret("Key: ", input, (t) => out.push(t))).rejects.toBeInstanceOf(
+      InputNotHiddenError,
+    );
+    expect(out).toEqual([]);
+    expect(input.resume).not.toHaveBeenCalled();
+  });
+
   it.each([
     ["not a terminal", { isTTY: false }],
     ["isTTY undefined (e.g. mintty without winpty)", { isTTY: undefined }],
@@ -91,10 +105,26 @@ describe("readSecret", () => {
   });
 });
 
-describe("readAll", () => {
+describe("readPiped", () => {
+  it("reads piped input", async () => {
+    const input = fakeInput(false);
+    const result = readPiped(input);
+    input.emit("data", "piped-key");
+    input.emit("end");
+    expect(await result).toBe("piped-key");
+  });
+
+  it("refuses an interactive terminal, where typing would be shown", async () => {
+    const input = fakeInput(true);
+    await expect(readPiped(input)).rejects.toBeInstanceOf(InputNotHiddenError);
+    expect(input.resume).not.toHaveBeenCalled();
+  });
+});
+
+describe("readPiped (all of standard input)", () => {
   it("collects all input", async () => {
     const input = fakeInput(false);
-    const result = readAll(input);
+    const result = readPiped(input);
     input.emit("data", "a");
     input.emit("data", "b");
     input.emit("end");
@@ -103,10 +133,10 @@ describe("readAll", () => {
 
   it("rejects on a stream error", async () => {
     const input = fakeInput(false);
-    const result = readAll(input);
+    const result = readPiped(input);
     input.emit("error", new Error("broken pipe"));
     await expect(result).rejects.toThrow("broken pipe");
-    const other = readAll(input);
+    const other = readPiped(input);
     input.emit("error", "odd");
     await expect(other).rejects.toThrow("odd");
   });
