@@ -96,6 +96,13 @@ export async function drainedOrClosed(res: ServerResponse): Promise<boolean> {
   }
 }
 
+/**
+ * Most request headers accepted. Node silently drops headers past its limit, so a request that
+ * reaches the limit is refused: otherwise a client could pad its request until a proxy's
+ * forwarding headers (which the no-auth mode refuses) fall off the end unseen.
+ */
+const MAX_HEADERS = 100;
+
 /** Methods the MCP endpoint and health/metadata routes can use; anything else gets 405. */
 const ALLOWED_METHODS = new Set(["GET", "HEAD", "POST", "DELETE", "OPTIONS"]);
 
@@ -121,6 +128,15 @@ export async function listen(
       res.end('{"error":"method_not_allowed"}');
       return;
     }
+    // rawHeaders alternates names and values. Some Node releases cut it at exactly the limit with no
+    // other signal (seen on 24.15.0 and 24.16.0); newer ones refuse requests over the limit
+    // themselves (431, empty body; seen on 22.23.4 and 24.22.2), but one exactly at the limit still
+    // reaches here. A request at the limit looks the same as a cut one, so keep ">=".
+    if (req.rawHeaders.length / 2 >= MAX_HEADERS) {
+      res.writeHead(431, { "Content-Type": "application/json", Connection: "close" });
+      res.end('{"error":"too_many_headers"}');
+      return;
+    }
     let request: Request;
     try {
       request = toRequest(req, res);
@@ -140,7 +156,7 @@ export async function listen(
   server.requestTimeout = 120_000;
   server.headersTimeout = 30_000;
   server.keepAliveTimeout = 5_000;
-  server.maxHeadersCount = 100;
+  server.maxHeadersCount = MAX_HEADERS;
   await new Promise<void>((resolve, reject) => {
     server.once("error", reject);
     server.listen(options.port, options.host, () => {

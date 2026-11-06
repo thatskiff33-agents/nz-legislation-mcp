@@ -249,6 +249,75 @@ describe("listen", () => {
     expect((await fetch(`${base()}/`)).status).toBe(200);
   });
 
+  it("refuses a request at the header limit, so padding cannot hide a proxy's headers", async () => {
+    let seen: string | null | undefined;
+    server = await listen(
+      (request) => {
+        seen = request.headers.get("x-forwarded-for");
+        return Promise.resolve(new Response("ok"));
+      },
+      { host: "127.0.0.1", port: 0, logger: silentLogger },
+    );
+    const port = (server.address() as AddressInfo).port;
+    const send = (padding: number) =>
+      new Promise<string>((resolve) => {
+        const socket = connect(port, "127.0.0.1", () => {
+          const pad = Array.from({ length: padding }, (_, i) => `X-Pad-${String(i)}: 1\r\n`).join(
+            "",
+          );
+          socket.write(
+            `GET / HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n${pad}X-Forwarded-For: 203.0.113.9\r\n\r\n`,
+          );
+        });
+        let data = "";
+        socket.on("data", (d: Buffer) => (data += d.toString()));
+        // A reset fails the assertion below rather than crashing the test run.
+        socket.on("error", () => {
+          resolve("");
+        });
+        socket.on("close", () => {
+          resolve(data.split("\r\n")[0] ?? "");
+        });
+      });
+    // 2 + 120 + 1 headers: Node keeps the first 100, so the forwarding header would be lost.
+    expect(await send(120)).toContain("431");
+    // Exactly at the limit (2 + 97 + 1 = 100) is refused too: it looks the same as a cut request.
+    expect(await send(97)).toContain("431");
+    expect(seen).toBeUndefined();
+    // 2 + 96 + 1 = 99 headers: below the limit, served, with the forwarding header intact.
+    expect(await send(96)).toContain("200");
+    expect(seen).toBe("203.0.113.9");
+  });
+
+  it("refuses at the header limit in its own handler, whatever Node itself does", async () => {
+    let called = false;
+    server = await listen(
+      () => {
+        called = true;
+        return Promise.resolve(new Response("ok"));
+      },
+      { host: "127.0.0.1", port: 0, logger: silentLogger },
+    );
+    // A request as Node delivers it after cutting the header list at the limit.
+    const written: { status?: number; headers?: Record<string, string>; body?: string } = {};
+    const res = {
+      writeHead: (status: number, headers: Record<string, string>) => {
+        written.status = status;
+        written.headers = headers;
+      },
+      end: (body: string) => {
+        written.body = body;
+      },
+    };
+    server.emit("request", { method: "GET", rawHeaders: Array<string>(200).fill("x") }, res);
+    expect(written).toEqual({
+      status: 431,
+      headers: { "Content-Type": "application/json", Connection: "close" },
+      body: '{"error":"too_many_headers"}',
+    });
+    expect(called).toBe(false);
+  });
+
   it("rejects when the port is unavailable", async () => {
     server = await listen(() => Promise.resolve(new Response("x")), {
       host: "127.0.0.1",
