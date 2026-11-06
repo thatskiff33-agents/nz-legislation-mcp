@@ -130,7 +130,9 @@ describe("parseVersionId", () => {
   });
 });
 
-describe("property-based", () => {
+// Property tests generate many inputs; under coverage on a loaded machine one took 5.2 s (issue #48),
+// over Vitest's 5 s default, while it usually takes under 1 s. A higher limit avoids flaky CI runs.
+describe("property-based", { timeout: 20_000 }, () => {
   const segment = (re: string) => fc.stringMatching(new RegExp(`^${re}$`));
   const workArb = fc
     .constantFrom(...(Object.keys(ID_SUBTYPES) as (keyof typeof ID_SUBTYPES)[]))

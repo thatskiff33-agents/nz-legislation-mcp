@@ -10,13 +10,12 @@ import { ConfigError, loadConfig } from "./config.js";
 import { createLogger } from "./logger.js";
 import { createServer } from "./server.js";
 import { streamVersionXml } from "./text/xml-source.js";
+import { createTextCache } from "./tools/get-provision-text.js";
 import { todayInNewZealand, type ToolDeps } from "./tools/shared.js";
 import { SERVER_NAME, VERSION } from "./version.js";
 
 /** Bounded size of the optional response cache. */
 const CACHE_MAX_ENTRIES = 500;
-/** Bounded size of the optional rendered-text cache (entries can be large). */
-const TEXT_CACHE_MAX_ENTRIES = 50;
 
 export interface MainIo {
   readonly env: Readonly<Record<string, string | undefined>>;
@@ -63,7 +62,7 @@ export function buildDeps(env: MainIo["env"], stderr: MainIo["stderr"]): ToolDep
     client,
     logger,
     today: todayInNewZealand,
-    textCache: memory ? new MemoryCache(TEXT_CACHE_MAX_ENTRIES) : undefined,
+    textCache: memory ? createTextCache() : undefined,
     xml: streamVersionXml,
   };
 }

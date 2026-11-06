@@ -9,8 +9,9 @@ on:
 permissions:
   contents: read
 
+# Cancel superseded pull request runs; runs on main get a group of their own, so none is dropped.
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
@@ -35,7 +36,13 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm check
+      # pnpm check, split so that only the tests run on every Node line: the static checks and
+      # the build give the same result on both, so they run once (Node 22).
+      - if: matrix.node == 22
+        run: pnpm run check:static
+      - run: pnpm test
+      - if: matrix.node == 22
+        run: pnpm build
 
   audit:
     name: dependency audit
@@ -52,8 +59,8 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      # The audit reads the lockfile and pnpm-workspace.yaml (for the time-boxed exception), so
+      # no install is needed.
       - run: pnpm audit --audit-level moderate
 
   bundle:
