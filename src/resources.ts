@@ -90,8 +90,8 @@ async function runTool<I extends z.ZodType, O extends z.ZodType>(
 /** Tool notes that mention tool-only parameters, reworded for a resource reader. */
 function forResource(note: string): string {
   return note.replace(
-    "Pass part to choose another.",
-    "To read another, use the get_provision_text tool with part (resource URIs cannot choose).",
+    "Pass part (and subpart) to choose another.",
+    "To read another, use the get_provision_text tool with part and subpart (resource URIs cannot choose).",
   );
 }
 

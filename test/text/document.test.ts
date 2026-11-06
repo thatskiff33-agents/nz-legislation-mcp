@@ -33,12 +33,15 @@ describe("outline", () => {
       kind: "section",
       heading: "Main obligations",
       depth: 2,
-      within: ["B", "BB"],
+      within: [
+        { kind: "part", label: "B" },
+        { kind: "subpart", label: "BB" },
+      ],
     });
     expect(doc.outline.find((e) => e.label === "BB")).toMatchObject({
       kind: "subpart",
       depth: 1,
-      within: ["B"],
+      within: [{ kind: "part", label: "B" }],
     });
     expect(doc.outline[0]).toMatchObject({ kind: "part", label: "A", depth: 0, within: [] });
   });
@@ -354,7 +357,7 @@ describe("structure fidelity", () => {
 
 describe("real extracts (GST Act 1985, Income Tax Act 2007)", () => {
   const REAL = loadXml("real-extracts.xml");
-  const read = (target: { section?: string; schedule?: string; part?: string }) =>
+  const read = (target: { section?: string; schedule?: string; part?: string; subpart?: string }) =>
     readLegislation(chunked(REAL), { target });
 
   it("keeps quoted statutory words, in quotation marks (ITA YC 20)", async () => {
@@ -438,7 +441,11 @@ describe("real extracts (GST Act 1985, Income Tax Act 2007)", () => {
 
   it("narrows matches to a part or subpart", async () => {
     expect((await read({ section: "CZ 23", part: "CB" })).found).toBeNull();
-    expect((await read({ section: "CZ 23", part: "Subpart CZ" })).matches).toHaveLength(2);
+    // "CZ" is a subpart: as a part it matches nothing; as a subpart it matches both copies.
+    expect((await read({ section: "CZ 23", part: "CZ" })).found).toBeNull();
+    expect((await read({ section: "CZ 23", subpart: "Subpart CZ" })).matches).toHaveLength(2);
+    expect((await read({ section: "CZ 23", part: "C", subpart: "CZ" })).matches).toHaveLength(2);
+    expect((await read({ section: "CZ 23", part: "B", subpart: "CZ" })).found).toBeNull();
   });
 });
 
@@ -488,7 +495,10 @@ describe("matching rules", () => {
       `<prov><label>${n}</label><heading>${word}</heading><prov.body><subprov><label/><para><text>${word}</text></para></subprov></prov.body></prov>`;
     const xml = `<act><body/><schedule.group><schedule><label>1</label><heading>S</heading><schedule.provisions><part><label>1</label><heading>P1</heading>${clause("1", "First")}</part><part><label>2</label><heading>P2</heading>${clause("1", "Second")}</part></schedule.provisions></schedule><schedule><label>2</label><heading>T</heading></schedule></schedule.group></act>`;
     const doc = await readLegislation(chunked(xml), { target: { section: "1", schedule: "1" } });
-    expect(doc.matches.map((m) => m.entry.within)).toEqual([["1"], ["2"]]);
+    expect(doc.matches.map((m) => m.entry.within)).toEqual([
+      [{ kind: "part", label: "1" }],
+      [{ kind: "part", label: "2" }],
+    ]);
     const second = await readLegislation(chunked(xml), {
       target: { section: "1", schedule: "1", part: "2" },
     });
@@ -545,7 +555,10 @@ describe("review follow-ups", () => {
       `<prov><label>1</label><heading>${word}</heading><prov.body><subprov><label/><para><text>${word}</text></para></subprov></prov.body></prov>`;
     const xml = `<act><body/><schedule.group><schedule><label>1</label><heading>Rates</heading><schedule.misc><head1 type="part"><label>Part A</label><heading>First</heading>${clause("Alpha")}</head1><head1 type="part"><label>Part B</label><heading>Second</heading>${clause("Beta")}</head1></schedule.misc></schedule></schedule.group></act>`;
     const all = await readLegislation(chunked(xml), { target: { section: "1", schedule: "1" } });
-    expect(all.matches.map((m) => m.entry.within)).toEqual([["Part A"], ["Part B"]]);
+    expect(all.matches.map((m) => m.entry.within)).toEqual([
+      [{ kind: "part", label: "Part A" }],
+      [{ kind: "part", label: "Part B" }],
+    ]);
     const b = await readLegislation(chunked(xml), {
       target: { section: "1", schedule: "1", part: "B" },
     });

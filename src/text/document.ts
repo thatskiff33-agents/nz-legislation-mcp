@@ -23,6 +23,12 @@ import { safeCut, wellFormed } from "./slice.js";
 
 type OutlineKind = "part" | "subpart" | "crosshead" | "section" | "schedule";
 
+/** An enclosing part or subpart: its kind matters, because subpart numbers restart in each part. */
+export interface Enclosing {
+  readonly kind: "part" | "subpart";
+  readonly label: string;
+}
+
 export interface OutlineEntry {
   readonly kind: OutlineKind;
   label: string;
@@ -34,8 +40,8 @@ export interface OutlineEntry {
   readonly depth: number;
   /** Label of the schedule this entry is in, or null for the body. */
   readonly schedule: string | null;
-  /** Labels of the enclosing parts/subparts, outermost first (shared, do not mutate). */
-  readonly within: readonly string[];
+  /** The enclosing parts and subparts, outermost first (shared, do not mutate). */
+  readonly within: readonly Enclosing[];
 }
 
 /** What to render. A section is matched in the body unless `schedule` is given. */
@@ -44,8 +50,10 @@ interface Target {
   readonly section?: string | undefined;
   /** Schedule label (e.g. "1"); "" matches an unnumbered schedule. */
   readonly schedule?: string | undefined;
-  /** Only match inside this part or subpart (label). */
+  /** Only match inside this Part (label). */
   readonly part?: string | undefined;
+  /** Only match inside this Subpart (label); with `part`, the subpart of that part. */
+  readonly subpart?: string | undefined;
 }
 
 export interface ReadOptions {
@@ -91,6 +99,29 @@ export function normaliseLabel(label: string): string {
 /** Normalises a part/subpart label, accepting forms like "Part C" or "subpart CB". */
 export function normalisePartLabel(label: string): string {
   return normaliseLabel(label.trim().replace(/^(?:sub)?part\s+/iu, ""));
+}
+
+/**
+ * True if `within` (outermost first) is inside the given Part and/or Subpart. A Part matches only
+ * parts and a Subpart only subparts; with both, the subpart must be inside that part. Either may be
+ * written "2" or "Part 2" / "Subpart 2".
+ */
+export function isWithin(
+  within: readonly Enclosing[],
+  part: string | undefined,
+  subpart: string | undefined,
+): boolean {
+  const wantPart = part === undefined ? undefined : normalisePartLabel(part);
+  const partAt =
+    wantPart === undefined
+      ? -1
+      : within.findIndex((w) => w.kind === "part" && normalisePartLabel(w.label) === wantPart);
+  if (wantPart !== undefined && partAt < 0) return false;
+  if (subpart === undefined) return true;
+  const wantSubpart = normalisePartLabel(subpart);
+  return within.some(
+    (w, i) => i > partAt && w.kind === "subpart" && normalisePartLabel(w.label) === wantSubpart,
+  );
 }
 
 const OUTLINE_ELEMENTS: Readonly<Partial<Record<string, OutlineKind>>> = {
@@ -326,9 +357,9 @@ export async function readLegislation(
   const closers: string[] = [];
   /** Whether each open element is repealed. */
   const repealedFlags: boolean[] = [];
-  /** Labels of open parts/subparts (filled in when their label closes). */
-  const within: string[] = [];
-  let withinSnapshot: readonly string[] = [];
+  /** Open parts/subparts (labels filled in when their label closes). */
+  const within: Enclosing[] = [];
+  let withinSnapshot: readonly Enclosing[] = [];
   let withinDirty = false;
   /** Labels of open schedules. */
   const schedules: string[] = [];
@@ -336,7 +367,7 @@ export async function readLegislation(
   const target = options.target;
   const wantSection = target?.section === undefined ? undefined : normaliseLabel(target.section);
   const wantSchedule = target?.schedule === undefined ? undefined : normaliseLabel(target.schedule);
-  const wantPart = target?.part === undefined ? undefined : normalisePartLabel(target.part);
+  const scoped = target?.part !== undefined || target?.subpart !== undefined;
   const hasTarget = wantSection !== undefined || wantSchedule !== undefined;
   const includeHistory = options.includeHistory === true;
 
@@ -368,7 +399,7 @@ export async function readLegislation(
     scheduleScope: number;
   } = { matches: [], parseError: undefined, stop: false, scheduleScope: -1 };
 
-  const currentWithin = (): readonly string[] => {
+  const currentWithin = (): readonly Enclosing[] => {
     if (withinDirty) {
       withinSnapshot = [...within];
       withinDirty = false;
@@ -377,9 +408,7 @@ export async function readLegislation(
   };
 
   const matches = (entry: OutlineEntry): boolean => {
-    if (wantPart !== undefined && !entry.within.some((l) => normalisePartLabel(l) === wantPart)) {
-      return false;
-    }
+    if (scoped && !isWithin(entry.within, target.part, target.subpart)) return false;
     if (wantSection !== undefined) {
       if (entry.kind !== "section" || normaliseLabel(entry.label) !== wantSection) return false;
       return wantSchedule === undefined
@@ -438,7 +467,7 @@ export async function readLegislation(
       };
       outline.push(entry);
       if (kind === "part" || kind === "subpart") {
-        within.push("");
+        within.push({ kind, label: "" });
         withinDirty = true;
       }
       if (kind === "schedule") schedules.push("");
@@ -543,7 +572,7 @@ export async function readLegislation(
       owner[field] = owner[field].replace(/\s+/gu, " ").trim();
       collect = null;
       if (field === "label" && (owner.kind === "part" || owner.kind === "subpart")) {
-        within[within.length - 1] = owner.label;
+        within[within.length - 1] = { kind: owner.kind, label: owner.label };
         withinDirty = true;
       }
       if (field === "label" && owner.kind === "schedule") {

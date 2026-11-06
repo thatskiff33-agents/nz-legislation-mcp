@@ -100,6 +100,7 @@ async function readSide(
     section?: string | undefined;
     schedule?: string | undefined;
     part?: string | undefined;
+    subpart?: string | undefined;
   },
   signal: AbortSignal,
 ): Promise<ReadResult> {
@@ -151,7 +152,12 @@ export const compareVersions = defineTool({
     const what = describeTarget(args.section, args.schedule);
     const same = fromId === toId;
 
-    const target = { section: args.section, schedule: args.schedule, part: args.part };
+    const target = {
+      section: args.section,
+      schedule: args.schedule,
+      part: args.part,
+      subpart: args.subpart,
+    };
     const before = await readSide(deps, fromId, target, signal);
     const after = same ? before : await readSide(deps, toId, target, signal);
     const found = after.found ?? before.found;

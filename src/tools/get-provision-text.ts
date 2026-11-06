@@ -47,6 +47,7 @@ async function readCached(
     section?: string | undefined;
     schedule?: string | undefined;
     part?: string | undefined;
+    subpart?: string | undefined;
     include_history?: boolean | undefined;
   },
   signal: AbortSignal,
@@ -56,12 +57,18 @@ async function readCached(
     args.section,
     args.schedule,
     args.part,
+    args.subpart,
     args.include_history === true,
   ]);
   const cached = deps.textCache?.get(key) as Rendered | undefined;
   if (cached !== undefined) return cached;
   const doc = await readLegislation(deps.xml(versionId, signal), {
-    target: { section: args.section, schedule: args.schedule, part: args.part },
+    target: {
+      section: args.section,
+      schedule: args.schedule,
+      part: args.part,
+      subpart: args.subpart,
+    },
     includeHistory: args.include_history === true,
   });
   // Keep only what later pages need (not the outline of a successful read).

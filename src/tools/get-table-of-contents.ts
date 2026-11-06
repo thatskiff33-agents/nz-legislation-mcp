@@ -1,13 +1,21 @@
 /** get_table_of_contents: the structure of one version (parts, subparts, sections, schedules). */
 import { z } from "zod";
 import {
+  isWithin,
   normaliseLabel,
   normalisePartLabel,
   readLegislation,
   type OutlineEntry,
 } from "../text/document.js";
 import { cleanText, defineTool, permalink, PermalinkSchema, READ_ONLY_API_TOOL } from "./shared.js";
-import { LabelSchema, versionInfo, VersionInfoShape } from "./text-common.js";
+import {
+  describeEnclosing,
+  LabelSchema,
+  PartSchema,
+  SubpartSchema,
+  versionInfo,
+  VersionInfoShape,
+} from "./text-common.js";
 import { refineSelector, selectVersion, VersionSelectorShape } from "./versions.js";
 
 /** Below this many entries the whole outline is returned. */
@@ -18,21 +26,51 @@ const MAX_ENTRIES = 500;
 const InputSchema = z
   .strictObject({
     ...VersionSelectorShape,
-    part: LabelSchema.min(1)
-      .optional()
-      .describe(
-        'Only list what is inside this part or subpart (label, e.g. "C" or "CB"). Large Acts list parts and subparts only unless you give one.',
-      ),
+    part: PartSchema.optional().describe(
+      'Only list what is inside this Part (label, e.g. "2" or "C"). Large Acts list parts and subparts only unless you give one.',
+    ),
+    subpart: SubpartSchema.optional().describe(
+      'Only list what is inside this Subpart (label, e.g. "1" or "CB"). Subpart numbers often restart in each Part, so give part as well.',
+    ),
     schedule: LabelSchema.optional().describe(
       'Only list what is inside this schedule (label, e.g. "1"; "" for an unnumbered schedule), including its clauses. Use it to find clause labels in large Acts.',
     ),
   })
   .superRefine((args, ctx) => {
     refineSelector(args, ctx);
-    if (args.part !== undefined && args.schedule !== undefined) {
-      ctx.addIssue({ code: "custom", message: "Give part or schedule, not both." });
+    if ((args.part !== undefined || args.subpart !== undefined) && args.schedule !== undefined) {
+      ctx.addIssue({ code: "custom", message: "Give part and subpart, or schedule, not both." });
     }
   });
+
+/** The label without a leading "Part"/"Subpart" word, for messages. */
+const bare = (label: string): string => label.replace(/^(?:sub)?part\s+/iu, "").trim();
+
+/** "part 2", "subpart 1" or "part 2 subpart 1", for scope lines and notes. */
+function describeScope(part: string | undefined, subpart: string | undefined): string {
+  return [
+    part === undefined ? "" : `part ${bare(part)}`,
+    subpart === undefined ? "" : `subpart ${bare(subpart)}`,
+  ]
+    .filter((s) => s !== "")
+    .join(" ");
+}
+
+/** True for the part or subpart entry the caller named (it heads its own listing). */
+function isScopeItself(e: OutlineEntry, part: string | undefined, subpart: string | undefined) {
+  if (subpart === undefined) {
+    return (
+      e.kind === "part" &&
+      part !== undefined &&
+      normalisePartLabel(e.label) === normalisePartLabel(part)
+    );
+  }
+  return (
+    e.kind === "subpart" &&
+    normalisePartLabel(e.label) === normalisePartLabel(subpart) &&
+    isWithin(e.within, part, undefined)
+  );
+}
 
 const EntrySchema = z.object({
   kind: z.enum(["part", "subpart", "crosshead", "section", "schedule"]),
@@ -100,30 +138,47 @@ export const getTableOfContents = defineTool({
           `No schedule labelled "${args.schedule}" was found. Omit schedule to see the schedules.`,
         );
       }
-    } else if (args.part !== undefined) {
-      const wanted = normalisePartLabel(args.part);
+    } else if (args.part !== undefined || args.subpart !== undefined) {
+      const { part, subpart } = args;
+      const what = describeScope(part, subpart);
       // Body parts only: schedules have their own parts, often reusing labels such as "A".
       chosen = doc.outline.filter(
         (e) =>
           e.schedule === null &&
-          (e.within.some((label) => normalisePartLabel(label) === wanted) ||
-            ((e.kind === "part" || e.kind === "subpart") &&
-              normalisePartLabel(e.label) === wanted)),
+          (isWithin(e.within, part, subpart) || isScopeItself(e, part, subpart)),
       );
-      scope = `Everything in part/subpart ${args.part}.`;
+      scope = `Everything in ${what}.`;
       if (chosen.length === 0) {
-        notes.push(
-          `No part or subpart labelled "${args.part}" was found. Omit part to see the top level.`,
-        );
-      } else if (chosen.length > MAX_ENTRIES) {
-        const subparts = chosen.filter((e) => e.kind === "part" || e.kind === "subpart");
-        if (subparts.length > 1) {
-          const count = chosen.length;
-          chosen = subparts;
-          scope = `Subparts of ${args.part} (it has too many entries to list at once).`;
-          notes.push(
-            `"${args.part}" has ${String(count)} entries, too many to list at once; pass one of the subpart labels above to list its sections.`,
+        notes.push(`No ${what} was found. Omit part and subpart to see the top level.`);
+      } else {
+        // Subpart numbers often restart in each part: say when one label matched in several.
+        if (part === undefined) {
+          const homes = new Set(
+            chosen
+              .filter((e) => e.kind === "subpart")
+              .map((e) =>
+                e.within
+                  .filter((w) => w.kind === "part")
+                  .map(describeEnclosing)
+                  .join(" > "),
+              ),
           );
+          if (homes.size > 1) {
+            notes.push(
+              `Subpart ${bare(String(subpart))} occurs in ${[...homes].map((h) => h || "the top level").join(", ")}; pass part as well to list just one.`,
+            );
+          }
+        }
+        if (chosen.length > MAX_ENTRIES && subpart === undefined) {
+          const headings = chosen.filter((e) => e.kind === "part" || e.kind === "subpart");
+          if (headings.length > 1) {
+            const count = chosen.length;
+            chosen = headings;
+            scope = `Subparts of ${what} (it has too many entries to list at once).`;
+            notes.push(
+              `${what} has ${String(count)} entries, too many to list at once; pass one of the subpart labels above as subpart (with part ${bare(String(part))}) to list its sections.`,
+            );
+          }
         }
       }
     } else if (doc.outline.length <= FULL_OUTLINE_LIMIT) {
@@ -140,7 +195,7 @@ export const getTableOfContents = defineTool({
       );
       scope = "Body parts and subparts, schedules, and sections outside any part.";
       notes.push(
-        `This document has ${String(doc.outline.length)} entries. Pass part (a part or subpart label above) to list its sections, or schedule (a schedule label above) to list its clauses.`,
+        `This document has ${String(doc.outline.length)} entries. Pass part (a part label above, with subpart for a subpart) to list its sections, or schedule (a schedule label above) to list its clauses.`,
       );
     }
 

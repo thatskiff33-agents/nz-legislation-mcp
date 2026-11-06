@@ -1,7 +1,7 @@
 /** Shared pieces for the tools that read legislation text. */
 import { z } from "zod";
 import { cleanText, versionDate } from "./shared.js";
-import type { Match, OutlineEntry } from "../text/document.js";
+import type { Enclosing, Match, OutlineEntry } from "../text/document.js";
 import type { VersionRecord } from "../api/client.js";
 
 /** Upper bound for section/schedule labels supplied by the caller. */
@@ -15,12 +15,24 @@ export const LabelSchema = z
   .max(MAX_LABEL_LENGTH)
   .regex(LABEL_PATTERN, { error: "Use the label as printed, e.g. 13, 6A or CA 1." });
 
+/** A Part label: "2", "C" or "Part 2" (a subpart label is refused, with a pointer to subpart). */
+export const PartSchema = LabelSchema.min(1).refine((value) => !/^subpart\b/iu.test(value), {
+  error:
+    'This is a subpart label: pass it as subpart (with part if you know it), e.g. subpart "1".',
+});
+
+/** A Subpart label: "1", "CB" or "Subpart 1" (a part label is refused, with a pointer to part). */
+export const SubpartSchema = LabelSchema.min(1).refine((value) => !/^part\b/iu.test(value), {
+  error: 'This is a part label: pass it as part, e.g. part "2".',
+});
+
 export const ProvisionShape = {
-  part: LabelSchema.min(1)
-    .optional()
-    .describe(
-      'Only look inside this part or subpart (label, e.g. "CB" or "A"). Use it when a label appears more than once, e.g. clause numbers repeated across the parts of a schedule.',
-    ),
+  part: PartSchema.optional().describe(
+    'Only look inside this Part (label, e.g. "2" or "C"). Use it when a label appears more than once, e.g. clause numbers repeated across the parts of a schedule. For subparts use subpart.',
+  ),
+  subpart: SubpartSchema.optional().describe(
+    'Only look inside this Subpart (label, e.g. "1" or "CB"). Subpart numbers often restart in each Part, so give part as well to pick one.',
+  ),
   section: LabelSchema.min(1)
     .optional()
     .describe('Section (or clause) label as printed, e.g. "13", "6A" or "CA 1".'),
@@ -37,7 +49,9 @@ export const ProvisionInfoSchema = z.object({
   repealed: z
     .boolean()
     .describe("True if this provision has been repealed (its text is just a marker)."),
-  within: z.array(z.string()).describe("Enclosing part/subpart labels, outermost first."),
+  within: z
+    .array(z.string())
+    .describe('Enclosing parts and subparts, outermost first, e.g. ["Part 2", "Subpart 1"].'),
 });
 
 export function provisionInfo(entry: OutlineEntry): z.output<typeof ProvisionInfoSchema> {
@@ -47,8 +61,15 @@ export function provisionInfo(entry: OutlineEntry): z.output<typeof ProvisionInf
     heading: cleanText(entry.heading),
     schedule: entry.schedule === null ? null : cleanText(entry.schedule),
     repealed: entry.repealed,
-    within: [...entry.within],
+    within: entry.within.map(describeEnclosing),
   };
+}
+
+/** "Part 2" or "Subpart 1" (labels that already carry the word are left as they are). */
+export function describeEnclosing(enclosing: Enclosing): string {
+  const label = cleanText(enclosing.label);
+  const word = enclosing.kind === "part" ? "Part" : "Subpart";
+  return label === "" || /^(?:sub)?part\b/iu.test(label) ? label || word : `${word} ${label}`;
 }
 
 /** Human description of a provision request, for messages. */
@@ -64,12 +85,12 @@ export function describeTarget(section: string | undefined, schedule: string | u
 export function duplicatesNote(matches: readonly Match[], chosen: OutlineEntry): string | null {
   if (matches.length < 2) return null;
   const describe = (e: OutlineEntry): string =>
-    `${e.within.length > 0 ? `in ${e.within.join(" > ")}` : "at the top level"}${e.repealed ? " (repealed)" : ""}`;
+    `${e.within.length > 0 ? `in ${e.within.map(describeEnclosing).join(" > ")}` : "at the top level"}${e.repealed ? " (repealed)" : ""}`;
   const list = matches.map((m) => describe(m.entry)).join("; ");
   const how =
     chosen.kind === "schedule"
       ? "Duplicated schedules are usually a repealed and a current version."
-      : "Pass part to choose another.";
+      : "Pass part (and subpart) to choose another.";
   return `This label appears ${String(matches.length)} times (${list}). Used the one ${describe(chosen)}. ${how}`;
 }
 

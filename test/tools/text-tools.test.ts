@@ -42,7 +42,7 @@ describe("get_table_of_contents", () => {
     const big = bigAct(4, 100, loose);
     const id = "act_public_2099_1_en_2099-01-01";
     const { deps: d } = deps(
-      [versionRecord(id), versionRecord(id), versionRecord(id)],
+      [versionRecord(id), versionRecord(id), versionRecord(id), versionRecord(id)],
       "2026-11-02",
       { [id]: big },
     );
@@ -53,11 +53,14 @@ describe("get_table_of_contents", () => {
       "schedule",
     ]);
     expect(top.notes.join(" ")).toContain("Pass part");
-    const part2 = await getTableOfContents.run({ version_id: id, part: "2A" }, d, signal);
+    // "2A" is a subpart (of part 2): it is listed by subpart, not by part.
+    const part2 = await getTableOfContents.run({ version_id: id, subpart: "2A" }, d, signal);
     expect(part2.entries.filter((e) => e.kind === "section")).toHaveLength(100);
+    const asPart = await getTableOfContents.run({ version_id: id, part: "2A" }, d, signal);
+    expect(asPart.entries).toEqual([]);
     const missing = await getTableOfContents.run({ version_id: id, part: "Z" }, d, signal);
     expect(missing.entries).toEqual([]);
-    expect(missing.notes.join(" ")).toContain('No part or subpart labelled "Z"');
+    expect(missing.notes.join(" ")).toContain("No part Z was found.");
   });
 
   it("lists subparts when a part is too big, and caps listings without subparts", async () => {
@@ -67,7 +70,8 @@ describe("get_table_of_contents", () => {
     });
     const out = await getTableOfContents.run({ version_id: id, part: "Part 1" }, d, signal);
     expect(out.entries.map((e) => `${e.kind}:${e.label}`)).toEqual(["part:1", "subpart:1A"]);
-    expect(out.notes.join(" ")).toContain('"Part 1" has 602 entries, too many to list at once');
+    expect(out.notes.join(" ")).toContain("part 1 has 602 entries, too many to list at once");
+    expect(out.notes.join(" ")).toContain("as subpart (with part 1)");
     const sections = Array.from(
       { length: 600 },
       (_, i) => `<prov><label>${String(i + 1)}</label><heading>S</heading></prov>`,
@@ -261,7 +265,7 @@ describe("get_provision_text", () => {
     const cz23 = await getProvisionText.run({ version_id: id, section: "CZ 23" }, d, signal);
     expect(cz23.provision.repealed).toBe(false);
     expect(cz23.notes.join(" ")).toContain(
-      "This label appears 2 times (in C > CZ (repealed); in C > CZ). Used the one in C > CZ.",
+      "This label appears 2 times (in Part C > Subpart CZ (repealed); in Part C > Subpart CZ). Used the one in Part C > Subpart CZ.",
     );
     const s24 = await getProvisionText.run({ version_id: id, section: "24" }, d, signal);
     expect(s24.provision.repealed).toBe(true);
@@ -500,7 +504,9 @@ describe("version safety and truncation (issue #40)", () => {
       schedule: "1",
     });
     expect(both.success).toBe(false);
-    expect(JSON.stringify(both.error?.issues)).toContain("Give part or schedule, not both.");
+    expect(JSON.stringify(both.error?.issues)).toContain(
+      "Give part and subpart, or schedule, not both.",
+    );
   });
 
   it("explains a capped listing", async () => {
