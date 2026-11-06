@@ -4,13 +4,14 @@ import { describe, expect, it } from "vitest";
 import { apiErrors, xmlErrors } from "../../src/api/errors.js";
 
 describe("xmlErrors (the text download from the website)", () => {
+  const PAGE = "https://www.legislation.govt.nz/act/public/1976/33/en/2014-01-01/";
   const all = [
-    xmlErrors.notFound("act_public_1976_33_en_2014-01-01"),
+    xmlErrors.notFound("act_public_1976_33_en_2014-01-01", PAGE),
     xmlErrors.unexpectedRedirect(302),
     xmlErrors.unavailable(503),
     xmlErrors.unexpectedStatus(500),
     xmlErrors.unreadable(),
-    xmlErrors.tooLarge(64 * 1024 * 1024),
+    xmlErrors.tooLarge(64 * 1024 * 1024, PAGE),
     xmlErrors.timeout(30_000),
     xmlErrors.network(),
   ];
@@ -36,11 +37,28 @@ describe("xmlErrors (the text download from the website)", () => {
   });
 
   it("says what to do for a missing or oversized text", () => {
-    expect(xmlErrors.notFound("v1").message).toContain("use list_versions to pick another version");
-    expect(xmlErrors.tooLarge(64 * 1024 * 1024).message).toContain("64 MB safety limit");
-    expect(xmlErrors.tooLarge(64 * 1024 * 1024).message).toContain(
-      "Read it on legislation.govt.nz",
+    expect(xmlErrors.notFound("v1", PAGE).message).toContain(
+      "use list_versions to pick another version",
     );
+    expect(xmlErrors.tooLarge(64 * 1024 * 1024, PAGE).message).toContain("64 MB safety limit");
+    expect(xmlErrors.tooLarge(64 * 1024 * 1024, PAGE).message).toContain(
+      `otherwise read it on the official page: ${PAGE}`,
+    );
+    expect(xmlErrors.notFound("v1", PAGE).message).toContain(PAGE);
+  });
+});
+
+describe("malformed XML", () => {
+  it("is reported as unreadable text from the website", async () => {
+    const { readLegislation } = await import("../../src/text/document.js");
+    const { chunked } = await import("../text/xml.js");
+    const error = await readLegislation(chunked("<act><body><prov></act>")).then(
+      () => undefined,
+      (e: unknown) => e,
+    );
+    expect(error).toMatchObject({ kind: "invalid_response" });
+    expect((error as Error).message).toContain("www.legislation.govt.nz");
+    expect((error as Error).message).not.toContain("Legislation API");
   });
 });
 

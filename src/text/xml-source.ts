@@ -80,7 +80,7 @@ export async function* streamVersionXml(
   if (response.status !== 200) {
     await response.body?.cancel().catch(() => undefined);
     const { status } = response;
-    if (status === 404) throw xmlErrors.notFound(versionId);
+    if (status === 404) throw xmlErrors.notFound(versionId, pageUrl(url));
     if (status >= 300 && status < 400) throw xmlErrors.unexpectedRedirect(status);
     if (status === 502 || status === 503 || status === 504) {
       throw xmlErrors.unavailable(status);
@@ -102,7 +102,7 @@ export async function* streamVersionXml(
       }
       if (chunk.done) break;
       total += chunk.value.byteLength;
-      if (total > maxBytes) throw xmlErrors.tooLarge(maxBytes);
+      if (total > maxBytes) throw xmlErrors.tooLarge(maxBytes, pageUrl(url));
       yield decoder.decode(chunk.value, { stream: true });
     }
     const tail = decoder.decode();
@@ -111,6 +111,11 @@ export async function* streamVersionXml(
     // Releases the connection when the consumer stops early or an error occurs.
     await reader.cancel().catch(() => undefined);
   }
+}
+
+/** The version's page on the website, from its XML URL (same path, ending "/"). */
+function pageUrl(xml: URL): string {
+  return xml.href.replace(/.xml$/u, "/");
 }
 
 function transportError(error: unknown, timeoutMs: number, caller: AbortSignal): ApiError {

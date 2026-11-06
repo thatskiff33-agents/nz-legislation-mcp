@@ -50,7 +50,7 @@ export const apiErrors = {
   unauthorised: (): ApiError =>
     new ApiError(
       "unauthorised",
-      "The Legislation API rejected the API key (401). The user should check which key the server is using and that it is their own valid key: running `npx nz-legislation-mcp doctor` shows where the key came from. It can come from LEGISLATION_NZ_API_KEY, a file named by LEGISLATION_NZ_API_KEY_FILE, the key file saved by `nz-legislation-mcp setup`, or the AI client's settings (Claude Code plugin, Claude Desktop bundle); on a self-hosted endpoint it is the operator's key. Keys are issued by the Parliamentary Counsel Office (contact@pco.govt.nz). Do not retry.",
+      "The Legislation API rejected the API key (401). The user should check which key the server is using and that it is their own valid key: in a terminal, `npx nz-legislation-mcp doctor` shows which key that terminal finds (a key set in the AI client's settings is seen only by that client). It can come from LEGISLATION_NZ_API_KEY, a file named by LEGISLATION_NZ_API_KEY_FILE, the key file saved by `nz-legislation-mcp setup`, or the AI client's settings (Claude Code plugin, Claude Desktop bundle); on a self-hosted endpoint it is the operator's key, so ask the operator. Keys are issued by the Parliamentary Counsel Office (contact@pco.govt.nz). Do not retry.",
       false,
       401,
     ),
@@ -158,10 +158,10 @@ const WEBSITE = "the legislation website (www.legislation.govt.nz)";
  * give remedies that apply to a whole-document download.
  */
 export const xmlErrors = {
-  notFound: (versionId: string): ApiError =>
+  notFound: (versionId: string, page: string): ApiError =>
     new ApiError(
       "not_found",
-      `The text (XML) of ${versionId} was not found on ${WEBSITE} (404). It may not be published yet: use list_versions to pick another version, or check the permalink.`,
+      `The text (XML) of ${versionId} was not found on ${WEBSITE} (404). It may not be published yet: use list_versions to pick another version, or check the version's page: ${page}`,
       false,
       404,
     ),
@@ -197,10 +197,10 @@ export const xmlErrors = {
       false,
     ),
 
-  tooLarge: (limitBytes: number): ApiError =>
+  tooLarge: (limitBytes: number, page: string): ApiError =>
     new ApiError(
       "response_too_large",
-      `The text (XML) of this version is larger than the ${String(Math.round(limitBytes / (1024 * 1024)))} MB safety limit, so it cannot be read here. Read it on legislation.govt.nz instead (see the permalink).`,
+      `The text (XML) of this version is larger than the ${sizeLimit(limitBytes)} safety limit, so it could not be read to the end. A single section or schedule (get_provision_text) may still work, because reading stops once it is found; otherwise read it on the official page: ${page}`,
       false,
     ),
 
@@ -218,6 +218,12 @@ export const xmlErrors = {
       true,
     ),
 } as const;
+
+/** A byte limit for people: whole MB when it is at least 1 MB, otherwise bytes. */
+function sizeLimit(bytes: number): string {
+  const mb = bytes / (1024 * 1024);
+  return mb >= 1 ? `${String(Math.round(mb))} MB` : `${String(bytes)}-byte`;
+}
 
 function capitalise(text: string): string {
   return `${text.charAt(0).toUpperCase()}${text.slice(1)}`;
