@@ -18,7 +18,7 @@ Unofficial MCP server for the New Zealand Legislation API (PCO, `api.legislation
    - an independent review has signed off on the final changes, with every finding fixed or answered;
    - no owner decision on it is open.
 
-   The agent records the merge decision on the PR. Releases and publishing (npm, MCP Registry, container images), repository settings, and anything legal stay with the owner.
+   The agent records the merge decision on the PR. Release pull requests (release-please) follow the same rule (owner decision relayed by the orchestrator session, 7 November 2026): merging one starts publishing after the `release` environment's 30-minute timer. Repository settings, the MCP Registry, and anything legal stay with the owner unless the owner approves a specific change.
 
 ## Hard rules
 

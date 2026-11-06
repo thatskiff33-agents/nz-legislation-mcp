@@ -120,7 +120,7 @@ jobs:
             trivy_sha256: 2f6bb988b553a1bbac6bdd1ce890f5e412439564e17522b88a4541b4f364fc8d
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
-    # Publishing waits for an owner's approval on the "release" environment.
+    # Publishing waits out the "release" environment's 30-minute timer (the cancel window).
     environment: release
     permissions:
       contents: read

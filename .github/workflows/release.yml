@@ -5,8 +5,8 @@ name: Release
 # artefact is out (publish-release). The npm tarball is packed in a job that runs no third-party
 # tooling after packing, and its SHA-256 travels to the publishing jobs as a job output, which no
 # later job can change. The Claude Desktop bundle is built from that tarball in a separate job, with
-# the standard zip command (no third-party tool), so it cannot change what npm publishes. Each publishing job waits for an
-# owner's approval on the "release" environment and installs nothing. The container is built from
+# the standard zip command (no third-party tool), so it cannot change what npm publishes. Each publishing job waits out
+# the "release" environment's 30-minute timer (the cancel window) and installs nothing. The container is built from
 # the tag source inside BuildKit, which does not expose the job's OIDC token or registry login to
 # build steps.
 on:
@@ -22,9 +22,9 @@ concurrency:
 
 jobs:
   release-please:
-    # Off until the owner has created the protected "release" environment (PUBLISHING.md) and set
-    # the repository variable RELEASE_ENABLED to true. GitHub would otherwise create a missing
-    # environment on first use with no protection, and publishing would need no approval.
+    # Off until the owner has created the "release" environment (PUBLISHING.md) and set the
+    # repository variable RELEASE_ENABLED to true. GitHub would otherwise create a missing
+    # environment on first use with no branch rule or wait timer.
     if: vars.RELEASE_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
