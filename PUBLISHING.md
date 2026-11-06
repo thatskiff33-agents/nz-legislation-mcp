@@ -10,18 +10,29 @@ Nothing leaves GitHub until someone approves the `release` environment.
    changelog. The version is set in `package.json` and in every generated manifest
    (`server.json`, the Claude Code plugin and the Claude Desktop bundle). A test checks that
    none is missed.
-2. Merging the release pull request creates the Git tag and GitHub release.
-3. A build job with no publishing rights runs `pnpm check`, packs the npm tarball and builds
-   the Claude Desktop bundle from that same tarball. Three publishing jobs then wait for
-   approval on the `release` environment. The npm and bundle jobs install nothing and run no
-   project tooling:
-   - npm: publishes the checked tarball with provenance, using trusted publishing (no npm
-     token is stored).
-   - Claude Desktop bundle: attached to the GitHub release with SHA-256 checksums.
-   - Container: built from the release tag (inside Docker, without access to the publishing
-     credentials), scanned, then pushed to `ghcr.io/thatskiff33/nz-legislation-mcp`
-     with an SBOM and provenance, and signed with cosign (keyless).
-4. After npm has the new version, publish to the MCP Registry by hand (see below).
+2. Merging the release pull request creates the Git tag and a **draft** GitHub release. The tag
+   is public at once; the GitHub release is not visible until step 4.
+3. Build, then publish:
+   - `pack` (no publishing rights) runs `pnpm check` and packs the npm tarball. No new step or
+     tool starts after packing other than the artifact upload. The tarball's name and SHA-256
+     are passed to later jobs as job outputs, which no later job can change, and printed in the
+     job summary.
+   - `bundle-build` (no publishing rights) verifies the tarball against that checksum and builds
+     the Claude Desktop bundle from it. The bundle tool runs only here. It cannot change what
+     npm publishes: tampering with the tarball artifact fails the checksum check and stops the
+     release.
+   - Three publishing jobs then wait for approval on the `release` environment. The npm and
+     bundle jobs install nothing, run no project tooling, and verify every file against the
+     job-output checksums before using it:
+     - npm: publishes the checked tarball with provenance, using trusted publishing (no npm
+       token is stored).
+     - Claude Desktop bundle: attached to the draft GitHub release with SHA-256 checksums.
+     - Container: built from the release tag (inside Docker, without access to the publishing
+       credentials), scanned, then pushed to `ghcr.io/thatskiff33/nz-legislation-mcp` with an
+       SBOM and provenance, and signed with cosign (keyless).
+4. `publish-release` publishes the draft GitHub release once npm, the bundle and the container
+   have all succeeded.
+5. After npm has the new version, publish to the MCP Registry by hand (see below).
 
 The Claude Code plugin is served straight from this repository, so it updates when `main`
 changes. It runs a pinned `npx -y nz-legislation-mcp@<version>`, so it only works once that
@@ -31,8 +42,36 @@ version is on npm. release-please cannot edit part of a string, so a small job
 ## Known limits
 
 - The bundle is built with the `@anthropic-ai/mcpb` CLI (2.1.2, pinned, install scripts
-  disabled). It is not a dev dependency because its dependency tree has open audit findings;
-  it runs only in the build job, which has no write or publishing rights.
+  disabled). It is not a dev dependency because its dependency tree has open audit findings.
+  It runs only in `bundle-build`, which has no write or publishing rights and cannot produce
+  the npm tarball. Its own dependencies are still resolved fresh by `npx`, so the bundle itself
+  is not yet protected from a newly published malicious dependency (#37, before v1.0.0).
+
+## If a release fails part-way
+
+The GitHub release stays a draft until npm, the bundle and the container are all out, so no
+half-finished GitHub release is shown. npm and the container wait for the bundle build, so a
+failed build or bundle stops everything before anything is published.
+
+**Keep the tag.** release-please finds the previous release by its tag. Deleting the tag makes it
+rebuild the changelog from the whole history. (This, and the skipped version number below, come
+from reading release-please 17.6.0's code; to confirm on the first real release.)
+
+Approvals are given per job. Use the second case below if npm was approved and published, even
+if another job was declined.
+
+- **Build or bundle failed, or every approval was declined:** nothing was published.
+  - If re-running the failed jobs from the workflow run can fix it, do that.
+  - Otherwise, delete only the draft release (`gh release delete <tag>`, without
+    `--cleanup-tag`), fix the problem on `main`, and release again. The next release pull
+    request is for the next version; the failed version number is skipped.
+- **npm published, but a later job failed or was declined:** npm versions cannot be reused. Re-run the failed
+  jobs from the workflow run; the bundle upload replaces any partly uploaded assets.
+  - If a re-run is not possible, download the `npm-tarball` and `desktop-bundle` artifacts from
+    the run.
+  - Check each file against the SHA-256 printed in the `pack` and `bundle-build` job summaries.
+  - Write `SHA256SUMS` for the two files, attach the bundle and `SHA256SUMS` to the draft, then
+    publish it (`gh release edit <tag> --draft=false`).
 
 ## One-time setup (before the first release)
 
@@ -84,5 +123,6 @@ The registry checks that the npm package belongs to this server through the `mcp
 - `docs/clients.md` and the README quick start still match the release.
 - The release pull request includes the "pin the Claude Code plugin" commit (the
   `sync-release-pr` job adds it a minute or so after release-please updates the pull request).
-  If it is merged without it, the tag and GitHub release are still created but the build job
-  fails its pin check and nothing is published; fix the pin on `main` and release again.
+  If it is merged without it, the tag and a draft GitHub release are still created, but the
+  `pack` job fails its pin check and nothing is published. Fix the pin on `main` and release
+  again, keeping the tag (see "If a release fails part-way").
