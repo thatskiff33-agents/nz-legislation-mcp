@@ -19,6 +19,7 @@
  */
 import sax from "sax";
 import { apiErrors } from "../api/errors.js";
+import { safeCut, wellFormed } from "./slice.js";
 
 type OutlineKind = "part" | "subpart" | "crosshead" | "section" | "schedule";
 
@@ -144,6 +145,9 @@ const BLOCKS = new Set([
   "table",
   "history-note",
   "conv.body",
+  "conv.end",
+  "signature-block",
+  "sig.para",
   "eqn-line",
   "proviso",
   "example",
@@ -186,6 +190,9 @@ const CONTROL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/gu;
  */
 const INVISIBLE = /[\u200B-\u200D\u2060\uFEFF\u202A-\u202E\u2066-\u2069]/gu;
 
+/** Punctuation that ends or continues the current line rather than starting new words. */
+const CLOSING_PUNCTUATION = /^[.,;:!?)\]}”’–—-]/u;
+
 /** Upper bound on rendered characters for a single provision or schedule. */
 const MAX_RENDERED_CHARS = 2_000_000;
 /** Upper bound on matches collected for a duplicated label. */
@@ -199,6 +206,8 @@ class TextWriter {
   #chars = 0;
   /** True when the current line holds only a label prefix so far. */
   #onlyLabel = false;
+  /** Indent of a line break that the next real words should start with (see breakBeforeText). */
+  #pending: number | undefined;
 
   get truncated(): boolean {
     return this.#chars + this.#current.length > MAX_RENDERED_CHARS;
@@ -209,20 +218,60 @@ class TextWriter {
   }
 
   newline(indent: number): void {
+    this.#pending = undefined;
     this.#flush();
     this.#indent = Math.max(0, indent);
+  }
+
+  /**
+   * After a block closes, words that follow it (closing words after a list, text after a
+   * signature line) start a new line at `indent`. The break is applied lazily, only if real
+   * words follow, so punctuation that belongs to the block's line is not stranded.
+   */
+  breakBeforeText(indent: number): void {
+    this.#pending = indent;
+  }
+
+  /**
+   * Writes punctuation that ends the current line, such as a closing quotation mark or a table
+   * cell separator. It cancels any pending break: what follows continues this line.
+   */
+  append(text: string): void {
+    this.#pending = undefined;
+    this.write(text);
+  }
+
+  /** Writes a marker on the current line, leaving any pending break for the words after it. */
+  mark(text: string): void {
+    const pending = this.#pending;
+    this.#pending = undefined;
+    this.write(text);
+    this.#pending = pending;
   }
 
   write(text: string): void {
     if (this.truncated) return;
     const clean = text.replace(CONTROL, "").replace(INVISIBLE, "").replace(/\s+/gu, " ");
+    const first = clean.trimStart().charAt(0);
+    if (this.#pending !== undefined && first !== "") {
+      if (!CLOSING_PUNCTUATION.test(first)) {
+        // Words, or an opening quotation mark or bracket, start the new line.
+        this.newline(this.#pending);
+      } else if (/[\p{L}\p{N}]/u.test(clean)) {
+        // "; and" or ", or": punctuation that continues this line, with words after it.
+        this.#pending = undefined;
+      }
+      // Bare closing punctuation (".") stays on this line and the break stays pending.
+    }
     if (clean.trim() !== "") this.#onlyLabel = false;
     if (this.#current === "") this.#current = clean.trimStart();
     else if (this.#current.endsWith(" ") && clean.startsWith(" ")) this.#current += clean.slice(1);
     else this.#current += clean;
     // Enforce the cap inside a line too: one huge text node must not grow without bound.
     const room = MAX_RENDERED_CHARS + 1 - this.#chars;
-    if (this.#current.length > room) this.#current = this.#current.slice(0, Math.max(0, room));
+    if (this.#current.length > room) {
+      this.#current = this.#current.slice(0, safeCut(this.#current, Math.max(0, room)));
+    }
   }
 
   /** Writes a label prefix such as "(1) "; the next paragraph continues on this line. */
@@ -244,9 +293,11 @@ class TextWriter {
 
   finish(): string {
     this.#flush();
-    const text = this.#lines.join("\n");
+    // Repaired here, on the whole text, because the parser can split a valid pair across two
+    // text events; per-event repair would corrupt it.
+    const text = wellFormed(this.#lines.join("\n"));
     return this.truncated
-      ? `${text.slice(0, MAX_RENDERED_CHARS)}\n[Text truncated: this provision exceeds the rendering limit.]`
+      ? `${text.slice(0, safeCut(text, MAX_RENDERED_CHARS))}\n[Text truncated: this provision exceeds the rendering limit.]`
       : text;
   }
 }
@@ -434,8 +485,10 @@ export async function readLegislation(
         }
         if (name === "label" && parentName === "prov") w.newline(indent);
         if (name === "brk") w.newline(indent);
-        if (name === "graphic") w.write(" [graphic omitted] ");
-        if (name === "entry") w.write(" | ");
+        // The marker stays on its figure heading's line ("Flowchart B3 ... [graphic omitted]").
+        if (name === "graphic") w.mark(" [graphic omitted] ");
+        // A cell separator continues the row's line, even after a list inside the previous cell.
+        if (name === "entry") w.append(" | ");
         if (name === "history-note") w.write("[History] ");
         // The marker leads the element's line; its first paragraph continues on that line.
         if (repealed && !LABELLED.has(name)) w.label("[Repealed] ");
@@ -543,10 +596,15 @@ export async function readLegislation(
       }
       if (capture !== null && depth === skipDepth) skipDepth = -1;
       else if (capture !== null && skipDepth < 0 && headerDepth < 0) {
-        if (name === "label-para" || name === "def-para") indent -= 1;
-        if (name === "row") w.write(" |");
+        if (name === "row") w.append(" |");
         if (name === "table") w.newline(indent);
-        if (closer !== "") w.write(closer);
+        if (closer !== "") w.append(closer);
+        // Words after a block (closing words such as "shall be deemed ..." after a list of
+        // paragraphs, text after a list item or signature line) belong to the enclosing element:
+        // they start a new line at its indent instead of running on. Blocks that follow already
+        // start their own line, so only loose words are affected.
+        if (name === "label-para" || name === "def-para") indent -= 1;
+        if (BLOCKS.has(name)) w.breakBeforeText(indent);
         if (depth === quoteDepth) quoteDepth = -1;
       }
       if (capture !== null && depth === capture.depth) {

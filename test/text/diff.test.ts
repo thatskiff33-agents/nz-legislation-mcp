@@ -1,5 +1,33 @@
+import fc from "fast-check";
 import { describe, expect, it } from "vitest";
 import { diffLines, formatDiff, type DiffLine } from "../../src/text/diff.js";
+
+describe("diffLines (properties)", () => {
+  // Small alphabets make shared lines likely, so the diff has real work to do.
+  const lines = fc.array(fc.constantFrom("a", "b", "c", "d", ""), { maxLength: 30 });
+
+  it("keeps every line: dropping additions gives before, dropping removals gives after", () => {
+    fc.assert(
+      fc.property(lines, lines, (before, after) => {
+        const result = diffLines(before, after);
+        expect(result).not.toBeNull();
+        const out = result ?? [];
+        expect(out.filter((l) => l.op !== "added").map((l) => l.text)).toEqual(before);
+        expect(out.filter((l) => l.op !== "removed").map((l) => l.text)).toEqual(after);
+      }),
+    );
+  });
+
+  it("reports no changes for identical input", () => {
+    fc.assert(
+      fc.property(lines, (same) => {
+        const result = diffLines(same, [...same]);
+        expect(result).not.toBeNull();
+        expect((result ?? []).every((l) => l.op === "same")).toBe(true);
+      }),
+    );
+  });
+});
 
 function diff(before: string[], after: string[]): DiffLine[] {
   const lines = diffLines(before, after);

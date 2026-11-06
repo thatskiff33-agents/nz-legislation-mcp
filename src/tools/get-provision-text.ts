@@ -1,6 +1,7 @@
 /** get_provision_text: the text of one section, schedule clause or schedule. */
 import { z } from "zod";
 import { readLegislation, type ReadResult } from "../text/document.js";
+import { pageBounds } from "../text/slice.js";
 import {
   cleanText,
   defineTool,
@@ -151,8 +152,8 @@ export const getProvisionText = defineTool({
     }
 
     const maxChars = args.max_chars ?? DEFAULT_MAX_CHARS;
-    const offset = Math.min(args.offset ?? 0, doc.text.length);
-    const end = Math.min(offset + maxChars, doc.text.length);
+    // Cut points never split a character; max_chars >= 1000, so a page is never empty.
+    const { start: offset, end } = pageBounds(doc.text, args.offset ?? 0, maxChars);
     return {
       ...versionInfo(record),
       title: cleanText(doc.title === "" ? record.title : doc.title),

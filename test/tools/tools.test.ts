@@ -466,6 +466,9 @@ describe("shared helpers", () => {
 
   it("cleans API text: control characters removed, length capped", () => {
     expect(cleanText("  Income\u0000 Tax\nAct  ")).toBe("Income  Tax Act");
+    // A two-unit character at the cap is kept whole or dropped, never split.
+    const astral = cleanText(`${"x".repeat(498)}\u{1D465}${"y".repeat(10)}`);
+    expect(astral).toBe(`${"x".repeat(498)}…`);
     const long = cleanText("x".repeat(600));
     expect(long).toHaveLength(500);
     expect(long.endsWith("…")).toBe(true);
