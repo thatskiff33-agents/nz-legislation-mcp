@@ -18,9 +18,9 @@ Nothing leaves GitHub until someone approves the `release` environment.
      are passed to later jobs as job outputs, which no later job can change, and printed in the
      job summary.
    - `bundle-build` (no publishing rights) verifies the tarball against that checksum and builds
-     the Claude Desktop bundle from it. The bundle tool runs only here. It cannot change what
-     npm publishes: tampering with the tarball artifact fails the checksum check and stops the
-     release.
+     the Claude Desktop bundle from it with the standard `zip` command: no third-party tool runs
+     in a release. It cannot change what npm publishes: tampering with the tarball artifact fails
+     the checksum check and stops the release.
    - Three publishing jobs then wait for approval on the `release` environment. The npm and
      bundle jobs install nothing, run no project tooling, and verify every file against the
      job-output checksums before using it:
@@ -41,11 +41,14 @@ version is on npm. release-please cannot edit part of a string, so a small job
 
 ## Known limits
 
-- The bundle is built with the `@anthropic-ai/mcpb` CLI (2.1.2, pinned, install scripts
-  disabled). It is not a dev dependency because its dependency tree has open audit findings.
-  It runs only in `bundle-build`, which has no write or publishing rights and cannot produce
-  the npm tarball. Its own dependencies are still resolved fresh by `npx`, so the bundle itself
-  is not yet protected from a newly published malicious dependency (#37, before v1.0.0).
+- A `.mcpb` bundle is a zip archive with `manifest.json` at its root, so `scripts/build-mcpb.sh`
+  builds it with `zip`, leaving out the same files the official `@anthropic-ai/mcpb` CLI does.
+  The CLI itself (2.1.2, pinned, install scripts disabled) never runs in a release, because its
+  dependency tree has open audit findings and is resolved fresh by `npx`. It runs only in CI's
+  `claude desktop bundle` job, which publishes nothing: `scripts/check-mcpb.sh` validates the
+  manifest with it and checks that our bundle has the same files and permissions as `mcpb pack`
+  would produce (#37). Before the first release, install the bundle in Claude Desktop by hand
+  (#11) to confirm it end to end.
 
 ## If a release fails part-way
 
