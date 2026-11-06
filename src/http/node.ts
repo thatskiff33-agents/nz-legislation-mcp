@@ -129,8 +129,9 @@ export async function listen(
       return;
     }
     // rawHeaders alternates names and values. Some Node releases cut it at exactly the limit with no
-    // other signal (seen on 24.15.0); newer ones refuse such requests themselves (seen in CI on
-    // 22.23.4 and 24.22.2). A request at the limit is refused here either way: keep ">=".
+    // other signal (seen on 24.15.0 and 24.16.0); newer ones refuse requests over the limit
+    // themselves (431, empty body; seen on 22.23.4 and 24.22.2), but one exactly at the limit still
+    // reaches here. A request at the limit looks the same as a cut one, so keep ">=".
     if (req.rawHeaders.length / 2 >= MAX_HEADERS) {
       res.writeHead(431, { "Content-Type": "application/json", Connection: "close" });
       res.end('{"error":"too_many_headers"}');

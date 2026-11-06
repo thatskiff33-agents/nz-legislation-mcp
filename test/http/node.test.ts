@@ -271,6 +271,10 @@ describe("listen", () => {
         });
         let data = "";
         socket.on("data", (d: Buffer) => (data += d.toString()));
+        // A reset fails the assertion below rather than crashing the test run.
+        socket.on("error", () => {
+          resolve("");
+        });
         socket.on("close", () => {
           resolve(data.split("\r\n")[0] ?? "");
         });
@@ -295,17 +299,22 @@ describe("listen", () => {
       { host: "127.0.0.1", port: 0, logger: silentLogger },
     );
     // A request as Node delivers it after cutting the header list at the limit.
-    const written: { status?: number; body?: string } = {};
+    const written: { status?: number; headers?: Record<string, string>; body?: string } = {};
     const res = {
-      writeHead: (status: number) => {
+      writeHead: (status: number, headers: Record<string, string>) => {
         written.status = status;
+        written.headers = headers;
       },
       end: (body: string) => {
         written.body = body;
       },
     };
     server.emit("request", { method: "GET", rawHeaders: Array<string>(200).fill("x") }, res);
-    expect(written).toEqual({ status: 431, body: '{"error":"too_many_headers"}' });
+    expect(written).toEqual({
+      status: 431,
+      headers: { "Content-Type": "application/json", Connection: "close" },
+      body: '{"error":"too_many_headers"}',
+    });
     expect(called).toBe(false);
   });
 
