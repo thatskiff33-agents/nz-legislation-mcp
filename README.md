@@ -42,6 +42,9 @@ The key is personal: PCO's terms do not allow it to be shared.
    npx -y nz-legislation-mcp setup
    ```
 
+   If your terminal can't hide typing (for example Git Bash on Windows), setup stops
+   without reading the key: use PowerShell or Windows Terminal, or `--key-stdin`.
+
 2. Add the server to your AI client. For example, Claude Code:
 
    ```sh

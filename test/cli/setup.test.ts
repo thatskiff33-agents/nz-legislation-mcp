@@ -4,7 +4,11 @@ import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { apiErrors } from "../../src/api/errors.js";
 import { runSetup, verifyWithApi, type SetupIo } from "../../src/cli/setup.js";
-import { InputCancelledError } from "../../src/cli/terminal.js";
+import {
+  InputCancelledError,
+  InputNotHiddenError,
+  TerminalReadError,
+} from "../../src/cli/terminal.js";
 import { DUMMY_KEY } from "../dummy-key.js";
 import { fakeFetch, json, status } from "../api/fake-fetch.js";
 import { fixture } from "../fixtures.js";
@@ -67,9 +71,24 @@ describe("setup", () => {
     expect(await runSetup([], cancelled.value)).toBe(130);
     expect(cancelled.err.join("")).toContain("Cancelled. Nothing was saved.");
     const failed = io({ readStdin: () => Promise.reject(new Error("EIO")) });
-    expect(await runSetup(["--key-stdin"], failed.value)).toBe(130);
+    expect(await runSetup(["--key-stdin"], failed.value)).toBe(1);
     expect(failed.err.join("")).toContain("Could not read the key.");
     expect(() => statSync(failed.path)).toThrow();
+    const broken = io({
+      readSecret: () => Promise.reject(new TerminalReadError("Could not read from the terminal.")),
+    });
+    expect(await runSetup([], broken.value)).toBe(1);
+    expect(broken.err.join("")).toContain("Could not read from the terminal. Nothing was saved.");
+  });
+
+  it("refuses, saving nothing, when the terminal cannot hide the key", async () => {
+    const t = io({
+      readSecret: () =>
+        Promise.reject(new InputNotHiddenError("This terminal can't hide your key.")),
+    });
+    expect(await runSetup([], t.value)).toBe(1);
+    expect(t.err.join("")).toBe("This terminal can't hide your key.\n");
+    expect(() => statSync(t.path)).toThrow();
   });
 
   it("reads the key from standard input and can skip verification", async () => {

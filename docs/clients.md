@@ -12,7 +12,9 @@ Run this once. It asks for your key (input hidden), checks it with the Legislati
 npx -y nz-legislation-mcp setup
 ```
 
-Check everything is working at any time with `npx -y nz-legislation-mcp doctor`.
+If your terminal can't hide typing (for example Git Bash or mintty on Windows), setup stops without reading the key. Run it in PowerShell or Windows Terminal instead, or pipe the key in with `--key-stdin`.
+
+Check everything is working at any time with `npx -y nz-legislation-mcp doctor`. It exits with code 1 if a required check fails (Node.js, the key, the Legislation API). A warning about legislation.govt.nz, which only the text tools need, is reported but does not change the exit code.
 
 Node.js 22 or later is required.
 

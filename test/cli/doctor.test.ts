@@ -31,7 +31,10 @@ describe("doctor", () => {
     expect(r.code).toBe(0);
     expect(r.text).toContain("[ok] Legislation API: reachable; 9876 of 10000 requests left today");
     expect(r.text).toContain("[ok] legislation.govt.nz (for text): reachable");
-    expect(r.text).toContain("All checks passed.");
+    expect(r.text).toContain(
+      "[ok] API key: found and well-formed, from the environment variable LEGISLATION_NZ_API_KEY",
+    );
+    expect(r.text).toContain("\nAll checks passed.\n");
     expect(r.text).not.toContain(DUMMY_KEY);
   });
 
@@ -54,12 +57,15 @@ describe("doctor", () => {
       "[fail] Legislation API: The Legislation API rejected the API key",
     );
     expect(rejected.text).toContain("[warn] legislation.govt.nz (for text): HTTP 503");
+    expect(rejected.text).toContain("\nSome required checks failed.\n");
     const offline = await doctor({ LEGISLATION_NZ_API_KEY: DUMMY_KEY }, [
       json(fixture("search-works"), 200, {}),
       new TypeError("offline"),
     ]);
     expect(offline.text).toContain("[ok] Legislation API: reachable\n");
     expect(offline.text).toContain("[warn] legislation.govt.nz (for text): not reachable");
+    expect(offline.text).toContain("\nAll required checks passed, with warnings.\n");
+    expect(offline.text).not.toContain("All checks passed.");
     expect(offline.code).toBe(0);
   });
 

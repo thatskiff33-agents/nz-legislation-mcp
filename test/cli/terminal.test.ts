@@ -1,10 +1,19 @@
 import { EventEmitter } from "node:events";
 import { describe, expect, it, vi } from "vitest";
-import { InputCancelledError, readAll, readSecret, type Input } from "../../src/cli/terminal.js";
+import {
+  InputCancelledError,
+  InputNotHiddenError,
+  TerminalReadError,
+  readAll,
+  readSecret,
+  type Input,
+} from "../../src/cli/terminal.js";
 
-function fakeInput(
-  tty: boolean,
-): Input & { emit: (event: string, value?: unknown) => boolean; raw: boolean[] } {
+function fakeInput(tty: boolean): Input & {
+  emit: (event: string, value?: unknown) => boolean;
+  listenerCount: (event: string) => number;
+  raw: boolean[];
+} {
   const emitter = new EventEmitter();
   const raw: boolean[] = [];
   return Object.assign(emitter, {
@@ -50,20 +59,35 @@ describe("readSecret", () => {
     expect(await result).toBe("my-key");
   });
 
-  it("cancels (and restores the terminal) if the input stream fails", async () => {
+  it("fails (and restores the terminal) if the input stream fails", async () => {
     const input = fakeInput(true);
     const result = readSecret("", input, () => undefined);
     input.emit("error", new Error("EIO"));
-    await expect(result).rejects.toBeInstanceOf(InputCancelledError);
+    await expect(result).rejects.toBeInstanceOf(TerminalReadError);
     expect(input.raw.at(-1)).toBe(false);
   });
 
-  it("reads a line without a terminal, and accepts end of input", async () => {
-    const input = fakeInput(false);
+  it("accepts end of input on a terminal", async () => {
+    const input = fakeInput(true);
     const result = readSecret("", input, () => undefined);
-    input.emit("data", "piped-key");
+    input.emit("data", "typed-key");
     input.emit("end");
-    expect(await result).toBe("piped-key");
+    expect(await result).toBe("typed-key");
+  });
+
+  it.each([
+    ["not a terminal", { isTTY: false }],
+    ["isTTY undefined (e.g. mintty without winpty)", { isTTY: undefined }],
+    ["a terminal without raw mode", { setRawMode: undefined }],
+  ])("refuses before prompting or reading when input is %s", async (_case, override) => {
+    const input = Object.assign(fakeInput(true), override);
+    const out: string[] = [];
+    await expect(readSecret("Key: ", input, (t) => out.push(t))).rejects.toBeInstanceOf(
+      InputNotHiddenError,
+    );
+    expect(out).toEqual([]);
+    expect(input.resume).not.toHaveBeenCalled();
+    expect(input.listenerCount("data")).toBe(0);
   });
 });
 

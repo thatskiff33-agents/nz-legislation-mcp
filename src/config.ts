@@ -27,6 +27,8 @@ type CacheMode = (typeof CACHE_MODES)[number];
 
 export interface Config {
   readonly apiKey: Secret;
+  /** Where the key came from, for messages (never the key itself). */
+  readonly keySource: string;
   readonly timeoutMs: number;
   readonly cache: CacheMode;
   readonly logLevel: LogLevel;
@@ -212,6 +214,7 @@ export function loadConfig(
   const file = env[ENV.apiKeyFile];
 
   let key: string | undefined;
+  let keySource = "";
   if (direct !== undefined && direct !== "" && file !== undefined && file !== "") {
     problems.push(`Set only one of ${ENV.apiKey} or ${ENV.apiKeyFile}, not both.`);
   } else if (file !== undefined && file !== "") {
@@ -225,12 +228,18 @@ export function loadConfig(
     if (contents !== undefined) {
       const result = validateKey(contents, `The file named by ${ENV.apiKeyFile}`);
       if (result instanceof Error) problems.push(result.message);
-      else key = result;
+      else {
+        key = result;
+        keySource = `the file named by ${ENV.apiKeyFile} (${file})`;
+      }
     }
   } else if (direct !== undefined && direct !== "") {
     const result = validateKey(direct, ENV.apiKey);
     if (result instanceof Error) problems.push(result.message);
-    else key = result;
+    else {
+      key = result;
+      keySource = `the environment variable ${ENV.apiKey}`;
+    }
   } else {
     let contents: string | undefined;
     try {
@@ -246,7 +255,10 @@ export function loadConfig(
     } else if (contents !== undefined) {
       const result = validateKey(contents, `The key file ${keyFilePath}`);
       if (result instanceof Error) problems.push(result.message);
-      else key = result;
+      else {
+        key = result;
+        keySource = `the key file saved by setup (${keyFilePath})`;
+      }
     }
   }
 
@@ -261,5 +273,5 @@ export function loadConfig(
   const logLevel = parseOption(env, ENV.logLevel, z.enum(LOG_LEVELS), "info", problems);
 
   if (key === undefined || problems.length > 0) throw new ConfigError(problems);
-  return { apiKey: new Secret(key), timeoutMs, cache, logLevel };
+  return { apiKey: new Secret(key), keySource, timeoutMs, cache, logLevel };
 }
