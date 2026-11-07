@@ -2,7 +2,7 @@
   "manifest_version": "0.3",
   "name": "nz-legislation-mcp",
   "display_name": "NZ Legislation",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Search and read New Zealand legislation via the official PCO Legislation API.",
   "long_description": "Unofficial, security-hardened MCP server for the New Zealand Legislation API. Bring your own API key. Unofficial: not affiliated with the Parliamentary Counsel Office. Check the official version on legislation.govt.nz.",
   "author": {

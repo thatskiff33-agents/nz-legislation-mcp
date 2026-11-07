@@ -1,7 +1,7 @@
 {
   "name": "nz-legislation-mcp",
   "mcpName": "io.github.thatskiff33/nz-legislation-mcp",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Unofficial, security-hardened MCP server for the New Zealand Legislation API. Bring your own API key.",
   "license": "Apache-2.0",
   "author": "nz-legislation-mcp contributors",

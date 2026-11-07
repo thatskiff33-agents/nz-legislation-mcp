@@ -2,7 +2,7 @@
   "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
   "name": "nz-legislation-mcp",
   "displayName": "NZ Legislation",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Search and read New Zealand legislation via the official PCO Legislation API.",
   "author": {
     "name": "nz-legislation-mcp contributors",
