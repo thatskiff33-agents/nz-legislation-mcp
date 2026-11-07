@@ -78,7 +78,7 @@ To use one:
      --certificate-identity https://github.com/thatskiff33/nz-legislation-mcp/.github/workflows/container.yml@refs/heads/main
    ```
 
-   The identity is the workflow file and the branch it ran from (`job_workflow_ref`). On 1.0.1 the signing certificate's subject matched it (checked by reading the certificate; a full `cosign verify` run is still to be recorded on #11). If verification fails, compare it with the certificate's subject in `cosign verify ... --certificate-identity-regexp '.*' -o json` and report it.
+   The identity is the workflow file and the branch it ran from (`job_workflow_ref`). On 1.0.1 this command passed (cosign v3.1.4, 7 November 2026, recorded on #11), and the same command with a different workflow in the identity failed. If verification fails on the identity, cosign's error (v3.1.4) names the identity it found (`expected SAN value "...", got "..."`); report that value.
 
 2. Set `NZLM_IMAGE` in `deploy/.env` to that digest, for example `ghcr.io/thatskiff33/nz-legislation-mcp:1.0.1@sha256:<digest>`. A tag can later be moved; a digest cannot. Never use an unpinned `latest`.
 
