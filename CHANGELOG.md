@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.2](https://github.com/thatskiff33/nz-legislation-mcp/compare/v1.0.1...v1.0.2) (2026-11-07)
+
+
+### Bug Fixes
+
+* **cli:** show a person-facing message when the key is rejected (401) ([#91](https://github.com/thatskiff33/nz-legislation-mcp/issues/91)) ([c0caae3](https://github.com/thatskiff33/nz-legislation-mcp/commit/c0caae3d002e88f7f1173ed22664f117880b1569))
+
 ## [1.0.1](https://github.com/thatskiff33/nz-legislation-mcp/compare/v1.0.0...v1.0.1) (2026-11-06)
 
 
