@@ -21,6 +21,7 @@ import { defaultKeyFilePath, validateKey } from "../config.js";
 import { Secret } from "../secret.js";
 import { InputCancelledError, InputNotHiddenError, TerminalReadError } from "./terminal.js";
 import { CLIENT_SETUP_HINT } from "./clients.js";
+import { terminalMessage } from "./messages.js";
 
 export interface SetupIo {
   readonly env: Readonly<Record<string, string | undefined>>;
@@ -119,7 +120,10 @@ export async function runSetup(argv: readonly string[], io: SetupIo): Promise<nu
       await io.verify(key);
       io.stdout("Key checked with the Legislation API: OK.\n");
     } catch (error) {
-      const message = error instanceof ApiError ? error.message : "The key could not be checked.";
+      const message =
+        error instanceof ApiError
+          ? terminalMessage(error, "setup")
+          : "The key could not be checked.";
       io.stderr(`${message}\nNothing was saved. Use --no-verify to save it anyway.\n`);
       return 1;
     }

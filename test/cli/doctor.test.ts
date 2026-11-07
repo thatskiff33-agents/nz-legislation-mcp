@@ -57,8 +57,9 @@ describe("doctor", () => {
     ]);
     expect(rejected.code).toBe(1);
     expect(rejected.text).toContain(
-      "[fail] Legislation API: The Legislation API rejected the API key",
+      '[fail] Legislation API: The Legislation API rejected the API key (401). Check that it is your current key from PCO; the API key line above shows where it came from. To replace the key saved by setup, run "npx -y nz-legislation-mcp setup --force".\n',
     );
+    expect(rejected.text).not.toContain("The user should");
     expect(rejected.text).toContain("[warn] legislation.govt.nz (for text): HTTP 503");
     expect(rejected.text).toContain("\nSome required checks failed.\n");
     const offline = await doctor({ ...NO_KEY, LEGISLATION_NZ_API_KEY: DUMMY_KEY }, [

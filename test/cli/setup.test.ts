@@ -117,9 +117,18 @@ describe("setup", () => {
   it("does not save a key the API rejects", async () => {
     const t = io({ verify: () => Promise.reject(apiErrors.unauthorised()) });
     expect(await runSetup([], t.value)).toBe(1);
-    expect(t.err.join("")).toContain("rejected the API key");
-    expect(t.err.join("")).toContain("Nothing was saved");
+    const said = t.err.join("");
+    expect(said).toContain(
+      "The Legislation API rejected the API key (401). Check that you copied the whole key PCO sent you and that it is your current key.\nNothing was saved. Use --no-verify to save it anyway.\n",
+    );
+    // The model-facing guidance (about "the user" and AI clients) is not shown to a person.
+    expect(said).not.toContain("The user should");
+    expect(said).not.toContain("Do not retry");
     expect(() => statSync(t.path)).toThrow();
+    const quota = io({ verify: () => Promise.reject(apiErrors.dailyQuota()) });
+    expect(await runSetup([], quota.value)).toBe(1);
+    expect(quota.err.join("")).toContain(apiErrors.dailyQuota().message);
+    expect(() => statSync(quota.path)).toThrow();
     const odd = io({ verify: () => Promise.reject(new Error("weird")) });
     expect(await runSetup([], odd.value)).toBe(1);
     expect(odd.err.join("")).toContain("The key could not be checked.");

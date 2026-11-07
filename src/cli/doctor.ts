@@ -12,6 +12,7 @@ import { existsSync } from "node:fs";
 import { defaultKeyFilePath, loadConfig, type ConfigError } from "../config.js";
 import { WEBSITE_ORIGIN } from "../domain/vocabulary.js";
 import { MIN_NODE_MAJOR, USER_AGENT, VERSION } from "../version.js";
+import { terminalMessage } from "./messages.js";
 
 export interface DoctorIo {
   readonly env: Readonly<Record<string, string | undefined>>;
@@ -76,7 +77,7 @@ export async function runDoctor(io: DoctorIo): Promise<number> {
       );
     } catch (error) {
       // The client only rejects with ApiError here (inputs are fixed and valid).
-      report("fail", "Legislation API", (error as ApiError).message);
+      report("fail", "Legislation API", terminalMessage(error as ApiError, "doctor"));
     }
   }
 
