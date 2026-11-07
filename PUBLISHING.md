@@ -94,9 +94,8 @@ cancelled.
 Do these in order. Each one is an outward-facing change, made by a maintainer or with the
 owner's approval.
 
-Status on 7 November 2026: steps 1 to 3 and 5 to 7 are done (#53, #11), and 1.0.1 is the first
-published release. Still to do, in step 4: unpublish the placeholders and turn on "disallow
-tokens".
+Status on 7 November 2026: all seven steps are done (#53, #11), and 1.0.1 is the first published
+release. The step 4 Publishing access setting is as reported by the owner.
 
 1. Release App: release-please and the plugin-pin job write with a dedicated GitHub App, not
    the workflow's own token. Only the App may then create release tags (step 5), and the release
@@ -136,7 +135,9 @@ tokens".
      (`npm unpublish nz-legislation-mcp@<version>`, naming each version), so only real releases
      remain. Unpublishing is limited by npm's
      [unpublish policy](https://docs.npmjs.com/policies/unpublish), which adds conditions once a
-     package is more than 72 hours old.
+     package is more than 72 hours old. Done on 7 November 2026: the public registry (read at about
+     00:09 UTC) lists only 1.0.1, with the single dist-tag `latest` (#11). npm keeps the removed
+     version numbers in the package's `time` history, and they cannot be reused.
    - Add the trusted publisher (npm 11.15.0 or later), or use the package's settings page on
      npmjs.com with the same owner, repository, workflow and environment:
 
@@ -151,7 +152,10 @@ tokens".
      `npm trust revoke --id <id>`) and add it again.
    - Trusted publishing needs npm 11.5.1 or later (the workflow publishes with Node 24's npm).
    - After the first release publishes from CI: the package's settings, Publishing access,
-     "Require two-factor authentication and disallow tokens".
+     "Require two-factor authentication and disallow bypass 2fa tokens (recommended)" (npm's
+     wording on 7 November 2026, as reported by the owner; earlier versions of this guide said
+     "disallow tokens"). Reported set by the owner on 7 November 2026; the agent could not view
+     the setting (#11).
 5. Repository settings, Rules, New tag ruleset: target tags matching `v*`, enforcement
    active, rules "Restrict creations", "Restrict updates" and "Restrict deletions", and add the
    release App (step 1) as the only bypass actor, with bypass mode "Always allow" ("For pull requests only" would block tag creation). Release tags can then only be created with the
