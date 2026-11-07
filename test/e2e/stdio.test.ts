@@ -72,7 +72,7 @@ describe("stdio binary", () => {
   it("exits 1 with a readable message when no key is configured", () => {
     const run = spawnSync(process.execPath, [CLI], {
       // Isolate the key file on every platform: XDG_CONFIG_HOME on Linux and macOS, APPDATA on
-      // Windows (without it, the server would find a real key saved by setup; #92).
+      // Windows (without it, the server could find a real key saved by setup; #92).
       env: {
         PATH: process.env["PATH"] ?? "",
         XDG_CONFIG_HOME: "/nonexistent-nzlm-test",
