@@ -68,7 +68,7 @@ Release images are published (from 1.0.1) to `ghcr.io/thatskiff33/nz-legislation
 
 To use one:
 
-1. Look up the digest of the version you want, then verify the signature of that digest. Releases are signed by this repository's `container.yml` workflow, run from `main` by the release workflow:
+1. Look up the digest of the version you want, then verify the signature of that digest. Releases are signed by this repository's `container.yml` workflow, run from `main` by the release workflow. Use cosign v3 or later: releases are signed with cosign v3, and on 7 November 2026 cosign v2.4.1 reported "no signatures found" for 1.0.1, while v3.0.2 and v3.1.4 verified it.
 
    ```sh
    digest="$(docker buildx imagetools inspect ghcr.io/thatskiff33/nz-legislation-mcp:1.0.1 \
