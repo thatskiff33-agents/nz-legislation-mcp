@@ -14,9 +14,9 @@ const REJECTED = "The Legislation API rejected the API key (401).";
 
 const REJECTED_ADVICE: Readonly<Record<TerminalCommand, string>> = {
   // The person has just pasted the key, so the likely causes are a partial copy or an old key.
-  setup: `${REJECTED} Check that you copied the whole key from PCO's email and that it is your current key.`,
+  setup: `${REJECTED} Check that you copied the whole key PCO sent you and that it is your current key.`,
   // The "API key" line above names where the key came from.
-  doctor: `${REJECTED} Check that it is your current key from PCO; the API key line above shows where it came from. To replace the key saved by setup, run "npx nz-legislation-mcp setup --force".`,
+  doctor: `${REJECTED} Check that it is your current key from PCO; the API key line above shows where it came from. To replace the key saved by setup, run "npx -y nz-legislation-mcp setup --force".`,
 };
 
 /** The message to show a person at a terminal for an API error. */

@@ -119,7 +119,7 @@ describe("setup", () => {
     expect(await runSetup([], t.value)).toBe(1);
     const said = t.err.join("");
     expect(said).toContain(
-      "The Legislation API rejected the API key (401). Check that you copied the whole key from PCO's email and that it is your current key.\nNothing was saved. Use --no-verify to save it anyway.\n",
+      "The Legislation API rejected the API key (401). Check that you copied the whole key PCO sent you and that it is your current key.\nNothing was saved. Use --no-verify to save it anyway.\n",
     );
     // The model-facing guidance (about "the user" and AI clients) is not shown to a person.
     expect(said).not.toContain("The user should");
